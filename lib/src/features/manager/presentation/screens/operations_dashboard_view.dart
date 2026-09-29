@@ -1,0 +1,286 @@
+import 'package:flutter/material.dart';
+
+import '../../../farmer/presentation/widgets/farmer_formatters.dart';
+import '../../data/repositories/union_operations_repository.dart';
+import '../../domain/entities/operations_models.dart';
+import '../widgets/operations_widgets.dart';
+
+class OperationsDashboardView extends StatelessWidget {
+  const OperationsDashboardView({
+    super.key,
+    required this.repository,
+    required this.onOpenRequests,
+    required this.onOpenJobs,
+  });
+
+  final UnionOperationsRepository repository;
+  final VoidCallback onOpenRequests;
+  final VoidCallback onOpenJobs;
+
+  @override
+  Widget build(BuildContext context) {
+    final jobs = repository.jobs.take(3).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _PageTitle(
+          title: "Today's Overview",
+          subtitle: 'Requests, resources and field activity',
+        ),
+        _MetricWrap(
+          children: [
+            _CompactMetricCard(
+              value: '${repository.pendingRequestCount}',
+              label: 'Pending',
+              icon: Icons.pending_actions,
+              color: const Color(0xFFC8872B),
+            ),
+            _CompactMetricCard(
+              value: '${repository.activeJobs.length}',
+              label: 'Active',
+              icon: Icons.route,
+              color: const Color(0xFF277DA1),
+            ),
+            _CompactMetricCard(
+              value: '${repository.completedTodayCount}',
+              label: 'Completed',
+              icon: Icons.task_alt,
+              color: const Color(0xFF2F6F4E),
+            ),
+          ],
+        ),
+        const SizedBox(height: 22),
+        _DashboardPanel(
+          title: 'Attention Needed',
+          icon: Icons.priority_high_rounded,
+          child: Column(
+            children: [
+              _AttentionRow(
+                icon: Icons.warning_amber_outlined,
+                text:
+                    '${repository.pendingRequestCount} requests awaiting approval',
+                onTap: onOpenRequests,
+              ),
+              const Divider(height: 24),
+              _AttentionRow(
+                icon: Icons.build_outlined,
+                text:
+                    '${repository.maintenanceCount} tractor under maintenance',
+              ),
+              const Divider(height: 24),
+              _AttentionRow(
+                icon: Icons.fact_check_outlined,
+                text: '1 completed job awaiting verification',
+                onTap: onOpenJobs,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        _DashboardPanel(
+          title: "Today's Jobs",
+          icon: Icons.event_note_outlined,
+          child: Column(
+            children: [
+              for (final job in jobs) ...[
+                _TodayJobRow(job: job),
+                if (job != jobs.last) const Divider(height: 24),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DashboardPanel extends StatelessWidget {
+  const _DashboardPanel({
+    required this.title,
+    required this.icon,
+    required this.child,
+  });
+
+  final String title;
+  final IconData icon;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return OperationsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: theme.colorScheme.primary, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                title,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _MetricWrap extends StatelessWidget {
+  const _MetricWrap({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth < 420 ? 1 : 3;
+        final width = (constraints.maxWidth - (columns - 1) * 10) / columns;
+        return Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: children
+              .map((child) => SizedBox(width: width, child: child))
+              .toList(),
+        );
+      },
+    );
+  }
+}
+
+class _CompactMetricCard extends StatelessWidget {
+  const _CompactMetricCard({
+    required this.value,
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+
+  final String value;
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return OperationsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                value,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+        ],
+      ),
+    );
+  }
+}
+
+class _AttentionRow extends StatelessWidget {
+  const _AttentionRow({required this.icon, required this.text, this.onTap});
+
+  final IconData icon;
+  final String text;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Row(
+        children: [
+          Icon(icon, color: Theme.of(context).colorScheme.secondary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ),
+          if (onTap != null) const Icon(Icons.chevron_right),
+        ],
+      ),
+    );
+  }
+}
+
+class _TodayJobRow extends StatelessWidget {
+  const _TodayJobRow({required this.job});
+
+  final OperationsJob job;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 58,
+          child: Text(
+            formatTime(job.scheduledAt),
+            style: Theme.of(
+              context,
+            ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800),
+          ),
+        ),
+        Expanded(child: Text('${job.serviceType.label} - ${job.tractor.id}')),
+        OperationsStatusChip.job(jobStatus: job.status),
+      ],
+    );
+  }
+}
+
+class _PageTitle extends StatelessWidget {
+  const _PageTitle({required this.title, required this.subtitle});
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 4),
+          Text(subtitle),
+        ],
+      ),
+    );
+  }
+}
