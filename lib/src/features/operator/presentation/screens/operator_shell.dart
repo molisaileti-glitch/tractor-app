@@ -10,11 +10,11 @@ class OperatorShell extends StatefulWidget {
   const OperatorShell({
     super.key,
     required this.repository,
-    required this.onSwitchWorkspace,
+    required this.onLogout,
   });
 
   final OperatorLocalRepository repository;
-  final VoidCallback onSwitchWorkspace;
+  final VoidCallback onLogout;
 
   @override
   State<OperatorShell> createState() => _OperatorShellState();
@@ -29,7 +29,7 @@ class _OperatorShellState extends State<OperatorShell> {
       OperatorJobsScreen(repository: widget.repository),
       OperatorMapScreen(repository: widget.repository),
       OperatorHistoryScreen(repository: widget.repository),
-      OperatorProfileScreen(onSwitchWorkspace: widget.onSwitchWorkspace),
+      OperatorProfileScreen(onLogout: widget.onLogout),
     ];
 
     return AnimatedBuilder(

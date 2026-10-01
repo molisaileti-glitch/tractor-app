@@ -50,92 +50,70 @@ class OperationsDashboardView extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 22),
-        _DashboardPanel(
+        _DashboardSectionHeader(
           title: 'Attention Needed',
           icon: Icons.priority_high_rounded,
-          child: Column(
-            children: [
-              _AttentionRow(
-                icon: Icons.warning_amber_outlined,
-                text:
-                    '${repository.pendingRequestCount} requests awaiting approval',
-                onTap: onOpenRequests,
-              ),
-              const Divider(height: 24),
-              _AttentionRow(
-                icon: Icons.build_outlined,
-                text:
-                    '${repository.maintenanceCount} tractor under maintenance',
-              ),
-              const Divider(height: 24),
-              _AttentionRow(
-                icon: Icons.fact_check_outlined,
-                text: '1 completed job awaiting verification',
-                onTap: onOpenJobs,
-              ),
-            ],
-          ),
+        ),
+        const SizedBox(height: 10),
+        _AttentionCard(
+          icon: Icons.warning_amber_outlined,
+          text: '${repository.pendingRequestCount} requests awaiting approval',
+          onTap: onOpenRequests,
+        ),
+        const SizedBox(height: 10),
+        _AttentionCard(
+          icon: Icons.build_outlined,
+          text: '${repository.maintenanceCount} tractor under maintenance',
+        ),
+        const SizedBox(height: 10),
+        _AttentionCard(
+          icon: Icons.fact_check_outlined,
+          text: '1 completed job awaiting verification',
+          onTap: onOpenJobs,
         ),
         const SizedBox(height: 18),
-        _DashboardPanel(
+        _DashboardSectionHeader(
           title: "Today's Jobs",
           icon: Icons.event_note_outlined,
-          child: Column(
-            children: [
-              for (final job in jobs) ...[
-                _TodayJobRow(job: job),
-                if (job != jobs.last) const Divider(height: 24),
-              ],
-            ],
-          ),
         ),
+        const SizedBox(height: 10),
+        for (final job in jobs) ...[
+          _TodayJobCard(job: job),
+          if (job != jobs.last) const SizedBox(height: 10),
+        ],
       ],
     );
   }
 }
 
-class _DashboardPanel extends StatelessWidget {
-  const _DashboardPanel({
-    required this.title,
-    required this.icon,
-    required this.child,
-  });
+class _DashboardSectionHeader extends StatelessWidget {
+  const _DashboardSectionHeader({required this.title, required this.icon});
 
   final String title;
   final IconData icon;
-  final Widget child;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return OperationsCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: theme.colorScheme.primary, size: 20),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                title,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
+    return Row(
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primary.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(8),
           ),
-          const SizedBox(height: 16),
-          child,
-        ],
-      ),
+          child: Icon(icon, color: theme.colorScheme.primary, size: 20),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          title,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -203,8 +181,8 @@ class _CompactMetricCard extends StatelessWidget {
   }
 }
 
-class _AttentionRow extends StatelessWidget {
-  const _AttentionRow({required this.icon, required this.text, this.onTap});
+class _AttentionCard extends StatelessWidget {
+  const _AttentionCard({required this.icon, required this.text, this.onTap});
 
   final IconData icon;
   final String text;
@@ -212,18 +190,28 @@ class _AttentionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return OperationsCard(
       onTap: onTap,
       child: Row(
         children: [
-          Icon(icon, color: Theme.of(context).colorScheme.secondary),
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: Theme.of(
+                context,
+              ).colorScheme.secondary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: Theme.of(context).colorScheme.secondary),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               text,
               style: Theme.of(
                 context,
-              ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
+              ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w800),
             ),
           ),
           if (onTap != null) const Icon(Icons.chevron_right),
@@ -233,27 +221,46 @@ class _AttentionRow extends StatelessWidget {
   }
 }
 
-class _TodayJobRow extends StatelessWidget {
-  const _TodayJobRow({required this.job});
+class _TodayJobCard extends StatelessWidget {
+  const _TodayJobCard({required this.job});
 
   final OperationsJob job;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 58,
-          child: Text(
-            formatTime(job.scheduledAt),
-            style: Theme.of(
-              context,
-            ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800),
+    return OperationsCard(
+      child: Row(
+        children: [
+          Container(
+            width: 58,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              formatTime(job.scheduledAt),
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w900,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
           ),
-        ),
-        Expanded(child: Text('${job.serviceType.label} - ${job.tractor.id}')),
-        OperationsStatusChip.job(jobStatus: job.status),
-      ],
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              '${job.serviceType.label} - ${job.tractor.id}',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w800),
+            ),
+          ),
+          OperationsStatusChip.job(jobStatus: job.status),
+        ],
+      ),
     );
   }
 }

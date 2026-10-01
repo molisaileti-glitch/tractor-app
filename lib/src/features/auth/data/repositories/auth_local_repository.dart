@@ -2,11 +2,16 @@ import 'package:flutter/foundation.dart';
 
 import '../../../farmer/data/models/farmer_profile_model.dart';
 import '../../../farmer/domain/entities/farmer_profile.dart';
+import '../models/auth_challenge_model.dart';
+import '../remote/auth_remote_data_source.dart';
 import '../../domain/entities/auth_session.dart';
 import '../../domain/repositories/auth_repository.dart';
 
 class AuthLocalRepository extends ChangeNotifier implements AuthRepository {
-  AuthLocalRepository();
+  AuthLocalRepository({AuthRemoteDataSource? remoteDataSource})
+    : remoteDataSource = remoteDataSource ?? const AuthRemoteDataSource();
+
+  final AuthRemoteDataSource remoteDataSource;
 
   AuthSession _currentSession = const AuthSession(
     status: AuthSessionStatus.signedOut,
@@ -18,6 +23,33 @@ class AuthLocalRepository extends ChangeNotifier implements AuthRepository {
   AuthSession get currentSession => _currentSession;
 
   List<FarmerProfileModel> get farmers => List.unmodifiable(_farmers);
+
+  Future<AuthChallengeModel> requestLoginChallenge({
+    required String identifier,
+    required String password,
+    required String deviceName,
+  }) {
+    return remoteDataSource.login(
+      identifier: identifier,
+      password: password,
+      deviceName: deviceName,
+    );
+  }
+
+  Future<AuthSession> verifyRemoteOtp({
+    required String challengeId,
+    required String code,
+    required String deviceName,
+  }) async {
+    final verified = await remoteDataSource.verifyOtp(
+      challengeId: challengeId,
+      code: code,
+      deviceName: deviceName,
+    );
+    _currentSession = verified.toEntity();
+    notifyListeners();
+    return _currentSession;
+  }
 
   @override
   Future<AuthSession> signIn({
@@ -74,8 +106,16 @@ class AuthLocalRepository extends ChangeNotifier implements AuthRepository {
 
   @override
   Future<void> signOut() async {
+    final token = _currentSession.accessToken;
     _currentSession = const AuthSession(status: AuthSessionStatus.signedOut);
     notifyListeners();
+    if (token != null && token.isNotEmpty) {
+      try {
+        await remoteDataSource.logout(token: token);
+      } on AuthRemoteException {
+        // The local app should still return to Login even if remote logout fails.
+      }
+    }
   }
 
   String _offlinePasswordMarker(String password) {

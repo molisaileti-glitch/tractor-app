@@ -7,6 +7,9 @@ class AuthSession {
     this.role,
     this.accessToken,
     this.refreshToken,
+    this.permissions = const [],
+    this.tenantName,
+    this.userId,
   });
 
   final AuthSessionStatus status;
@@ -14,6 +17,9 @@ class AuthSession {
   final String? role;
   final String? accessToken;
   final String? refreshToken;
+  final List<String> permissions;
+  final String? tenantName;
+  final String? userId;
 
   bool get isSignedIn => status == AuthSessionStatus.signedIn;
 }

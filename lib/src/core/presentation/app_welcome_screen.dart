@@ -7,7 +7,6 @@ class AppWelcomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
     return Scaffold(
       body: Stack(
         fit: StackFit.expand,
@@ -15,9 +14,7 @@ class AppWelcomeScreen extends StatelessWidget {
           Image.asset(
             'assets/images/tractor.jpeg',
             fit: BoxFit.cover,
-            alignment: size.width > 700
-                ? Alignment.centerRight
-                : Alignment.center,
+            alignment: Alignment.topCenter,
           ),
           DecoratedBox(
             decoration: BoxDecoration(
@@ -25,23 +22,11 @@ class AppWelcomeScreen extends StatelessWidget {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  const Color(0xFFFFF3D6).withValues(alpha: 0.08),
-                  const Color(0xFFF6DBA6).withValues(alpha: 0.40),
-                  const Color(0xFFF2C978).withValues(alpha: 0.88),
+                  Colors.black.withValues(alpha: 0.20),
+                  const Color(0xFF173B2A).withValues(alpha: 0.32),
+                  const Color(0xFF173B2A).withValues(alpha: 0.78),
                 ],
-                stops: const [0.0, 0.48, 1.0],
-              ),
-            ),
-          ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [
-                  const Color(0xFF26553C).withValues(alpha: 0.48),
-                  Colors.transparent,
-                ],
+                stops: const [0.0, 0.45, 1.0],
               ),
             ),
           ),
@@ -65,7 +50,7 @@ class AppWelcomeScreen extends StatelessWidget {
                             textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.displaySmall
                                 ?.copyWith(
-                                  color: const Color(0xFF173B2A),
+                                  color: Colors.white,
                                   fontWeight: FontWeight.w900,
                                   height: 0.95,
                                 ),
@@ -76,7 +61,7 @@ class AppWelcomeScreen extends StatelessWidget {
                             textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.titleLarge
                                 ?.copyWith(
-                                  color: const Color(0xFF214634),
+                                  color: Colors.white,
                                   fontWeight: FontWeight.w800,
                                   height: 1.12,
                                 ),
@@ -87,7 +72,9 @@ class AppWelcomeScreen extends StatelessWidget {
                             textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.bodyLarge
                                 ?.copyWith(
-                                  color: const Color(0xFF31513D),
+                                  color: const Color(
+                                    0xFFFFF8E8,
+                                  ).withValues(alpha: 0.88),
                                   height: 1.35,
                                   fontWeight: FontWeight.w600,
                                 ),

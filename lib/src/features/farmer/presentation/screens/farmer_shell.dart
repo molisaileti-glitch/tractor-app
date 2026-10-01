@@ -10,11 +10,11 @@ class FarmerShell extends StatefulWidget {
   const FarmerShell({
     super.key,
     required this.repository,
-    required this.onSwitchWorkspace,
+    required this.onLogout,
   });
 
   final FarmerLocalRepository repository;
-  final VoidCallback onSwitchWorkspace;
+  final VoidCallback onLogout;
 
   @override
   State<FarmerShell> createState() => _FarmerShellState();
@@ -29,10 +29,7 @@ class _FarmerShellState extends State<FarmerShell> {
       FarmerHomeScreen(repository: widget.repository, onOpenPlots: _openPlots),
       RequestsScreen(repository: widget.repository),
       PlotsScreen(repository: widget.repository),
-      ProfileScreen(
-        repository: widget.repository,
-        onSwitchWorkspace: widget.onSwitchWorkspace,
-      ),
+      ProfileScreen(repository: widget.repository, onLogout: widget.onLogout),
     ];
 
     return AnimatedBuilder(

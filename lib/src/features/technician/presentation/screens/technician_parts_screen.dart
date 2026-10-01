@@ -7,11 +7,11 @@ class TechnicianPartsScreen extends StatelessWidget {
   const TechnicianPartsScreen({
     super.key,
     required this.technicianRepository,
-    required this.onSwitchWorkspace,
+    required this.onLogout,
   });
 
   final TechnicianLocalRepository technicianRepository;
-  final VoidCallback onSwitchWorkspace;
+  final VoidCallback onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -68,10 +68,10 @@ class TechnicianPartsScreen extends StatelessWidget {
                 const SizedBox(height: 12),
               ],
               const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: onSwitchWorkspace,
-                icon: const Icon(Icons.switch_account_outlined),
-                label: const Text('Switch Workspace'),
+              FilledButton.icon(
+                onPressed: onLogout,
+                icon: const Icon(Icons.logout),
+                label: const Text('Logout'),
               ),
             ],
           ),

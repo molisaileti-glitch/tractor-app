@@ -8,11 +8,7 @@ void main() {
     await tester.pumpWidget(const TractorApp());
     await _openLogin(tester);
 
-    await tester.tap(find.byTooltip('Back'));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('Farmer App'));
-    await tester.pumpAndSettle();
+    await _verifyOtp(tester, '101652');
 
     expect(find.text('Good morning, Juma'), findsOneWidget);
     expect(find.text('Request Service'), findsOneWidget);
@@ -29,11 +25,7 @@ void main() {
     await tester.pumpWidget(const TractorApp());
     await _openLogin(tester);
 
-    await tester.tap(find.byTooltip('Back'));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('Union Operations'));
-    await tester.pumpAndSettle();
+    await _verifyOtp(tester, '101650');
 
     expect(find.text("Today's Overview"), findsOneWidget);
     expect(find.text('Pending'), findsOneWidget);
@@ -44,11 +36,7 @@ void main() {
     await tester.pumpWidget(const TractorApp());
     await _openLogin(tester);
 
-    await tester.tap(find.byTooltip('Back'));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('Operator App'));
-    await tester.pumpAndSettle();
+    await _verifyOtp(tester, '101651');
 
     expect(find.text('Good morning, John'), findsOneWidget);
     expect(find.text("TODAY'S JOB"), findsOneWidget);
@@ -59,11 +47,7 @@ void main() {
     await tester.pumpWidget(const TractorApp());
     await _openLogin(tester);
 
-    await tester.tap(find.byTooltip('Back'));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('Technician'));
-    await tester.pumpAndSettle();
+    await _verifyOtp(tester, '101653');
 
     expect(find.text('Technician'), findsOneWidget);
     expect(find.text('TRACTOR STATUS'), findsOneWidget);
@@ -75,15 +59,19 @@ void main() {
     await _openLogin(tester);
 
     expect(find.text('Login'), findsWidgets);
-    expect(find.text('Phone number'), findsOneWidget);
+    expect(find.text('Phone number / Email'), findsOneWidget);
     expect(find.byTooltip('Send OTP'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Send OTP'));
+    await _tapSendOtp(tester);
     await tester.pumpAndSettle();
 
-    expect(find.text('OTP Verification'), findsOneWidget);
-    expect(find.text('Verify'), findsOneWidget);
-    expect(find.text('Resend'), findsOneWidget);
+    expect(find.text('OTP'), findsOneWidget);
+    expect(
+      find.text('Enter the 6-digit code sent to your phone'),
+      findsOneWidget,
+    );
+    expect(find.text('Continue'), findsOneWidget);
+    expect(find.text('Resend code'), findsOneWidget);
   });
 
   testWidgets('otp code 101650 opens union operations dashboard', (
@@ -92,17 +80,7 @@ void main() {
     await tester.pumpWidget(const TractorApp());
     await _openLogin(tester);
 
-    await tester.tap(find.byTooltip('Send OTP'));
-    await tester.pumpAndSettle();
-
-    const code = '101650';
-    for (var index = 0; index < code.length; index++) {
-      await tester.enterText(find.byKey(ValueKey('otp-digit-$index')), code[index]);
-      await tester.pump();
-    }
-
-    await tester.tap(find.text('Verify'));
-    await tester.pumpAndSettle();
+    await _verifyOtp(tester, '101650');
 
     expect(find.text("Today's Overview"), findsOneWidget);
     expect(find.text('Manager: Asha'), findsOneWidget);
@@ -114,4 +92,28 @@ Future<void> _openLogin(WidgetTester tester) async {
   expect(find.text('Get started'), findsOneWidget);
   await tester.tap(find.text('Get started'));
   await tester.pumpAndSettle();
+}
+
+Future<void> _verifyOtp(WidgetTester tester, String code) async {
+  await _tapSendOtp(tester);
+  await tester.pumpAndSettle();
+
+  for (var index = 0; index < code.length; index++) {
+    await tester.enterText(
+      find.byKey(ValueKey('otp-digit-$index')),
+      code[index],
+    );
+    await tester.pump();
+  }
+
+  await tester.ensureVisible(find.text('Continue'));
+  await tester.pump();
+  await tester.tap(find.text('Continue'));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _tapSendOtp(WidgetTester tester) async {
+  await tester.ensureVisible(find.byTooltip('Send OTP'));
+  await tester.pump();
+  await tester.tap(find.byTooltip('Send OTP'));
 }

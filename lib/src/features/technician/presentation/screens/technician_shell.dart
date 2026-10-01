@@ -12,12 +12,12 @@ class TechnicianShell extends StatefulWidget {
     super.key,
     required this.operationsRepository,
     required this.technicianRepository,
-    required this.onSwitchWorkspace,
+    required this.onLogout,
   });
 
   final UnionOperationsRepository operationsRepository;
   final TechnicianLocalRepository technicianRepository;
-  final VoidCallback onSwitchWorkspace;
+  final VoidCallback onLogout;
 
   @override
   State<TechnicianShell> createState() => _TechnicianShellState();
@@ -43,7 +43,7 @@ class _TechnicianShellState extends State<TechnicianShell> {
       ),
       TechnicianPartsScreen(
         technicianRepository: widget.technicianRepository,
-        onSwitchWorkspace: widget.onSwitchWorkspace,
+        onLogout: widget.onLogout,
       ),
     ];
 

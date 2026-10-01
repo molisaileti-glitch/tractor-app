@@ -27,11 +27,11 @@ class OperationsShell extends StatefulWidget {
   const OperationsShell({
     super.key,
     required this.repository,
-    required this.onSwitchWorkspace,
+    required this.onLogout,
   });
 
   final UnionOperationsRepository repository;
-  final VoidCallback onSwitchWorkspace;
+  final VoidCallback onLogout;
 
   @override
   State<OperationsShell> createState() => _OperationsShellState();
@@ -77,9 +77,7 @@ class _OperationsShellState extends State<OperationsShell> {
                           child: Column(
                             children: [
                               Expanded(child: _navList()),
-                              _SwitchWorkspaceButton(
-                                onPressed: widget.onSwitchWorkspace,
-                              ),
+                              _LogoutButton(onPressed: widget.onLogout),
                             ],
                           ),
                         ),
@@ -104,9 +102,9 @@ class _OperationsShellState extends State<OperationsShell> {
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
                         child: OutlinedButton.icon(
-                          onPressed: widget.onSwitchWorkspace,
-                          icon: const Icon(Icons.switch_account_outlined),
-                          label: const Text('Switch Workspace'),
+                          onPressed: widget.onLogout,
+                          icon: const Icon(Icons.logout),
+                          label: const Text('Logout'),
                         ),
                       ),
                     )
@@ -189,8 +187,8 @@ class _OperationsDrawer extends StatelessWidget {
   }
 }
 
-class _SwitchWorkspaceButton extends StatelessWidget {
-  const _SwitchWorkspaceButton({required this.onPressed});
+class _LogoutButton extends StatelessWidget {
+  const _LogoutButton({required this.onPressed});
 
   final VoidCallback onPressed;
 
@@ -200,8 +198,8 @@ class _SwitchWorkspaceButton extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       child: OutlinedButton.icon(
         onPressed: onPressed,
-        icon: const Icon(Icons.switch_account_outlined),
-        label: const Text('Switch Workspace'),
+        icon: const Icon(Icons.logout),
+        label: const Text('Logout'),
       ),
     );
   }
