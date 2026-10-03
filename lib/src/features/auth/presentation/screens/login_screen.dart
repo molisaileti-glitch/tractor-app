@@ -131,12 +131,13 @@ class _LoginScreenState extends State<LoginScreen> {
           phoneNumber: phoneNumber,
           onBack: () => Navigator.of(context).pop(),
           onVerified: _verifyCode,
+          onResend: _resendCode,
         ),
       ),
     );
   }
 
-  Future<bool> _verifyCode(String code) async {
+  Future<String?> _verifyCode(String code) async {
     if (_challengeId != null) {
       try {
         final session = await widget.repository.verifyRemoteOtp(
@@ -144,11 +145,11 @@ class _LoginScreenState extends State<LoginScreen> {
           code: code,
           deviceName: _deviceName,
         );
-        if (!mounted) return true;
+        if (!mounted) return null;
         _openWorkspaceForSession(session);
-        return true;
-      } on AuthRemoteException {
-        return false;
+        return null;
+      } on AuthRemoteException catch (error) {
+        return error.message;
       }
     }
 
@@ -160,15 +161,32 @@ class _LoginScreenState extends State<LoginScreen> {
       _ => null,
     };
 
-    if (route == null) return false;
+    if (route == null) return 'Invalid or expired code. Please try again.';
 
     await widget.repository.signIn(
       phoneOrEmail: _identifierController.text.trim(),
       password: 'otp:$code',
     );
-    if (!mounted) return true;
+    if (!mounted) return null;
     route();
-    return true;
+    return null;
+  }
+
+  Future<String?> _resendCode() async {
+    final challengeId = _challengeId;
+    if (challengeId == null) return null;
+
+    try {
+      final challenge = await widget.repository.resendRemoteOtp(
+        challengeId: challengeId,
+      );
+      if (challenge.challengeId.isNotEmpty) {
+        _challengeId = challenge.challengeId;
+      }
+      return null;
+    } on AuthRemoteException catch (error) {
+      return error.message;
+    }
   }
 
   void _openWorkspaceForSession(AuthSession session) {

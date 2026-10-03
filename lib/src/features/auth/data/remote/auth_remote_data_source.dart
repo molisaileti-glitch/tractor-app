@@ -68,7 +68,7 @@ class AuthRemoteDataSource {
 
   Future<AuthVerifiedSessionModel> me({required String token}) async {
     final json = await _get('/api/app/me', token: token);
-    return AuthVerifiedSessionModel.fromJson(_data(json));
+    return AuthVerifiedSessionModel.fromJson(_data(json), accessToken: token);
   }
 
   Future<void> logout({required String token}) async {

@@ -70,6 +70,18 @@ class OperatorProgressScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
+                  onPressed: () => _pause(context, job),
+                  icon: const Icon(Icons.pause_circle_outline),
+                  label: const Text('Pause'),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () => _resume(context, job),
+                  icon: const Icon(Icons.play_circle_outline),
+                  label: const Text('Resume'),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
                   onPressed: () => _showProblemDialog(context, job),
                   icon: const Icon(Icons.report_problem_outlined),
                   label: const Text('Report Problem'),
@@ -90,6 +102,30 @@ class OperatorProgressScreen extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pause(BuildContext context, OperatorJob job) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await repository.pauseJob(jobId: job.id, reason: 'Paused');
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          ok ? 'Job paused.' : repository.lastActionError ?? 'Pause failed.',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _resume(BuildContext context, OperatorJob job) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await repository.resumeJob(job.id);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          ok ? 'Job resumed.' : repository.lastActionError ?? 'Resume failed.',
         ),
       ),
     );
@@ -135,16 +171,22 @@ class OperatorProgressScreen extends StatelessWidget {
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: () {
-                repository.reportProblem(
+              onPressed: () async {
+                final messenger = ScaffoldMessenger.of(screenContext);
+                final ok = await repository.reportProblem(
                   jobId: job.id,
                   reason: reason,
                   notes: notesController.text.trim(),
                 );
                 Navigator.of(context).pop();
-                ScaffoldMessenger.of(screenContext).showSnackBar(
-                  const SnackBar(
-                    content: Text('Problem sent to dispatcher for review.'),
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      ok
+                          ? 'Problem sent to dispatcher for review.'
+                          : repository.lastActionError ??
+                                'Could not report problem.',
+                    ),
                   ),
                 );
               },

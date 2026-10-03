@@ -11,15 +11,20 @@ class OperationsDashboardView extends StatelessWidget {
     required this.repository,
     required this.onOpenRequests,
     required this.onOpenJobs,
+    required this.onOpenOversight,
   });
 
   final UnionOperationsRepository repository;
   final VoidCallback onOpenRequests;
   final VoidCallback onOpenJobs;
+  final VoidCallback onOpenOversight;
 
   @override
   Widget build(BuildContext context) {
     final jobs = repository.jobs.take(3).toList();
+    final awaitingVerification = repository.jobs
+        .where((job) => job.status == JobStatus.completedPendingConfirmation)
+        .length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -27,6 +32,16 @@ class OperationsDashboardView extends StatelessWidget {
           title: "Today's Overview",
           subtitle: 'Requests, resources and field activity',
         ),
+        if (repository.isSyncingMechanization) ...[
+          const LinearProgressIndicator(minHeight: 3),
+          const SizedBox(height: 14),
+        ] else if (repository.mechanizationSyncError != null) ...[
+          _SyncNotice(
+            message: repository.mechanizationSyncError!,
+            onRetry: repository.refreshMechanizationData,
+          ),
+          const SizedBox(height: 14),
+        ],
         _MetricWrap(
           children: [
             _CompactMetricCard(
@@ -46,6 +61,18 @@ class OperationsDashboardView extends StatelessWidget {
               label: 'Completed',
               icon: Icons.task_alt,
               color: const Color(0xFF2F6F4E),
+            ),
+            _CompactMetricCard(
+              value: '${repository.pendingOverrideCount}',
+              label: 'Overrides',
+              icon: Icons.rule_folder_outlined,
+              color: const Color(0xFFB45309),
+            ),
+            _CompactMetricCard(
+              value: '${repository.openExceptionCount}',
+              label: 'Exceptions',
+              icon: Icons.report_problem_outlined,
+              color: const Color(0xFFE11D48),
             ),
           ],
         ),
@@ -68,8 +95,21 @@ class OperationsDashboardView extends StatelessWidget {
         const SizedBox(height: 10),
         _AttentionCard(
           icon: Icons.fact_check_outlined,
-          text: '1 completed job awaiting verification',
+          text: '$awaitingVerification completed jobs awaiting verification',
           onTap: onOpenJobs,
+        ),
+        const SizedBox(height: 10),
+        _AttentionCard(
+          icon: Icons.rule_folder_outlined,
+          text:
+              '${repository.pendingOverrideCount} start override requests pending',
+          onTap: onOpenOversight,
+        ),
+        const SizedBox(height: 10),
+        _AttentionCard(
+          icon: Icons.report_problem_outlined,
+          text: '${repository.openExceptionCount} open exceptions',
+          onTap: onOpenOversight,
         ),
         const SizedBox(height: 18),
         _DashboardSectionHeader(
@@ -77,11 +117,47 @@ class OperationsDashboardView extends StatelessWidget {
           icon: Icons.event_note_outlined,
         ),
         const SizedBox(height: 10),
-        for (final job in jobs) ...[
-          _TodayJobCard(job: job),
-          if (job != jobs.last) const SizedBox(height: 10),
-        ],
+        if (jobs.isEmpty)
+          const OperationsCard(child: Text('No jobs loaded yet.'))
+        else
+          for (final job in jobs) ...[
+            _TodayJobCard(job: job),
+            if (job != jobs.last) const SizedBox(height: 10),
+          ],
       ],
+    );
+  }
+}
+
+class _SyncNotice extends StatelessWidget {
+  const _SyncNotice({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return OperationsCard(
+      child: Row(
+        children: [
+          Icon(
+            Icons.cloud_off_outlined,
+            color: Theme.of(context).colorScheme.error,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Retry',
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
+      ),
     );
   }
 }

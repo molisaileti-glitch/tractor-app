@@ -22,6 +22,7 @@ class OperatorCompleteJobScreen extends StatefulWidget {
 class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
   final _notesController = TextEditingController();
   final _areaController = TextEditingController(text: '4.1');
+  bool _submitting = false;
 
   @override
   void dispose() {
@@ -79,9 +80,11 @@ class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
                 ),
                 const SizedBox(height: 16),
                 FilledButton.icon(
-                  onPressed: _submit,
+                  onPressed: _submitting ? null : _submit,
                   icon: const Icon(Icons.send_outlined),
-                  label: const Text('Submit Completed Work'),
+                  label: Text(
+                    _submitting ? 'Submitting...' : 'Submit Completed Work',
+                  ),
                 ),
               ],
             ),
@@ -91,14 +94,28 @@ class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
     );
   }
 
-  void _submit() {
+  Future<void> _submit() async {
+    setState(() => _submitting = true);
     final messenger = ScaffoldMessenger.of(context);
     final area = double.tryParse(_areaController.text.trim()) ?? 4.1;
-    widget.repository.completeJob(
+    final ok = await widget.repository.completeJob(
       jobId: widget.jobId,
       areaServicedHectares: area,
       notes: _notesController.text.trim(),
     );
+    if (!mounted) return;
+    setState(() => _submitting = false);
+    if (!ok) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.repository.lastActionError ??
+                'Completed work could not be submitted.',
+          ),
+        ),
+      );
+      return;
+    }
     Navigator.of(context).popUntil((route) => route.isFirst);
     messenger.showSnackBar(
       const SnackBar(content: Text('Completed work submitted')),

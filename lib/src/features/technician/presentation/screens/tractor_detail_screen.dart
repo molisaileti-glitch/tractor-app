@@ -6,7 +6,7 @@ import '../../data/repositories/technician_local_repository.dart';
 import '../widgets/technician_widgets.dart';
 import 'log_maintenance_screen.dart';
 
-class TractorDetailScreen extends StatelessWidget {
+class TractorDetailScreen extends StatefulWidget {
   const TractorDetailScreen({
     super.key,
     required this.operationsRepository,
@@ -19,14 +19,32 @@ class TractorDetailScreen extends StatelessWidget {
   final String tractorId;
 
   @override
+  State<TractorDetailScreen> createState() => _TractorDetailScreenState();
+}
+
+class _TractorDetailScreenState extends State<TractorDetailScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _loadDetails();
+  }
+
+  Future<void> _loadDetails() async {
+    await widget.operationsRepository.refreshTractorDetails(widget.tractorId);
+    if (mounted) setState(() {});
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final tractor = operationsRepository.tractors.firstWhere(
-      (item) => item.id == tractorId,
+    final tractor = widget.operationsRepository.tractors.firstWhere(
+      (item) => item.id == widget.tractorId,
     );
-    final records = technicianRepository.recordsForTractor(tractorId);
+    final records = widget.technicianRepository.recordsForTractor(
+      widget.tractorId,
+    );
 
     return Scaffold(
-      appBar: AppBar(title: Text(tractor.id)),
+      appBar: AppBar(title: Text(tractor.assetNo ?? tractor.id)),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
         child: Align(
@@ -41,7 +59,7 @@ class TractorDetailScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        tractor.model,
+                        tractor.label ?? tractor.model,
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.w900,
                         ),
@@ -55,14 +73,50 @@ class TractorDetailScreen extends StatelessWidget {
                         label: 'Operating hours',
                         value: '${tractor.operatingHours} hrs',
                       ),
+                      if (tractor.registrationNo != null)
+                        _DetailRow(
+                          label: 'Registration',
+                          value: tractor.registrationNo,
+                        ),
+                      if (tractor.station != null)
+                        _DetailRow(label: 'Station', value: tractor.station),
+                      if (tractor.unionName != null)
+                        _DetailRow(label: 'Union', value: tractor.unionName),
+                      if (tractor.horsepower != null)
+                        _DetailRow(
+                          label: 'Horsepower',
+                          value: '${tractor.horsepower} HP',
+                        ),
+                      if (tractor.year != null)
+                        _DetailRow(label: 'Year', value: '${tractor.year}'),
                       _DetailRow(
-                        label: 'Last service',
-                        value: formatDate(DateTime(2026, 8, 10)),
+                        label: 'Online',
+                        value: tractor.online == true ? 'Yes' : 'No',
                       ),
-                      const _DetailRow(
-                        label: 'Next service',
-                        value: '2,000 hrs',
+                      _DetailRow(
+                        label: 'Inspected today',
+                        value: tractor.inspectedToday == true ? 'Yes' : 'No',
                       ),
+                      if (tractor.assignedOperators.isNotEmpty)
+                        _DetailRow(
+                          label: 'Operators',
+                          value: tractor.assignedOperators.join(', '),
+                        ),
+                      if (tractor.implementNames.isNotEmpty)
+                        _DetailRow(
+                          label: 'Implements',
+                          value: tractor.implementNames.join(', '),
+                        ),
+                      if (tractor.maintenanceDue.isNotEmpty)
+                        _DetailRow(
+                          label: 'Maintenance due',
+                          value: tractor.maintenanceDue.join(', '),
+                        ),
+                      if (tractor.maintenanceDue.isEmpty)
+                        _DetailRow(
+                          label: 'Last service',
+                          value: formatDate(DateTime(2026, 8, 10)),
+                        ),
                     ],
                   ),
                 ),
@@ -118,8 +172,8 @@ class TractorDetailScreen extends StatelessWidget {
                   onPressed: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => LogMaintenanceScreen(
-                        operationsRepository: operationsRepository,
-                        technicianRepository: technicianRepository,
+                        operationsRepository: widget.operationsRepository,
+                        technicianRepository: widget.technicianRepository,
                         tractorId: tractor.id,
                       ),
                     ),

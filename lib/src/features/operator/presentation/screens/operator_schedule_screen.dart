@@ -13,6 +13,12 @@ class OperatorScheduleScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final anchorDate = repository.jobs.isEmpty
+        ? DateTime.now()
+        : repository.jobs.first.scheduledAt;
+    final selectedJobs = repository.jobs
+        .where((job) => _sameDate(job.scheduledAt, anchorDate))
+        .toList();
     return Scaffold(
       appBar: AppBar(title: const Text('Schedule')),
       body: SingleChildScrollView(
@@ -27,7 +33,7 @@ class OperatorScheduleScreen extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      'September',
+                      formatDate(anchorDate),
                       style: Theme.of(context).textTheme.headlineSmall
                           ?.copyWith(fontWeight: FontWeight.w900),
                     ),
@@ -46,15 +52,18 @@ class OperatorScheduleScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 8),
-                const _OperatorWeekStrip(),
+                _OperatorWeekStrip(selectedDate: anchorDate),
                 const SizedBox(height: 12),
                 OperatorCard(
                   child: Column(
                     children: [
-                      for (final hour in [8, 9, 10, 11, 12, 13, 14])
+                      for (final hour in List.generate(
+                        14,
+                        (index) => index + 6,
+                      ))
                         _ScheduleHour(
                           hour: hour,
-                          jobs: repository.jobs
+                          jobs: selectedJobs
                               .where((job) => job.scheduledAt.hour == hour)
                               .toList(),
                           onOpen: (job) => Navigator.of(context).push(
@@ -76,22 +85,28 @@ class OperatorScheduleScreen extends StatelessWidget {
       ),
     );
   }
+
+  bool _sameDate(DateTime first, DateTime second) {
+    return first.year == second.year &&
+        first.month == second.month &&
+        first.day == second.day;
+  }
 }
 
 class _OperatorWeekStrip extends StatelessWidget {
-  const _OperatorWeekStrip();
+  const _OperatorWeekStrip({required this.selectedDate});
+
+  final DateTime selectedDate;
 
   @override
   Widget build(BuildContext context) {
-    const days = [
-      ('Mon', 22),
-      ('Tue', 23),
-      ('Wed', 24),
-      ('Thu', 25),
-      ('Fri', 26),
-      ('Sat', 27),
-      ('Sun', 28),
-    ];
+    final startOfWeek = selectedDate.subtract(
+      Duration(days: selectedDate.weekday - DateTime.monday),
+    );
+    final days = List.generate(
+      7,
+      (index) => startOfWeek.add(Duration(days: index)),
+    );
     return Row(
       children: [
         for (final day in days)
@@ -100,7 +115,7 @@ class _OperatorWeekStrip extends StatelessWidget {
               margin: const EdgeInsets.symmetric(horizontal: 3),
               padding: const EdgeInsets.symmetric(vertical: 9),
               decoration: BoxDecoration(
-                color: day.$2 == 28
+                color: _sameDate(day, selectedDate)
                     ? Theme.of(context).colorScheme.primary
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(10),
@@ -108,16 +123,20 @@ class _OperatorWeekStrip extends StatelessWidget {
               child: Column(
                 children: [
                   Text(
-                    day.$1,
+                    _weekday(day.weekday),
                     style: TextStyle(
-                      color: day.$2 == 28 ? Colors.white : Colors.black54,
+                      color: _sameDate(day, selectedDate)
+                          ? Colors.white
+                          : Colors.black54,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                   Text(
-                    '${day.$2}',
+                    '${day.day}',
                     style: TextStyle(
-                      color: day.$2 == 28 ? Colors.white : Colors.black87,
+                      color: _sameDate(day, selectedDate)
+                          ? Colors.white
+                          : Colors.black87,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -127,6 +146,16 @@ class _OperatorWeekStrip extends StatelessWidget {
           ),
       ],
     );
+  }
+
+  bool _sameDate(DateTime first, DateTime second) {
+    return first.year == second.year &&
+        first.month == second.month &&
+        first.day == second.day;
+  }
+
+  String _weekday(int weekday) {
+    return const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][weekday - 1];
   }
 }
 

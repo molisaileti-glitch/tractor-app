@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/union_operations_repository.dart';
 import '../../domain/entities/operations_models.dart';
 import '../widgets/operations_widgets.dart';
@@ -12,38 +11,47 @@ class TractorsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tractors = repository.tractors;
     return _DirectoryPage(
       title: 'Tractors',
       children: [
-        _PrettyGrid(
-          children: [
-            for (final tractor in repository.tractors)
-              OperationsCard(
-                child: Row(
-                  children: [
-                    const Icon(Icons.agriculture),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            tractor.id,
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w900),
-                          ),
-                          Text(tractor.model),
-                          Text('${tractor.operatingHours} operating hours'),
-                          if (tractor.note != null) Text(tractor.note!),
-                        ],
+        if (tractors.isEmpty)
+          const OperationsCard(child: Text('No tractors loaded yet.'))
+        else
+          _PrettyGrid(
+            children: [
+              for (final tractor in tractors)
+                OperationsCard(
+                  child: Row(
+                    children: [
+                      const Icon(Icons.agriculture),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              tractor.assetNo ?? tractor.id,
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w900),
+                            ),
+                            Text(tractor.model),
+                            if (tractor.registrationNo != null)
+                              Text(tractor.registrationNo!),
+                            Text('${tractor.operatingHours} operating hours'),
+                            if (tractor.station != null) Text(tractor.station!),
+                            if (tractor.note != null) Text(tractor.note!),
+                          ],
+                        ),
                       ),
-                    ),
-                    OperationsStatusChip.tractor(tractorStatus: tractor.status),
-                  ],
+                      OperationsStatusChip.tractor(
+                        tractorStatus: tractor.status,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-          ],
-        ),
+            ],
+          ),
       ],
     );
   }
@@ -56,38 +64,42 @@ class OperatorsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final operators = repository.operators;
     return _DirectoryPage(
       title: 'Operators',
       children: [
-        _PrettyGrid(
-          children: [
-            for (final operator in repository.operators)
-              OperationsCard(
-                child: Row(
-                  children: [
-                    const Icon(Icons.engineering_outlined),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            operator.name,
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w900),
-                          ),
-                          Text(operator.note ?? 'Ready for dispatch'),
-                        ],
+        if (operators.isEmpty)
+          const OperationsCard(child: Text('No operators loaded yet.'))
+        else
+          _PrettyGrid(
+            children: [
+              for (final operator in operators)
+                OperationsCard(
+                  child: Row(
+                    children: [
+                      const Icon(Icons.engineering_outlined),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              operator.name,
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w900),
+                            ),
+                            if (operator.note != null) Text(operator.note!),
+                          ],
+                        ),
                       ),
-                    ),
-                    OperationsStatusChip.operator(
-                      operatorStatus: operator.status,
-                    ),
-                  ],
+                      OperationsStatusChip.operator(
+                        operatorStatus: operator.status,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-          ],
-        ),
+            ],
+          ),
       ],
     );
   }
@@ -109,32 +121,35 @@ class FarmersView extends StatelessWidget {
     return _DirectoryPage(
       title: 'Farmers',
       children: [
-        _PrettyGrid(
-          children: [
-            for (final farmer in farmers)
-              OperationsCard(
-                child: Row(
-                  children: [
-                    const Icon(Icons.person_outline),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            farmer[0],
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w900),
-                          ),
-                          Text(farmer[1]),
-                        ],
+        if (farmers.isEmpty)
+          const OperationsCard(child: Text('No farmers loaded yet.'))
+        else
+          _PrettyGrid(
+            children: [
+              for (final farmer in farmers)
+                OperationsCard(
+                  child: Row(
+                    children: [
+                      const Icon(Icons.person_outline),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              farmer[0],
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w900),
+                            ),
+                            Text(farmer[1]),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-          ],
-        ),
+            ],
+          ),
       ],
     );
   }
@@ -156,18 +171,21 @@ class MaintenanceView extends StatelessWidget {
       children: [
         _MaintenanceSummary(repository: repository),
         const SizedBox(height: 16),
-        _PrettyGrid(
-          children: [
-            for (final tractor in blocked)
-              _MaintenanceCard(
-                tractorId: tractor.id,
-                model: tractor.model,
-                note: tractor.note ?? tractor.status.label,
-                status: tractor.status,
-                hours: tractor.operatingHours,
-              ),
-          ],
-        ),
+        if (blocked.isEmpty)
+          const OperationsCard(child: Text('No blocked tractors loaded yet.'))
+        else
+          _PrettyGrid(
+            children: [
+              for (final tractor in blocked)
+                _MaintenanceCard(
+                  tractorId: tractor.id,
+                  model: tractor.model,
+                  note: tractor.note ?? tractor.status.label,
+                  status: tractor.status,
+                  hours: tractor.operatingHours,
+                ),
+            ],
+          ),
       ],
     );
   }
@@ -221,6 +239,10 @@ class ReportsView extends StatelessWidget {
                   'Rejected',
                   '${_requestCount(OperationsRequestStatus.rejected)}',
                 ),
+                _ReportRow(
+                  'Returned',
+                  '${_requestCount(OperationsRequestStatus.returned)}',
+                ),
               ],
             ),
             _ReportPanel(
@@ -254,38 +276,6 @@ class ReportsView extends StatelessWidget {
               ],
             ),
           ],
-        ),
-        const SizedBox(height: 16),
-        OperationsCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: Theme.of(
-                      context,
-                    ).colorScheme.tertiary.withValues(alpha: 0.14),
-                    child: const Icon(Icons.map_outlined),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Service Coverage',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              const _CoverageBar(label: 'Kibaha', value: 0.82),
-              const _CoverageBar(label: 'Mlandizi', value: 0.64),
-              const _CoverageBar(label: 'Bagamoyo', value: 0.48),
-              const _CoverageBar(label: 'Kisarawe', value: 0.36),
-            ],
-          ),
         ),
       ],
     );
@@ -434,7 +424,7 @@ class _MaintenanceCard extends StatelessWidget {
               Expanded(
                 child: _SmallStat(
                   label: 'Last service',
-                  value: formatShortDate(DateTime(2026, 8, 10)),
+                  value: 'Not recorded',
                   icon: Icons.history,
                 ),
               ),
@@ -514,44 +504,6 @@ class _ReportRow {
 
   final String label;
   final String value;
-}
-
-class _CoverageBar extends StatelessWidget {
-  const _CoverageBar({required this.label, required this.value});
-
-  final String label;
-  final double value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          SizedBox(width: 86, child: Text(label)),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(
-                value: value,
-                minHeight: 10,
-                backgroundColor: Colors.black.withValues(alpha: 0.08),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          SizedBox(
-            width: 42,
-            child: Text(
-              '${(value * 100).round()}%',
-              textAlign: TextAlign.right,
-              style: const TextStyle(fontWeight: FontWeight.w800),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _SmallStat extends StatelessWidget {

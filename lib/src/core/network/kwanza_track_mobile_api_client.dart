@@ -226,12 +226,18 @@ class KwanzaTrackMobileApiClient {
     required String jobId,
     required String text,
     String severity = 'warning',
+    bool? openTicket,
     Map<String, Object?>? phone,
   }) {
     return _post(
       '/jobs/$jobId/issue',
       token: token,
-      body: {'text': text, 'severity': severity, 'phone': phone},
+      body: {
+        'text': text,
+        'severity': severity,
+        'open_ticket': openTicket,
+        'phone': phone,
+      },
     );
   }
 
@@ -239,11 +245,12 @@ class KwanzaTrackMobileApiClient {
     required String token,
     required String jobId,
     required String reason,
+    Map<String, Object?>? phone,
   }) {
     return _post(
       '/jobs/$jobId/override-request',
       token: token,
-      body: {'reason': reason},
+      body: {'reason': reason, 'phone': phone},
     );
   }
 

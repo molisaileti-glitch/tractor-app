@@ -5,6 +5,7 @@ enum OperationsRequestStatus {
   pending('Pending'),
   approved('Approved'),
   rejected('Rejected'),
+  returned('Returned'),
   scheduled('Scheduled'),
   cancelled('Cancelled');
 
@@ -39,8 +40,10 @@ enum JobStatus {
   scheduled('Scheduled'),
   dispatched('Dispatched'),
   enRoute('En route'),
+  arrived('Arrived'),
   inProgress('Work in progress'),
   completedPendingConfirmation('Awaiting verification'),
+  flagged('Flagged'),
   closed('Closed'),
   cancelled('Cancelled');
 
@@ -165,6 +168,22 @@ class TractorAsset {
     required this.model,
     required this.status,
     required this.operatingHours,
+    this.assetNo,
+    this.label,
+    this.make,
+    this.year,
+    this.horsepower,
+    this.registrationNo,
+    this.ownership,
+    this.station,
+    this.condition,
+    this.implementNames = const [],
+    this.unionName,
+    this.online,
+    this.qrToken,
+    this.inspectedToday,
+    this.assignedOperators = const [],
+    this.maintenanceDue = const [],
     this.note,
   });
 
@@ -172,18 +191,68 @@ class TractorAsset {
   final String model;
   final TractorStatus status;
   final int operatingHours;
+  final String? assetNo;
+  final String? label;
+  final String? make;
+  final int? year;
+  final int? horsepower;
+  final String? registrationNo;
+  final String? ownership;
+  final String? station;
+  final String? condition;
+  final List<String> implementNames;
+  final String? unionName;
+  final bool? online;
+  final String? qrToken;
+  final bool? inspectedToday;
+  final List<String> assignedOperators;
+  final List<String> maintenanceDue;
   final String? note;
 
   TractorAsset copyWith({
+    String? id,
+    String? model,
     TractorStatus? status,
     int? operatingHours,
+    String? assetNo,
+    String? label,
+    String? make,
+    int? year,
+    int? horsepower,
+    String? registrationNo,
+    String? ownership,
+    String? station,
+    String? condition,
+    List<String>? implementNames,
+    String? unionName,
+    bool? online,
+    String? qrToken,
+    bool? inspectedToday,
+    List<String>? assignedOperators,
+    List<String>? maintenanceDue,
     String? note,
   }) {
     return TractorAsset(
-      id: id,
-      model: model,
+      id: id ?? this.id,
+      model: model ?? this.model,
       status: status ?? this.status,
       operatingHours: operatingHours ?? this.operatingHours,
+      assetNo: assetNo ?? this.assetNo,
+      label: label ?? this.label,
+      make: make ?? this.make,
+      year: year ?? this.year,
+      horsepower: horsepower ?? this.horsepower,
+      registrationNo: registrationNo ?? this.registrationNo,
+      ownership: ownership ?? this.ownership,
+      station: station ?? this.station,
+      condition: condition ?? this.condition,
+      implementNames: implementNames ?? this.implementNames,
+      unionName: unionName ?? this.unionName,
+      online: online ?? this.online,
+      qrToken: qrToken ?? this.qrToken,
+      inspectedToday: inspectedToday ?? this.inspectedToday,
+      assignedOperators: assignedOperators ?? this.assignedOperators,
+      maintenanceDue: maintenanceDue ?? this.maintenanceDue,
       note: note ?? this.note,
     );
   }
@@ -263,4 +332,62 @@ class OperationsJob {
       history: history ?? this.history,
     );
   }
+}
+
+class MechanizationOverride {
+  const MechanizationOverride({
+    required this.id,
+    required this.jobId,
+    required this.status,
+    required this.reason,
+    required this.requestedBy,
+    this.requestedAt,
+    this.decidedBy,
+    this.decidedAt,
+    this.decisionNote,
+    this.expiresAt,
+    this.usable = false,
+    this.failedChecks = const [],
+    this.distanceToPlotMeters,
+    this.distanceToTractorMeters,
+  });
+
+  final String id;
+  final String jobId;
+  final String status;
+  final String reason;
+  final String requestedBy;
+  final DateTime? requestedAt;
+  final String? decidedBy;
+  final DateTime? decidedAt;
+  final String? decisionNote;
+  final DateTime? expiresAt;
+  final bool usable;
+  final List<String> failedChecks;
+  final num? distanceToPlotMeters;
+  final num? distanceToTractorMeters;
+}
+
+class MechanizationException {
+  const MechanizationException({
+    required this.id,
+    required this.title,
+    required this.status,
+    required this.severity,
+    this.type,
+    this.jobReference,
+    this.tractorLabel,
+    this.detail,
+    this.openedAt,
+  });
+
+  final String id;
+  final String title;
+  final String status;
+  final String severity;
+  final String? type;
+  final String? jobReference;
+  final String? tractorLabel;
+  final String? detail;
+  final DateTime? openedAt;
 }

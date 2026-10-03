@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'core/presentation/app_welcome_screen.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/data/repositories/auth_local_repository.dart';
+import 'features/auth/domain/entities/auth_session.dart';
 import 'features/auth/presentation/screens/farmer_registration_screen.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/farmer/data/repositories/farmer_local_repository.dart';
@@ -42,6 +43,12 @@ class _TractorAppState extends State<TractorApp> {
   _Workspace _workspace = _Workspace.welcome;
 
   @override
+  void initState() {
+    super.initState();
+    _restoreSavedSession();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Shamba Bora',
@@ -55,12 +62,9 @@ class _TractorAppState extends State<TractorApp> {
           repository: authRepository,
           onBack: () => setState(() => _workspace = _Workspace.welcome),
           onOpenFarmer: () => setState(() => _workspace = _Workspace.farmer),
-          onOpenOperations: () =>
-              setState(() => _workspace = _Workspace.operations),
-          onOpenOperator: () =>
-              setState(() => _workspace = _Workspace.operator),
-          onOpenTechnician: () =>
-              setState(() => _workspace = _Workspace.technician),
+          onOpenOperations: _openOperations,
+          onOpenOperator: _openOperator,
+          onOpenTechnician: _openTechnician,
           onCreateFarmerAccount: () =>
               setState(() => _workspace = _Workspace.registerFarmer),
         ),
@@ -91,7 +95,71 @@ class _TractorAppState extends State<TractorApp> {
   }
 
   void _logout() {
+    operationsRepository.setMechanizationAccessToken(null);
+    operatorRepository.setMechanizationAccessToken(null);
     authRepository.signOut();
     setState(() => _workspace = _Workspace.login);
+  }
+
+  void _openOperations() {
+    operationsRepository.setMechanizationAccessToken(
+      authRepository.currentSession.accessToken,
+    );
+    setState(() => _workspace = _Workspace.operations);
+  }
+
+  void _openOperator() {
+    operatorRepository.setMechanizationAccessToken(
+      authRepository.currentSession.accessToken,
+    );
+    setState(() => _workspace = _Workspace.operator);
+  }
+
+  void _openTechnician() {
+    operationsRepository.setMechanizationAccessToken(
+      authRepository.currentSession.accessToken,
+    );
+    setState(() => _workspace = _Workspace.technician);
+  }
+
+  Future<void> _restoreSavedSession() async {
+    final session = await authRepository.restoreSavedSession();
+    if (!mounted || !session.isSignedIn) return;
+    _openWorkspaceForSession(session);
+  }
+
+  void _openWorkspaceForSession(AuthSession session) {
+    final role = session.role?.toLowerCase() ?? '';
+    final permissions = session.permissions;
+    final managesMechanization = permissions.any(
+      (permission) =>
+          permission == 'mech.requests.manage' ||
+          permission == 'mech.jobs.manage' ||
+          permission == 'mech.override' ||
+          permission == 'mech.exceptions.manage' ||
+          permission == 'mech.registry.manage',
+    );
+
+    if (managesMechanization ||
+        role.contains('dispatcher') ||
+        role.contains('officer') ||
+        role.contains('manager') ||
+        role.contains('owner')) {
+      _openOperations();
+      return;
+    }
+    if (role.contains('operator') || permissions.contains('mech.operate')) {
+      _openOperator();
+      return;
+    }
+    if (role.contains('technician')) {
+      _openTechnician();
+      return;
+    }
+    if (role.contains('farmer')) {
+      setState(() => _workspace = _Workspace.farmer);
+      return;
+    }
+    _openOperations();
   }
 }

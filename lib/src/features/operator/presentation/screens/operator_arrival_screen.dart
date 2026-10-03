@@ -32,6 +32,8 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
   bool _useSimulation = false;
   bool _simulateInsideFarm = true;
   bool _checkingLocation = false;
+  bool _submittingInspection = false;
+  bool _submittingStart = false;
   PlotGeofenceResult? _geofenceResult;
   String? _locationError;
 
@@ -168,10 +170,25 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
                   ),
                   const SizedBox(height: 10),
                 ],
+                OutlinedButton.icon(
+                  onPressed:
+                      _submittingInspection || _geofenceResult == null
+                      ? null
+                      : _recordInspection,
+                  icon: const Icon(Icons.fact_check_outlined),
+                  label: Text(
+                    _submittingInspection
+                        ? 'Recording inspection...'
+                        : 'Record Inspection',
+                  ),
+                ),
+                const SizedBox(height: 10),
                 FilledButton.icon(
-                  onPressed: isInsideFarm ? _startJob : null,
+                  onPressed: _geofenceResult != null && !_submittingStart
+                      ? _startJob
+                      : null,
                   icon: const Icon(Icons.play_arrow),
-                  label: const Text('Start Job'),
+                  label: Text(_submittingStart ? 'Starting...' : 'Start Job'),
                 ),
               ],
             ),
@@ -243,6 +260,14 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
     required FarmPlot plot,
     required bool insideFarm,
   }) {
+    if (plot.boundaryPoints.isEmpty) {
+      return DeviceLocation(
+        latitude: insideFarm ? -6.7971107 : -6.1709,
+        longitude: insideFarm ? 39.2488665 : 35.7409,
+        accuracyMeters: insideFarm ? 8 : 18,
+        recordedAt: DateTime.now(),
+      );
+    }
     final latitude =
         plot.boundaryPoints
             .map((point) => point.latitude)
@@ -258,17 +283,89 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
       latitude: insideFarm ? latitude : latitude + 0.02,
       longitude: insideFarm ? longitude : longitude + 0.02,
       accuracyMeters: insideFarm ? 8 : 18,
-      recordedAt: DateTime(2026, 9, 28, 8, 42),
+      recordedAt: DateTime.now(),
     );
   }
 
-  void _startJob() {
-    widget.repository.startJob(widget.jobId);
-    Navigator.of(context).pushReplacement(
+  Future<void> _startJob() async {
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final location = _geofenceResult?.location;
+    setState(() => _submittingStart = true);
+    final arrived = await widget.repository.arriveJob(
+      widget.jobId,
+      phone: location,
+    );
+    if (!mounted) return;
+    if (!arrived) {
+      setState(() => _submittingStart = false);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.repository.lastActionError ?? 'Could not record arrival.',
+          ),
+        ),
+      );
+      return;
+    }
+    final started = await widget.repository.startJob(
+      widget.jobId,
+      phone: location,
+    );
+    if (!mounted) return;
+    setState(() => _submittingStart = false);
+    if (!started) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.repository.lastActionError ??
+                'The backend did not allow this job to start.',
+          ),
+        ),
+      );
+      return;
+    }
+    navigator.pushReplacement(
       MaterialPageRoute(
         builder: (_) => OperatorProgressScreen(
           repository: widget.repository,
           jobId: widget.jobId,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _recordInspection() async {
+    final job = widget.repository.jobById(widget.jobId);
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _submittingInspection = true);
+    final ok = await widget.repository.recordInspection(
+      tractorId: job.tractorId,
+      jobId: job.id,
+      checklist: const {
+        'engine_oil': true,
+        'coolant': true,
+        'fuel': true,
+        'tyres': true,
+        'brakes': true,
+        'lights': true,
+        'hydraulics': true,
+        'implement': true,
+        'leaks': true,
+        'tracker': true,
+      },
+      isFit: true,
+      phone: _geofenceResult?.location,
+    );
+    if (!mounted) return;
+    setState(() => _submittingInspection = false);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          ok
+              ? 'Inspection recorded.'
+              : widget.repository.lastActionError ??
+                    'Inspection could not be recorded.',
         ),
       ),
     );

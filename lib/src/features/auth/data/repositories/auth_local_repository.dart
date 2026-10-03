@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../../farmer/data/models/farmer_profile_model.dart';
 import '../../../farmer/domain/entities/farmer_profile.dart';
@@ -8,10 +9,16 @@ import '../../domain/entities/auth_session.dart';
 import '../../domain/repositories/auth_repository.dart';
 
 class AuthLocalRepository extends ChangeNotifier implements AuthRepository {
-  AuthLocalRepository({AuthRemoteDataSource? remoteDataSource})
-    : remoteDataSource = remoteDataSource ?? const AuthRemoteDataSource();
+  AuthLocalRepository({
+    AuthRemoteDataSource? remoteDataSource,
+    FlutterSecureStorage? secureStorage,
+  }) : remoteDataSource = remoteDataSource ?? const AuthRemoteDataSource(),
+       secureStorage = secureStorage ?? const FlutterSecureStorage();
+
+  static const _accessTokenKey = 'kwanza_track_access_token';
 
   final AuthRemoteDataSource remoteDataSource;
+  final FlutterSecureStorage secureStorage;
 
   AuthSession _currentSession = const AuthSession(
     status: AuthSessionStatus.signedOut,
@@ -23,6 +30,21 @@ class AuthLocalRepository extends ChangeNotifier implements AuthRepository {
   AuthSession get currentSession => _currentSession;
 
   List<FarmerProfileModel> get farmers => List.unmodifiable(_farmers);
+
+  Future<AuthSession> restoreSavedSession() async {
+    try {
+      final token = await secureStorage.read(key: _accessTokenKey);
+      if (token == null || token.isEmpty) return _currentSession;
+      return await refreshRemoteSession(token: token);
+    } on AuthRemoteException {
+      await secureStorage.delete(key: _accessTokenKey);
+      _currentSession = const AuthSession(status: AuthSessionStatus.signedOut);
+      notifyListeners();
+      return _currentSession;
+    } catch (_) {
+      return _currentSession;
+    }
+  }
 
   Future<AuthChallengeModel> requestLoginChallenge({
     required String identifier,
@@ -47,6 +69,19 @@ class AuthLocalRepository extends ChangeNotifier implements AuthRepository {
       deviceName: deviceName,
     );
     _currentSession = verified.toEntity();
+    await _persistAccessToken(_currentSession.accessToken);
+    notifyListeners();
+    return _currentSession;
+  }
+
+  Future<AuthChallengeModel> resendRemoteOtp({required String challengeId}) {
+    return remoteDataSource.resendOtp(challengeId: challengeId);
+  }
+
+  Future<AuthSession> refreshRemoteSession({required String token}) async {
+    final verified = await remoteDataSource.me(token: token);
+    _currentSession = verified.toEntity();
+    await _persistAccessToken(_currentSession.accessToken);
     notifyListeners();
     return _currentSession;
   }
@@ -108,6 +143,7 @@ class AuthLocalRepository extends ChangeNotifier implements AuthRepository {
   Future<void> signOut() async {
     final token = _currentSession.accessToken;
     _currentSession = const AuthSession(status: AuthSessionStatus.signedOut);
+    await _persistAccessToken(null);
     notifyListeners();
     if (token != null && token.isNotEmpty) {
       try {
@@ -120,5 +156,17 @@ class AuthLocalRepository extends ChangeNotifier implements AuthRepository {
 
   String _offlinePasswordMarker(String password) {
     return 'offline-demo:${password.length}';
+  }
+
+  Future<void> _persistAccessToken(String? token) async {
+    try {
+      if (token == null || token.isEmpty) {
+        await secureStorage.delete(key: _accessTokenKey);
+        return;
+      }
+      await secureStorage.write(key: _accessTokenKey, value: token);
+    } catch (error) {
+      debugPrint('Could not persist auth token: $error');
+    }
   }
 }

@@ -24,6 +24,14 @@ class TechnicianHomeScreen extends StatelessWidget {
     final outOfService = operationsRepository.tractors
         .where((tractor) => tractor.status == TractorStatus.outOfService)
         .length;
+    final attention = operationsRepository.tractors
+        .where(
+          (tractor) =>
+              tractor.maintenanceDue.isNotEmpty ||
+              tractor.status == TractorStatus.underMaintenance ||
+              tractor.status == TractorStatus.outOfService,
+        )
+        .toList();
 
     return _TechnicianPage(
       title: 'Technician',
@@ -62,26 +70,27 @@ class TechnicianHomeScreen extends StatelessWidget {
           ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
         ),
         const SizedBox(height: 10),
-        const TechnicianCard(
+        TechnicianCard(
           child: Column(
             children: [
-              _AttentionLine(
-                tractorId: 'TR-004',
-                issue: 'Engine service due',
-                detail: '8 operating hours remaining',
-              ),
-              Divider(height: 28),
-              _AttentionLine(
-                tractorId: 'TR-012',
-                issue: 'Hydraulic issue reported',
-                detail: 'Inspection required before dispatch',
-              ),
-              Divider(height: 28),
-              _AttentionLine(
-                tractorId: 'TR-007',
-                issue: 'Scheduled maintenance overdue',
-                detail: '12 operating hours past service point',
-              ),
+              if (attention.isEmpty)
+                const _AttentionLine(
+                  tractorId: 'All tractors',
+                  issue: 'No maintenance due',
+                  detail: 'Fleet is ready for dispatch',
+                ),
+              for (final tractor in attention) ...[
+                _AttentionLine(
+                  tractorId: tractor.assetNo ?? tractor.id,
+                  issue: tractor.maintenanceDue.isEmpty
+                      ? tractor.status.label
+                      : 'Maintenance due',
+                  detail: tractor.maintenanceDue.isEmpty
+                      ? tractor.note ?? 'Inspection required before dispatch'
+                      : tractor.maintenanceDue.join(', '),
+                ),
+                if (tractor != attention.last) const Divider(height: 28),
+              ],
             ],
           ),
         ),

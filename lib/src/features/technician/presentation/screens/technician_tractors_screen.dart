@@ -97,12 +97,16 @@ class _TechnicianTractorsScreenState extends State<TechnicianTractorsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              tractor.id,
+                              tractor.assetNo ?? tractor.id,
                               style: Theme.of(context).textTheme.titleMedium
                                   ?.copyWith(fontWeight: FontWeight.w900),
                             ),
                             Text(tractor.model),
+                            if (tractor.registrationNo != null)
+                              Text(tractor.registrationNo!),
                             Text('${tractor.operatingHours} operating hours'),
+                            if (tractor.station != null)
+                              Text(tractor.station!),
                             if (tractor.note != null) Text(tractor.note!),
                           ],
                         ),

@@ -1,7 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
-import '../../data/remote/service_orders_remote_data_source.dart';
 import '../../data/repositories/union_operations_repository.dart';
 import '../../domain/entities/operations_models.dart';
 import '../widgets/operations_widgets.dart';
@@ -20,7 +21,7 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
   OperationsRequestStatus? _status = OperationsRequestStatus.pending;
   String _query = '';
   bool _loadingRemoteRequests = false;
-  ServiceOrdersFetchResult? _remoteRequestsResult;
+  String? _remoteRequestsError;
 
   @override
   void initState() {
@@ -34,6 +35,24 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
         .requestsByStatus(_status)
         .where((request) => _matchesQuery(request))
         .toList();
+    final pendingCount = widget.repository
+        .requestsByStatus(OperationsRequestStatus.pending)
+        .length;
+    final approvedCount = widget.repository
+        .requestsByStatus(OperationsRequestStatus.approved)
+        .length;
+    final rejectedCount = widget.repository
+        .requestsByStatus(OperationsRequestStatus.rejected)
+        .length;
+    final returnedCount = widget.repository
+        .requestsByStatus(OperationsRequestStatus.returned)
+        .length;
+    final scheduledCount = widget.repository
+        .requestsByStatus(OperationsRequestStatus.scheduled)
+        .length;
+    final cancelledCount = widget.repository
+        .requestsByStatus(OperationsRequestStatus.cancelled)
+        .length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -47,7 +66,9 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
         const SizedBox(height: 14),
         _RemoteRequestsBanner(
           isLoading: _loadingRemoteRequests,
-          result: _remoteRequestsResult,
+          error: _remoteRequestsError ?? widget.repository.mechanizationActionError,
+          count: widget.repository.requests.length,
+          onRefresh: _loadRemoteRequests,
         ),
         const SizedBox(height: 12),
         TextField(
@@ -63,31 +84,43 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
           runSpacing: 8,
           children: [
             ChoiceChip(
-              label: Text('Pending ${widget.repository.pendingRequestCount}'),
+              label: Text('Pending $pendingCount'),
               selected: _status == OperationsRequestStatus.pending,
               onSelected: (_) =>
                   setState(() => _status = OperationsRequestStatus.pending),
             ),
             ChoiceChip(
-              label: const Text('Approved'),
+              label: Text('Approved $approvedCount'),
               selected: _status == OperationsRequestStatus.approved,
               onSelected: (_) =>
                   setState(() => _status = OperationsRequestStatus.approved),
             ),
             ChoiceChip(
-              label: const Text('Rejected'),
+              label: Text('Rejected $rejectedCount'),
               selected: _status == OperationsRequestStatus.rejected,
               onSelected: (_) =>
                   setState(() => _status = OperationsRequestStatus.rejected),
             ),
             ChoiceChip(
-              label: const Text('Cancelled'),
+              label: Text('Returned $returnedCount'),
+              selected: _status == OperationsRequestStatus.returned,
+              onSelected: (_) =>
+                  setState(() => _status = OperationsRequestStatus.returned),
+            ),
+            ChoiceChip(
+              label: Text('Scheduled $scheduledCount'),
+              selected: _status == OperationsRequestStatus.scheduled,
+              onSelected: (_) =>
+                  setState(() => _status = OperationsRequestStatus.scheduled),
+            ),
+            ChoiceChip(
+              label: Text('Cancelled $cancelledCount'),
               selected: _status == OperationsRequestStatus.cancelled,
               onSelected: (_) =>
                   setState(() => _status = OperationsRequestStatus.cancelled),
             ),
             ChoiceChip(
-              label: const Text('All'),
+              label: Text('All ${widget.repository.requests.length}'),
               selected: _status == null,
               onSelected: (_) => setState(() => _status = null),
             ),
@@ -125,34 +158,41 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
 
   Future<void> _loadRemoteRequests() async {
     setState(() => _loadingRemoteRequests = true);
-    final result = await widget.repository.fetchRemoteServiceOrders();
+    await widget.repository.refreshServiceRequests();
     if (!mounted) return;
     setState(() {
-      _remoteRequestsResult = result;
+      _remoteRequestsError = widget.repository.mechanizationActionError;
       _loadingRemoteRequests = false;
     });
   }
 }
 
 class _RemoteRequestsBanner extends StatelessWidget {
-  const _RemoteRequestsBanner({required this.isLoading, required this.result});
+  const _RemoteRequestsBanner({
+    required this.isLoading,
+    required this.error,
+    required this.count,
+    required this.onRefresh,
+  });
 
   final bool isLoading;
-  final ServiceOrdersFetchResult? result;
+  final String? error;
+  final int count;
+  final VoidCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = result?.isSuccess == false
+    final color = error != null
         ? const Color(0xFFC8872B)
         : theme.colorScheme.primary;
     final text = isLoading
-        ? 'Checking backend service orders...'
-        : result == null
-        ? 'Offline requests are ready.'
-        : result!.isSuccess
-        ? 'Backend connected - ${result!.orders.length} remote service orders'
-        : 'Using offline requests - ${result!.errorMessage}';
+        ? 'Checking backend service requests...'
+        : error != null
+        ? 'Backend requests unavailable - $error'
+        : count == 0
+        ? 'Waiting for backend service requests.'
+        : 'Backend connected - $count service requests loaded';
 
     return Container(
       width: double.infinity,
@@ -178,6 +218,11 @@ class _RemoteRequestsBanner extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
+          ),
+          IconButton(
+            tooltip: 'Refresh',
+            onPressed: isLoading ? null : onRefresh,
+            icon: const Icon(Icons.refresh),
           ),
         ],
       ),
@@ -294,6 +339,17 @@ class _RequestPreviewCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
+          if (request.rejectionReason != null &&
+              request.status != OperationsRequestStatus.pending) ...[
+            Text(
+              request.rejectionReason!,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: Colors.black.withValues(alpha: 0.70),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
           Align(
             alignment: Alignment.centerRight,
             child: Text(
@@ -463,42 +519,95 @@ class OperationsRequestDetailScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 6),
                           if (request.status == OperationsRequestStatus.pending)
-                            Row(
+                            Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
                               children: [
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: () =>
-                                        _showRejectSheet(context, request),
-                                    icon: const Icon(Icons.close),
-                                    label: const Text('Reject'),
-                                  ),
+                                OutlinedButton.icon(
+                                  onPressed: () =>
+                                      _showRejectSheet(context, request),
+                                  icon: const Icon(Icons.close),
+                                  label: const Text('Reject'),
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: FilledButton.icon(
-                                    onPressed: () =>
-                                        _approve(context, request.id),
-                                    icon: const Icon(Icons.check),
-                                    label: const Text('Approve'),
-                                  ),
+                                OutlinedButton.icon(
+                                  onPressed: () {
+                                    unawaited(
+                                      repository.returnRequest(
+                                        id: request.id,
+                                        reason:
+                                            'Plot boundary crosses the road reserve',
+                                      ),
+                                    );
+                                    Navigator.of(context).pop();
+                                  },
+                                  icon: const Icon(Icons.keyboard_return),
+                                  label: const Text('Return'),
+                                ),
+                                FilledButton.icon(
+                                  onPressed: () =>
+                                      _approve(context, request.id),
+                                  icon: const Icon(Icons.check),
+                                  label: const Text('Approve'),
                                 ),
                               ],
                             )
                           else if (request.status ==
                               OperationsRequestStatus.approved)
-                            FilledButton.icon(
-                              onPressed: () =>
-                                  _openSchedule(context, request.id),
-                              icon: const Icon(Icons.calendar_month_outlined),
-                              label: const Text('Schedule Service'),
+                            Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
+                              children: [
+                                FilledButton.icon(
+                                  onPressed: () =>
+                                      _openSchedule(context, request.id),
+                                  icon: const Icon(Icons.calendar_month_outlined),
+                                  label: const Text('Schedule Service'),
+                                ),
+                                OutlinedButton.icon(
+                                  onPressed: () {
+                                    unawaited(
+                                      repository.cancelRequest(
+                                        id: request.id,
+                                        reason: 'Farmer withdrew',
+                                        notes: '',
+                                      ),
+                                    );
+                                    Navigator.of(context).pop();
+                                  },
+                                  icon: const Icon(Icons.cancel_outlined),
+                                  label: const Text('Cancel'),
+                                ),
+                              ],
                             )
                           else if (request.status ==
                               OperationsRequestStatus.scheduled)
-                            const Text('This request has been scheduled.')
+                            Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
+                              children: [
+                                const Text('This request has been scheduled.'),
+                                OutlinedButton.icon(
+                                  onPressed: () {
+                                    unawaited(
+                                      repository.cancelRequest(
+                                        id: request.id,
+                                        reason: 'Farmer withdrew',
+                                        notes: '',
+                                      ),
+                                    );
+                                    Navigator.of(context).pop();
+                                  },
+                                  icon: const Icon(Icons.cancel_outlined),
+                                  label: const Text('Cancel'),
+                                ),
+                              ],
+                            )
                           else if (request.status ==
                                   OperationsRequestStatus.cancelled ||
                               request.status ==
-                                  OperationsRequestStatus.rejected)
+                                  OperationsRequestStatus.rejected ||
+                              request.status ==
+                                  OperationsRequestStatus.returned)
                             Text(
                               '${request.status.label}: ${request.rejectionReason ?? 'No reason recorded.'}',
                             ),
@@ -516,7 +625,7 @@ class OperationsRequestDetailScreen extends StatelessWidget {
   }
 
   void _approve(BuildContext context, String id) {
-    repository.approveRequest(id);
+    unawaited(repository.approveRequest(id));
     showDialog<void>(
       context: context,
       builder: (_) => AlertDialog(
@@ -705,10 +814,12 @@ class _RejectRequestSheetState extends State<_RejectRequestSheet> {
               Expanded(
                 child: FilledButton(
                   onPressed: () {
-                    widget.repository.rejectRequest(
-                      id: widget.request.id,
-                      reason: _reason,
-                      notes: '',
+                    unawaited(
+                      widget.repository.rejectRequest(
+                        id: widget.request.id,
+                        reason: _reason,
+                        notes: '',
+                      ),
                     );
                     Navigator.of(context).pop();
                     Navigator.of(context).pop();

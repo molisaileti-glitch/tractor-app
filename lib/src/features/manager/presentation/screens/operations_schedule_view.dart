@@ -5,25 +5,45 @@ import '../../data/repositories/union_operations_repository.dart';
 import '../../domain/entities/operations_models.dart';
 import '../widgets/operations_widgets.dart';
 
-class OperationsScheduleView extends StatelessWidget {
+class OperationsScheduleView extends StatefulWidget {
   const OperationsScheduleView({super.key, required this.repository});
 
   final UnionOperationsRepository repository;
 
   @override
+  State<OperationsScheduleView> createState() => _OperationsScheduleViewState();
+}
+
+class _OperationsScheduleViewState extends State<OperationsScheduleView> {
+  late DateTime _selectedDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDate = DateTime.now();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final selectedJobs = widget.repository.jobs
+        .where((job) => _sameDate(job.scheduledAt, _selectedDate))
+        .toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             Text(
-              'September',
+              formatDate(_selectedDate),
               style: Theme.of(
                 context,
               ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
             ),
-            const Icon(Icons.keyboard_arrow_down),
+            IconButton(
+              tooltip: 'Choose date',
+              onPressed: _pickDate,
+              icon: const Icon(Icons.keyboard_arrow_down),
+            ),
             const Spacer(),
             IconButton(
               tooltip: 'Filter',
@@ -38,72 +58,108 @@ class OperationsScheduleView extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 8),
-        _WeekStrip(selectedDay: 28),
+        _WeekStrip(
+          selectedDate: _selectedDate,
+          onDateSelected: (date) => setState(() => _selectedDate = date),
+        ),
         const SizedBox(height: 12),
         OperationsCard(
-          child: _ScheduleBoard(jobs: repository.jobs),
+          child: _ScheduleBoard(jobs: selectedJobs),
         ),
       ],
     );
   }
+
+  bool _sameDate(DateTime first, DateTime second) {
+    return first.year == second.year &&
+        first.month == second.month &&
+        first.day == second.day;
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked == null) return;
+    setState(() => _selectedDate = picked);
+  }
 }
 
 class _WeekStrip extends StatelessWidget {
-  const _WeekStrip({required this.selectedDay});
+  const _WeekStrip({
+    required this.selectedDate,
+    required this.onDateSelected,
+  });
 
-  final int selectedDay;
+  final DateTime selectedDate;
+  final ValueChanged<DateTime> onDateSelected;
 
   @override
   Widget build(BuildContext context) {
-    const days = [
-      ('Mon', 22),
-      ('Tue', 23),
-      ('Wed', 24),
-      ('Thu', 25),
-      ('Fri', 26),
-      ('Sat', 27),
-      ('Sun', 28),
-    ];
+    final startOfWeek = selectedDate.subtract(
+      Duration(days: selectedDate.weekday - DateTime.monday),
+    );
+    final days = List.generate(
+      7,
+      (index) => startOfWeek.add(Duration(days: index)),
+    );
     return Row(
       children: [
         for (final day in days)
           Expanded(
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 3),
-              padding: const EdgeInsets.symmetric(vertical: 9),
-              decoration: BoxDecoration(
-                color: day.$2 == selectedDay
-                    ? Theme.of(context).colorScheme.primary
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    day.$1,
-                    style: TextStyle(
-                      color: day.$2 == selectedDay
-                          ? Colors.white
-                          : Colors.black54,
-                      fontWeight: FontWeight.w800,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: () => onDateSelected(day),
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                padding: const EdgeInsets.symmetric(vertical: 9),
+                decoration: BoxDecoration(
+                  color: _sameDate(day, selectedDate)
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      _weekday(day.weekday),
+                      style: TextStyle(
+                        color: _sameDate(day, selectedDate)
+                            ? Colors.white
+                            : Colors.black54,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${day.$2}',
-                    style: TextStyle(
-                      color: day.$2 == selectedDay
-                          ? Colors.white
-                          : Colors.black87,
-                      fontWeight: FontWeight.w900,
+                    const SizedBox(height: 2),
+                    Text(
+                      '${day.day}',
+                      style: TextStyle(
+                        color: _sameDate(day, selectedDate)
+                            ? Colors.white
+                            : Colors.black87,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
       ],
     );
+  }
+
+  bool _sameDate(DateTime first, DateTime second) {
+    return first.year == second.year &&
+        first.month == second.month &&
+        first.day == second.day;
+  }
+
+  String _weekday(int weekday) {
+    return const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][weekday - 1];
   }
 }
 
@@ -114,7 +170,7 @@ class _ScheduleBoard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rows = [8, 9, 10, 11, 12, 13, 14];
+    final rows = List.generate(14, (index) => index + 6);
     return Column(
       children: [
         for (final hour in rows)

@@ -50,7 +50,7 @@ class OperatorJobDetailScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(18),
                       ),
                       child: Text(
-                        '${job.tractorId} - ${job.plot.name}',
+                        '${job.tractorLabel ?? job.tractorId} - ${job.plot.name}',
                         style: const TextStyle(fontWeight: FontWeight.w900),
                       ),
                     ),
@@ -89,8 +89,31 @@ class OperatorJobDetailScreen extends StatelessWidget {
       );
       return;
     }
-    repository.startJourney(job.id);
-    Navigator.of(context).pushReplacement(
+    _startJourney(context, job);
+  }
+
+  Future<void> _startJourney(BuildContext context, OperatorJob job) async {
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final accepted = job.status == OperatorJobStatus.dispatched
+        ? await repository.acceptAssignment(job.id)
+        : true;
+    if (!accepted) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(repository.lastActionError ?? 'Accept failed.')),
+      );
+      return;
+    }
+    final ok = await repository.startJourney(job.id);
+    if (!ok) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(repository.lastActionError ?? 'Could not go en route.'),
+        ),
+      );
+      return;
+    }
+    navigator.pushReplacement(
       MaterialPageRoute(
         builder: (_) =>
             OperatorArrivalScreen(repository: repository, jobId: job.id),
@@ -138,16 +161,22 @@ class OperatorJobDetailScreen extends StatelessWidget {
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: () {
-                repository.reportProblem(
+              onPressed: () async {
+                final messenger = ScaffoldMessenger.of(screenContext);
+                final ok = await repository.reportProblem(
                   jobId: job.id,
                   reason: reason,
                   notes: notesController.text.trim(),
                 );
                 Navigator.of(context).pop();
-                ScaffoldMessenger.of(screenContext).showSnackBar(
-                  const SnackBar(
-                    content: Text('Problem sent to dispatcher for review.'),
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      ok
+                          ? 'Problem sent to dispatcher for review.'
+                          : repository.lastActionError ??
+                                'Could not report problem.',
+                    ),
                   ),
                 );
               },

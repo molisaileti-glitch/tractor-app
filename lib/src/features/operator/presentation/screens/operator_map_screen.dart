@@ -73,7 +73,8 @@ class OperatorMapScreen extends StatelessWidget {
       repository: repository,
       jobId: job.id,
     );
-    if (job.status == OperatorJobStatus.enRoute) {
+    if (job.status == OperatorJobStatus.enRoute ||
+        job.status == OperatorJobStatus.arrived) {
       screen = OperatorArrivalScreen(repository: repository, jobId: job.id);
     } else if (job.status == OperatorJobStatus.inProgress) {
       screen = OperatorProgressScreen(repository: repository, jobId: job.id);

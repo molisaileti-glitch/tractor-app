@@ -15,6 +15,7 @@ class OperatorJobsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final job = repository.todayJob;
+    final displayName = repository.operatorName?.split(' ').first ?? 'John';
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       child: Align(
@@ -28,7 +29,7 @@ class OperatorJobsScreen extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      'Good morning, John',
+                      'Good morning, $displayName',
                       style: Theme.of(context).textTheme.headlineSmall
                           ?.copyWith(fontWeight: FontWeight.w900),
                     ),
@@ -39,6 +40,16 @@ class OperatorJobsScreen extends StatelessWidget {
                   ),
                 ],
               ),
+              if (repository.isSyncingMechanization) ...[
+                const SizedBox(height: 12),
+                const LinearProgressIndicator(minHeight: 3),
+              ] else if (repository.mechanizationSyncError != null) ...[
+                const SizedBox(height: 12),
+                _SyncNotice(
+                  message: repository.mechanizationSyncError!,
+                  onRetry: repository.refreshMechanizationData,
+                ),
+              ],
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -98,6 +109,39 @@ class OperatorJobsScreen extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _SyncNotice extends StatelessWidget {
+  const _SyncNotice({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return OperatorCard(
+      child: Row(
+        children: [
+          Icon(
+            Icons.cloud_off_outlined,
+            color: Theme.of(context).colorScheme.error,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Retry',
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
       ),
     );
   }
@@ -174,7 +218,7 @@ class _TodayJobCard extends StatelessWidget {
           _Line(label: 'Farmer', value: job.farmerName),
           _Line(label: 'Plot', value: job.plot.name),
           _Line(label: 'Scheduled', value: formatTime(job.scheduledAt)),
-          _Line(label: 'Tractor', value: job.tractorId),
+          _Line(label: 'Tractor', value: job.tractorLabel ?? job.tractorId),
           const SizedBox(height: 18),
           FilledButton.icon(
             onPressed: onView,

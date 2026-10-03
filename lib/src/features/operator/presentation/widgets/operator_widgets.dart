@@ -33,6 +33,7 @@ class OperatorStatusPill extends StatelessWidget {
       OperatorJobStatus.scheduled => Theme.of(context).colorScheme.tertiary,
       OperatorJobStatus.dispatched => const Color(0xFF7B4BD2),
       OperatorJobStatus.enRoute => const Color(0xFF7B4BD2),
+      OperatorJobStatus.arrived => const Color(0xFF0EA5E9),
       OperatorJobStatus.inProgress => Theme.of(context).colorScheme.primary,
       OperatorJobStatus.completedPendingConfirmation => Theme.of(
         context,

@@ -22,9 +22,10 @@ class ScheduleServiceScreen extends StatefulWidget {
 class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
   String? _tractorId;
   String? _operatorId;
-  DateTime _date = DateTime(2026, 9, 28);
+  DateTime _date = DateTime.now();
   TimeOfDay _time = const TimeOfDay(hour: 8, minute: 0);
   int _duration = 4;
+  bool _submitting = false;
 
   @override
   void initState() {
@@ -133,11 +134,19 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
                 ),
                 const SizedBox(height: 18),
                 FilledButton.icon(
-                  onPressed: _tractorId == null || _operatorId == null
+                  onPressed: _tractorId == null ||
+                          _operatorId == null ||
+                          _submitting
                       ? null
                       : _confirmSchedule,
-                  icon: const Icon(Icons.check),
-                  label: const Text('Confirm Schedule'),
+                  icon: _submitting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.check),
+                  label: Text(_submitting ? 'Scheduling...' : 'Confirm Schedule'),
                 ),
               ],
             ),
@@ -151,7 +160,7 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
     final selected = await showDatePicker(
       context: context,
       initialDate: _date,
-      firstDate: DateTime(2026, 9, 24),
+      firstDate: DateTime.now(),
       lastDate: DateTime(2027, 12, 31),
     );
     if (selected == null) return;
@@ -164,7 +173,7 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
     setState(() => _time = selected);
   }
 
-  void _confirmSchedule() {
+  Future<void> _confirmSchedule() async {
     final scheduledAt = DateTime(
       _date.year,
       _date.month,
@@ -172,13 +181,22 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
       _time.hour,
       _time.minute,
     );
-    final jobId = widget.repository.scheduleRequest(
+    setState(() => _submitting = true);
+    final jobId = await widget.repository.scheduleRequest(
       requestId: widget.requestId,
       tractorId: _tractorId!,
       operatorId: _operatorId!,
       scheduledAt: scheduledAt,
       estimatedHours: _duration,
     );
+    if (!mounted) return;
+    setState(() => _submitting = false);
+    if (widget.repository.mechanizationActionError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(widget.repository.mechanizationActionError!)),
+      );
+      return;
+    }
     showDialog<void>(
       context: context,
       builder: (_) => AlertDialog(

@@ -143,6 +143,7 @@ class OperationsStatusChip extends StatelessWidget {
         OperationsRequestStatus.pending => const Color(0xFF9A6B00),
         OperationsRequestStatus.approved => scheme.primary,
         OperationsRequestStatus.rejected => scheme.error,
+        OperationsRequestStatus.returned => const Color(0xFFC8872B),
         OperationsRequestStatus.scheduled => scheme.tertiary,
         OperationsRequestStatus.cancelled => scheme.error,
       };
@@ -166,8 +167,10 @@ class OperationsStatusChip extends StatelessWidget {
       JobStatus.scheduled => scheme.tertiary,
       JobStatus.dispatched => const Color(0xFF7B4BD2),
       JobStatus.enRoute => const Color(0xFF7B4BD2),
+      JobStatus.arrived => const Color(0xFF0EA5E9),
       JobStatus.inProgress => const Color(0xFF7B4BD2),
       JobStatus.completedPendingConfirmation => const Color(0xFF9A6B00),
+      JobStatus.flagged => scheme.error,
       JobStatus.closed => scheme.primary,
       JobStatus.cancelled => scheme.error,
     };

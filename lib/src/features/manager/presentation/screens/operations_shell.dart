@@ -4,6 +4,7 @@ import '../../data/repositories/union_operations_repository.dart';
 import 'operations_dashboard_view.dart';
 import 'operations_directory_views.dart';
 import 'operations_jobs_view.dart';
+import 'operations_oversight_view.dart';
 import 'operations_requests_view.dart';
 import 'operations_schedule_view.dart';
 
@@ -12,6 +13,7 @@ enum OperationsSection {
   requests('Service Requests', Icons.fact_check_outlined),
   schedule('Schedule', Icons.calendar_month_outlined),
   jobs('Jobs', Icons.route_outlined),
+  oversight('Oversight', Icons.rule_folder_outlined),
   tractors('Tractors', Icons.agriculture_outlined),
   operators('Operators', Icons.engineering_outlined),
   farmers('Farmers', Icons.groups_outlined),
@@ -53,17 +55,31 @@ class _OperationsShellState extends State<OperationsShell> {
                 title: const Text('Union Operations'),
                 actions: [
                   IconButton(
-                    tooltip: 'Notifications',
-                    onPressed: () {},
-                    icon: const Icon(Icons.notifications_outlined),
+                    tooltip: 'Refresh',
+                    onPressed: widget.repository.isSyncingMechanization
+                        ? null
+                        : widget.repository.refreshMechanizationData,
+                    icon: const Icon(Icons.sync),
                   ),
-                  const Padding(
-                    padding: EdgeInsets.only(right: 16),
-                    child: Center(child: Text('Manager: Asha')),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 16),
+                    child: Center(
+                      child: Text(
+                        widget.repository.mechanizationUserName ??
+                            'Union staff',
+                      ),
+                    ),
                   ),
                 ],
               ),
-              drawer: compact ? _OperationsDrawer(child: _navList()) : null,
+              drawer: compact
+                  ? _OperationsDrawer(
+                      subtitle:
+                          widget.repository.mechanizationUserName ??
+                          'Union staff',
+                      child: _navList(),
+                    )
+                  : null,
               body: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -141,6 +157,8 @@ class _OperationsShellState extends State<OperationsShell> {
         onOpenRequests: () =>
             setState(() => _section = OperationsSection.requests),
         onOpenJobs: () => setState(() => _section = OperationsSection.jobs),
+        onOpenOversight: () =>
+            setState(() => _section = OperationsSection.oversight),
       ),
       OperationsSection.requests => OperationsRequestsView(
         repository: widget.repository,
@@ -149,6 +167,9 @@ class _OperationsShellState extends State<OperationsShell> {
         repository: widget.repository,
       ),
       OperationsSection.jobs => OperationsJobsView(
+        repository: widget.repository,
+      ),
+      OperationsSection.oversight => OperationsOversightView(
         repository: widget.repository,
       ),
       OperationsSection.tractors => TractorsView(repository: widget.repository),
@@ -165,8 +186,9 @@ class _OperationsShellState extends State<OperationsShell> {
 }
 
 class _OperationsDrawer extends StatelessWidget {
-  const _OperationsDrawer({required this.child});
+  const _OperationsDrawer({required this.subtitle, required this.child});
 
+  final String subtitle;
   final Widget child;
 
   @override
@@ -175,9 +197,9 @@ class _OperationsDrawer extends StatelessWidget {
       child: SafeArea(
         child: Column(
           children: [
-            const ListTile(
-              title: Text('Union Operations'),
-              subtitle: Text('Manager: Asha'),
+            ListTile(
+              title: const Text('Union Operations'),
+              subtitle: Text(subtitle),
             ),
             Expanded(child: child),
           ],

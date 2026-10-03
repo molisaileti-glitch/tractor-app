@@ -5,6 +5,7 @@ enum OperatorJobStatus {
   scheduled('Scheduled'),
   dispatched('Dispatched'),
   enRoute('En route'),
+  arrived('Arrived'),
   inProgress('Job in progress'),
   completedPendingConfirmation('Completed pending confirmation');
 
@@ -48,6 +49,7 @@ class OperatorJob {
     required this.tractorId,
     required this.scheduledAt,
     required this.status,
+    this.tractorLabel,
     this.journeyStartedAt,
     this.startedAt,
     this.finishedAt,
@@ -61,6 +63,7 @@ class OperatorJob {
   final ServiceType serviceType;
   final FarmPlot plot;
   final String tractorId;
+  final String? tractorLabel;
   final DateTime scheduledAt;
   final OperatorJobStatus status;
   final DateTime? journeyStartedAt;
@@ -75,6 +78,7 @@ class OperatorJob {
 
   OperatorJob copyWith({
     OperatorJobStatus? status,
+    String? tractorLabel,
     DateTime? journeyStartedAt,
     DateTime? startedAt,
     DateTime? finishedAt,
@@ -88,6 +92,7 @@ class OperatorJob {
       serviceType: serviceType,
       plot: plot,
       tractorId: tractorId,
+      tractorLabel: tractorLabel ?? this.tractorLabel,
       scheduledAt: scheduledAt,
       status: status ?? this.status,
       journeyStartedAt: journeyStartedAt ?? this.journeyStartedAt,

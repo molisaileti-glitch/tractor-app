@@ -7,11 +7,13 @@ class OtpVerificationScreen extends StatefulWidget {
     required this.phoneNumber,
     required this.onBack,
     required this.onVerified,
+    required this.onResend,
   });
 
   final String phoneNumber;
   final VoidCallback onBack;
-  final Future<bool> Function(String code) onVerified;
+  final Future<String?> Function(String code) onVerified;
+  final Future<String?> Function() onResend;
 
   @override
   State<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
@@ -25,6 +27,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   final _controllers = List.generate(6, (_) => TextEditingController());
   final _focusNodes = List.generate(6, (_) => FocusNode());
   bool _verifying = false;
+  bool _resending = false;
   String? _errorText;
 
   @override
@@ -64,8 +67,10 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                         phoneNumber: widget.phoneNumber,
                         errorText: _errorText,
                         verifying: _verifying,
+                        resending: _resending,
                         otpBoxBuilder: _otpBox,
                         onVerify: _verify,
+                        onResend: _resend,
                       ),
                     ],
                   ),
@@ -128,16 +133,35 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     }
 
     setState(() => _verifying = true);
-    final accepted = await widget.onVerified(code);
+    final error = await widget.onVerified(code);
     if (!mounted) return;
-    if (!accepted) {
+    if (error != null) {
       setState(() {
         _verifying = false;
-        _errorText = 'Invalid or expired code. Please check and try again.';
+        _errorText = error;
       });
       return;
     }
     Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
+  Future<void> _resend() async {
+    if (_resending) return;
+    setState(() {
+      _resending = true;
+      _errorText = null;
+    });
+    final error = await widget.onResend();
+    if (!mounted) return;
+    setState(() {
+      _resending = false;
+      _errorText = error;
+    });
+    if (error == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('A new verification code was sent.')),
+      );
+    }
   }
 }
 
@@ -146,15 +170,19 @@ class _OtpPanel extends StatelessWidget {
     required this.phoneNumber,
     required this.errorText,
     required this.verifying,
+    required this.resending,
     required this.otpBoxBuilder,
     required this.onVerify,
+    required this.onResend,
   });
 
   final String phoneNumber;
   final String? errorText;
   final bool verifying;
+  final bool resending;
   final Widget Function({required int index}) otpBoxBuilder;
   final VoidCallback onVerify;
+  final VoidCallback onResend;
 
   @override
   Widget build(BuildContext context) {
@@ -235,7 +263,10 @@ class _OtpPanel extends StatelessWidget {
               child: Text(verifying ? 'Verifying...' : 'Continue'),
             ),
             const SizedBox(height: 10),
-            TextButton(onPressed: () {}, child: const Text('Resend code')),
+            TextButton(
+              onPressed: resending || verifying ? null : onResend,
+              child: Text(resending ? 'Sending...' : 'Resend code'),
+            ),
           ],
         ),
       ),

@@ -8,9 +8,12 @@ class AuthVerifiedSessionModel {
     required this.tenant,
   });
 
-  factory AuthVerifiedSessionModel.fromJson(Map<String, Object?> json) {
+  factory AuthVerifiedSessionModel.fromJson(
+    Map<String, Object?> json, {
+    String? accessToken,
+  }) {
     return AuthVerifiedSessionModel(
-      token: json['token']?.toString() ?? '',
+      token: json['token']?.toString() ?? accessToken ?? '',
       expiresAt: json['expires_at']?.toString(),
       user: AuthUserModel.fromJson(_map(json['user'])),
       tenant: AuthTenantModel.fromJson(_map(json['tenant'])),
@@ -79,6 +82,7 @@ class AuthTenantModel {
     required this.brand,
     required this.logoUrl,
     required this.locale,
+    required this.smsCredits,
   });
 
   factory AuthTenantModel.fromJson(Map<String, Object?> json) {
@@ -87,6 +91,7 @@ class AuthTenantModel {
       brand: json['brand']?.toString(),
       logoUrl: json['logo_url']?.toString(),
       locale: json['locale']?.toString(),
+      smsCredits: _asInt(json['sms_credits']),
     );
   }
 
@@ -94,4 +99,11 @@ class AuthTenantModel {
   final String? brand;
   final String? logoUrl;
   final String? locale;
+  final int? smsCredits;
+
+  static int? _asInt(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '');
+  }
 }

@@ -22,6 +22,26 @@ class OperationsJobsView extends StatelessWidget {
           ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
         ),
         const SizedBox(height: 14),
+        if (repository.mechanizationActionError != null) ...[
+          OperationsCard(
+            child: Row(
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    repository.mechanizationActionError!,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         for (final job in repository.jobs) ...[
           _JobCard(repository: repository, job: job),
           const SizedBox(height: 12),
@@ -42,7 +62,9 @@ class _JobCard extends StatelessWidget {
       job.status == JobStatus.scheduled ||
       job.status == JobStatus.dispatched ||
       job.status == JobStatus.enRoute ||
-      job.status == JobStatus.inProgress;
+      job.status == JobStatus.arrived ||
+      job.status == JobStatus.inProgress ||
+      job.status == JobStatus.flagged;
 
   @override
   Widget build(BuildContext context) {
@@ -104,10 +126,24 @@ class _JobCard extends StatelessWidget {
           ],
           if (job.status == JobStatus.completedPendingConfirmation) ...[
             const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: () => repository.closeJob(job.id),
-              icon: const Icon(Icons.fact_check_outlined),
-              label: const Text('Close Job'),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showVerifyDialog(context),
+                    icon: const Icon(Icons.verified_outlined),
+                    label: const Text('Verify'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () => repository.closeJob(job.id),
+                    icon: const Icon(Icons.fact_check_outlined),
+                    label: const Text('Close'),
+                  ),
+                ),
+              ],
             ),
           ],
         ],
@@ -141,6 +177,56 @@ class _JobCard extends StatelessWidget {
                 },
               ),
               ListTile(
+                leading: const Icon(Icons.north_east),
+                title: const Text('Dispatch / reassign'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  repository.dispatchJob(job.id);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.insights_outlined),
+                title: const Text('Refresh verification'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  repository.refreshJobVerification(job.id);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.phone_in_talk_outlined),
+                title: const Text('Manual farmer confirm'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  repository.confirmJob(
+                    jobId: job.id,
+                    rating: 5,
+                    note: 'Confirmed by phone',
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.flag_outlined),
+                title: Text(
+                  job.status == JobStatus.flagged ? 'Clear flag' : 'Flag job',
+                ),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  if (job.status == JobStatus.flagged) {
+                    _showUnflagDialog(context);
+                  } else {
+                    _showFlagDialog(context);
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.task_alt_outlined),
+                title: const Text('Close as paid'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  repository.closeJob(job.id);
+                },
+              ),
+              ListTile(
                 leading: Icon(
                   Icons.cancel_outlined,
                   color: Theme.of(context).colorScheme.error,
@@ -164,6 +250,145 @@ class _JobCard extends StatelessWidget {
       ),
     );
   }
+
+  Future<void> _showFlagDialog(BuildContext context) async {
+    final controller = TextEditingController();
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Flag Job'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Reason',
+            hintText: 'Acreage looks inflated',
+          ),
+          minLines: 2,
+          maxLines: 3,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Flag'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (reason == null || reason.isEmpty) return;
+    repository.flagJob(jobId: job.id, reason: reason);
+  }
+
+  Future<void> _showUnflagDialog(BuildContext context) async {
+    final controller = TextEditingController();
+    final note = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Clear Flag'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Note',
+            hintText: 'Re-measured with the farmer',
+          ),
+          minLines: 2,
+          maxLines: 3,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (note == null || note.isEmpty) return;
+    repository.unflagJob(jobId: job.id, note: note);
+  }
+
+  Future<void> _showVerifyDialog(BuildContext context) async {
+    final acresController = TextEditingController(
+      text: (job.plot.areaHectares / 0.404686).toStringAsFixed(2),
+    );
+    final noteController = TextEditingController();
+    final input = await showDialog<_VerifyJobInput>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Verify Job'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: acresController,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(
+                labelText: 'Verified acres',
+                hintText: '4.5',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: noteController,
+              decoration: const InputDecoration(
+                labelText: 'Note',
+                hintText: 'Matches the trail',
+              ),
+              minLines: 2,
+              maxLines: 3,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final acres = num.tryParse(acresController.text.trim());
+              if (acres == null || acres <= 0) return;
+              Navigator.of(context).pop(
+                _VerifyJobInput(
+                  verifiedAcres: acres,
+                  note: noteController.text.trim(),
+                ),
+              );
+            },
+            child: const Text('Verify'),
+          ),
+        ],
+      ),
+    );
+    acresController.dispose();
+    noteController.dispose();
+    if (input == null) return;
+    repository.verifyJob(
+      jobId: job.id,
+      verifiedAcres: input.verifiedAcres,
+      note: input.note.isEmpty ? null : input.note,
+    );
+  }
+}
+
+class _VerifyJobInput {
+  const _VerifyJobInput({required this.verifiedAcres, required this.note});
+
+  final num verifiedAcres;
+  final String note;
 }
 
 class RescheduleJobScreen extends StatefulWidget {
@@ -273,8 +498,8 @@ class _RescheduleJobScreenState extends State<RescheduleJobScreen> {
     final picked = await showDatePicker(
       context: context,
       initialDate: _selectedAt,
-      firstDate: DateTime(2026, 9),
-      lastDate: DateTime(2027, 12, 31),
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
     );
     if (picked == null) return;
     setState(() {
