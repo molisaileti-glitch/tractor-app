@@ -29,7 +29,10 @@ class _OperatorShellState extends State<OperatorShell> {
       OperatorJobsScreen(repository: widget.repository),
       OperatorMapScreen(repository: widget.repository),
       OperatorHistoryScreen(repository: widget.repository),
-      OperatorProfileScreen(onLogout: widget.onLogout),
+      OperatorProfileScreen(
+        repository: widget.repository,
+        onLogout: widget.onLogout,
+      ),
     ];
 
     return AnimatedBuilder(

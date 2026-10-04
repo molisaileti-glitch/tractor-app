@@ -14,7 +14,8 @@ class OperatorMapScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final job = repository.todayJob;
+    final jobs = repository.jobs.toList()..sort(_sortJobs);
+    final primaryJob = jobs.firstOrNull;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       child: Align(
@@ -32,35 +33,58 @@ class OperatorMapScreen extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               OperatorMapCard(
-                showTrack: job.status == OperatorJobStatus.inProgress,
-                label: job.status == OperatorJobStatus.inProgress
-                    ? 'WORK TRACK'
-                    : 'FARM LOCATION',
-              ),
-              const SizedBox(height: 14),
-              OperatorCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      job.plot.name,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text('${job.serviceType.label} for ${job.farmerName}'),
-                    const SizedBox(height: 12),
-                    OperatorStatusPill(status: job.status),
-                  ],
+                jobs: jobs,
+                showTrack: jobs.any(
+                  (job) => job.status == OperatorJobStatus.inProgress,
                 ),
+                label: 'ASSIGNED JOBS',
               ),
               const SizedBox(height: 14),
-              FilledButton.icon(
-                onPressed: () => _openRelevantScreen(context, job),
-                icon: const Icon(Icons.open_in_new),
-                label: const Text('Open Job'),
-              ),
+              if (primaryJob == null)
+                const OperatorCard(
+                  child: Text(
+                    'No assigned jobs with map data were returned by the API.',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                )
+              else ...[
+                Text(
+                  'ASSIGNMENTS ON MAP',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                for (final job in jobs) ...[
+                  OperatorCard(
+                    onTap: () => _openRelevantScreen(context, job),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.agriculture),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                job.plot.name,
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.w900),
+                              ),
+                            ),
+                            OperatorStatusPill(status: job.status),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text('${job.serviceType.label} for ${job.farmerName}'),
+                        const SizedBox(height: 4),
+                        Text(job.tractorLabel ?? job.tractorId),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+              ],
             ],
           ),
         ),
@@ -80,5 +104,26 @@ class OperatorMapScreen extends StatelessWidget {
       screen = OperatorProgressScreen(repository: repository, jobId: job.id);
     }
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
+  }
+
+  int _sortJobs(OperatorJob first, OperatorJob second) {
+    final firstPriority = _statusPriority(first.status);
+    final secondPriority = _statusPriority(second.status);
+    if (firstPriority != secondPriority) {
+      return firstPriority.compareTo(secondPriority);
+    }
+    return first.scheduledAt.compareTo(second.scheduledAt);
+  }
+
+  int _statusPriority(OperatorJobStatus status) {
+    return switch (status) {
+      OperatorJobStatus.inProgress => 0,
+      OperatorJobStatus.arrived => 1,
+      OperatorJobStatus.enRoute => 2,
+      OperatorJobStatus.dispatched => 3,
+      OperatorJobStatus.assigned => 4,
+      OperatorJobStatus.scheduled => 5,
+      OperatorJobStatus.completedPendingConfirmation => 6,
+    };
   }
 }

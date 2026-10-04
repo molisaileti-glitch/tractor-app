@@ -1,14 +1,26 @@
 import 'package:flutter/material.dart';
 
+import '../../data/repositories/operator_local_repository.dart';
 import '../widgets/operator_widgets.dart';
 
 class OperatorProfileScreen extends StatelessWidget {
-  const OperatorProfileScreen({super.key, required this.onLogout});
+  const OperatorProfileScreen({
+    super.key,
+    required this.repository,
+    required this.onLogout,
+  });
 
+  final OperatorLocalRepository repository;
   final VoidCallback onLogout;
 
   @override
   Widget build(BuildContext context) {
+    final name = repository.operatorName ?? 'Operator';
+    final role = repository.operatorRole ?? 'Mechanization operator';
+    final email = repository.operatorEmail;
+    final activeJobs = repository.jobs.where((job) => !job.isComplete).length;
+    final completedJobs = repository.history.length;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       child: Align(
@@ -41,11 +53,13 @@ class OperatorProfileScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'John M.',
+                            name,
                             style: Theme.of(context).textTheme.titleLarge
                                 ?.copyWith(fontWeight: FontWeight.w900),
                           ),
-                          const Text('Operator - TR-001'),
+                          Text(email == null || email.isEmpty
+                              ? role
+                              : '$role - $email'),
                         ],
                       ),
                     ),
@@ -53,22 +67,23 @@ class OperatorProfileScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 14),
-              const OperatorCard(
+              OperatorCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _ProfileLine(
-                      icon: Icons.gps_fixed,
-                      title: 'GPS verification',
-                      subtitle:
-                          'Start Job is blocked until the tractor is inside the registered plot.',
+                      icon: Icons.assignment_outlined,
+                      title: 'Assigned jobs',
+                      subtitle: '$activeJobs active, $completedJobs completed',
                     ),
-                    Divider(height: 28),
+                    const Divider(height: 28),
                     _ProfileLine(
                       icon: Icons.sync_outlined,
-                      title: 'Offline ready',
-                      subtitle:
-                          'Journey, start, notes and completion events are local for now.',
+                      title: 'Backend sync',
+                      subtitle: repository.isSyncingMechanization
+                          ? 'Refreshing operator data...'
+                          : repository.mechanizationSyncError ??
+                                'Using authenticated mechanization API data.',
                     ),
                   ],
                 ),

@@ -19,15 +19,15 @@ class OperatorJobDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final job = repository.jobById(jobId);
-    return Scaffold(
+    return AnimatedBuilder(
+      animation: repository,
+      builder: (context, _) {
+        final job = repository.jobById(jobId);
+        return Scaffold(
       body: Stack(
         children: [
           Positioned.fill(
-            child: Container(
-              color: const Color(0xFFDCE9DF),
-              child: CustomPaint(painter: _OperatorMapPainter()),
-            ),
+            child: OperatorMapCard(job: job, label: 'JOB LOCATION', fill: true),
           ),
           SafeArea(
             child: Padding(
@@ -77,9 +77,17 @@ class OperatorJobDetailScreen extends StatelessWidget {
         ],
       ),
     );
+      },
+    );
   }
 
   void _advance(BuildContext context, OperatorJob job) {
+    if ((job.status == OperatorJobStatus.dispatched ||
+            job.status == OperatorJobStatus.assigned) &&
+        !job.acceptedByOperator) {
+      _acceptAssignment(context, job);
+      return;
+    }
     if (job.status == OperatorJobStatus.inProgress) {
       Navigator.of(context).push(
         MaterialPageRoute(
@@ -89,21 +97,36 @@ class OperatorJobDetailScreen extends StatelessWidget {
       );
       return;
     }
+    if (job.status == OperatorJobStatus.enRoute ||
+        job.status == OperatorJobStatus.arrived) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) =>
+              OperatorArrivalScreen(repository: repository, jobId: job.id),
+        ),
+      );
+      return;
+    }
     _startJourney(context, job);
+  }
+
+  Future<void> _acceptAssignment(BuildContext context, OperatorJob job) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await repository.acceptAssignment(job.id);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          ok
+              ? 'Assignment accepted. You can start the journey when ready.'
+              : repository.lastActionError ?? 'Accept failed.',
+        ),
+      ),
+    );
   }
 
   Future<void> _startJourney(BuildContext context, OperatorJob job) async {
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
-    final accepted = job.status == OperatorJobStatus.dispatched
-        ? await repository.acceptAssignment(job.id)
-        : true;
-    if (!accepted) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(repository.lastActionError ?? 'Accept failed.')),
-      );
-      return;
-    }
     final ok = await repository.startJourney(job.id);
     if (!ok) {
       messenger.showSnackBar(
@@ -236,17 +259,32 @@ class _JobActionSheet extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            job.serviceType.label,
+                            job.reference ?? job.id,
+                            style: Theme.of(context).textTheme.labelLarge
+                                ?.copyWith(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                          ),
+                          Text(
+                            job.serviceType.label.toUpperCase(),
                             style: Theme.of(context).textTheme.titleLarge
                                 ?.copyWith(fontWeight: FontWeight.w900),
                           ),
                           Text(
-                            '${job.farmerName} - ${formatTime(job.scheduledAt)}',
+                            job.timeWindow == null
+                                ? '${formatDate(job.scheduledAt)} - ${formatTime(job.scheduledAt)}'
+                                : '${formatDate(job.scheduledAt)} - ${job.timeWindow}',
                           ),
-                          Text(job.plot.name),
+                          Text('${job.farmerName} - ${job.plot.name}'),
+                          if (job.plannedAcres != null)
+                            Text(
+                              '${job.plannedAcres!.toStringAsFixed(1)} planned acres',
+                            ),
                         ],
                       ),
                     ),
+                    OperatorStatusPill(status: job.status),
                   ],
                 ),
               ),
@@ -257,7 +295,7 @@ class _JobActionSheet extends StatelessWidget {
                     child: FilledButton.icon(
                       onPressed: onStartJourney,
                       icon: const Icon(Icons.route_outlined),
-                      label: const Text('Start Journey'),
+                      label: Text(_primaryActionLabel(job)),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -274,44 +312,16 @@ class _JobActionSheet extends StatelessWidget {
       ),
     );
   }
-}
 
-class _OperatorMapPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final road = Paint()
-      ..color = Colors.white.withValues(alpha: 0.72)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 5
-      ..strokeCap = StrokeCap.round;
-    for (var i = 0; i < 6; i++) {
-      final y = size.height * (0.12 + i * 0.14);
-      canvas.drawLine(
-        Offset(size.width * 0.05, y),
-        Offset(size.width * 0.95, y + size.height * 0.08),
-        road,
-      );
-    }
-    final route = Paint()
-      ..color = const Color(0xFF2F6F4E)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 6
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-    final path = Path()
-      ..moveTo(size.width * 0.18, size.height * 0.24)
-      ..lineTo(size.width * 0.42, size.height * 0.36)
-      ..lineTo(size.width * 0.55, size.height * 0.52)
-      ..lineTo(size.width * 0.76, size.height * 0.60);
-    canvas.drawPath(path, route);
-    final marker = Paint()..color = const Color(0xFF2F6F4E);
-    canvas.drawCircle(
-      Offset(size.width * 0.76, size.height * 0.60),
-      12,
-      marker,
-    );
+  String _primaryActionLabel(OperatorJob job) {
+    return switch (job.status) {
+      OperatorJobStatus.dispatched || OperatorJobStatus.assigned =>
+        job.acceptedByOperator ? 'Start Journey' : 'Accept Assignment',
+      OperatorJobStatus.enRoute => 'Record Arrival',
+      OperatorJobStatus.arrived => 'Start Work',
+      OperatorJobStatus.inProgress => 'Continue Work',
+      OperatorJobStatus.scheduled => 'Open Job',
+      OperatorJobStatus.completedPendingConfirmation => 'View Job',
+    };
   }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

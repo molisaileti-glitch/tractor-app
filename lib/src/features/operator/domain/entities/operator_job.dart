@@ -3,6 +3,7 @@ import '../../../farmer/domain/entities/service_request.dart';
 
 enum OperatorJobStatus {
   scheduled('Scheduled'),
+  assigned('Assigned'),
   dispatched('Dispatched'),
   enRoute('En route'),
   arrived('Arrived'),
@@ -48,13 +49,22 @@ class OperatorJob {
     required this.plot,
     required this.tractorId,
     required this.scheduledAt,
+    this.scheduledEndAt,
     required this.status,
+    this.reference,
+    this.farmerPhone,
     this.tractorLabel,
+    this.timeWindow,
+    this.plannedAcres,
+    this.amount,
+    this.currency,
+    this.acceptedByOperator = false,
     this.journeyStartedAt,
     this.startedAt,
     this.finishedAt,
     this.areaServicedHectares,
     this.completionNotes,
+    this.trackPoints = const [],
     this.problemReports = const [],
   });
 
@@ -63,14 +73,23 @@ class OperatorJob {
   final ServiceType serviceType;
   final FarmPlot plot;
   final String tractorId;
+  final String? reference;
+  final String? farmerPhone;
   final String? tractorLabel;
+  final String? timeWindow;
+  final double? plannedAcres;
+  final num? amount;
+  final String? currency;
+  final bool acceptedByOperator;
   final DateTime scheduledAt;
+  final DateTime? scheduledEndAt;
   final OperatorJobStatus status;
   final DateTime? journeyStartedAt;
   final DateTime? startedAt;
   final DateTime? finishedAt;
   final double? areaServicedHectares;
   final String? completionNotes;
+  final List<BoundaryPoint> trackPoints;
   final List<OperatorProblemReport> problemReports;
 
   bool get isComplete =>
@@ -78,12 +97,21 @@ class OperatorJob {
 
   OperatorJob copyWith({
     OperatorJobStatus? status,
+    String? reference,
+    String? farmerPhone,
     String? tractorLabel,
+    String? timeWindow,
+    double? plannedAcres,
+    num? amount,
+    String? currency,
+    bool? acceptedByOperator,
+    DateTime? scheduledEndAt,
     DateTime? journeyStartedAt,
     DateTime? startedAt,
     DateTime? finishedAt,
     double? areaServicedHectares,
     String? completionNotes,
+    List<BoundaryPoint>? trackPoints,
     List<OperatorProblemReport>? problemReports,
   }) {
     return OperatorJob(
@@ -92,15 +120,52 @@ class OperatorJob {
       serviceType: serviceType,
       plot: plot,
       tractorId: tractorId,
+      reference: reference ?? this.reference,
+      farmerPhone: farmerPhone ?? this.farmerPhone,
       tractorLabel: tractorLabel ?? this.tractorLabel,
+      timeWindow: timeWindow ?? this.timeWindow,
+      plannedAcres: plannedAcres ?? this.plannedAcres,
+      amount: amount ?? this.amount,
+      currency: currency ?? this.currency,
+      acceptedByOperator: acceptedByOperator ?? this.acceptedByOperator,
       scheduledAt: scheduledAt,
+      scheduledEndAt: scheduledEndAt ?? this.scheduledEndAt,
       status: status ?? this.status,
       journeyStartedAt: journeyStartedAt ?? this.journeyStartedAt,
       startedAt: startedAt ?? this.startedAt,
       finishedAt: finishedAt ?? this.finishedAt,
       areaServicedHectares: areaServicedHectares ?? this.areaServicedHectares,
       completionNotes: completionNotes ?? this.completionNotes,
+      trackPoints: trackPoints ?? this.trackPoints,
       problemReports: problemReports ?? this.problemReports,
     );
   }
+}
+
+class OperatorStartCheckResult {
+  const OperatorStartCheckResult({
+    required this.canStart,
+    required this.overrideAllowed,
+    required this.failed,
+    required this.checks,
+  });
+
+  final bool canStart;
+  final bool overrideAllowed;
+  final List<String> failed;
+  final List<OperatorStartCheckItem> checks;
+}
+
+class OperatorStartCheckItem {
+  const OperatorStartCheckItem({
+    required this.key,
+    required this.label,
+    required this.passed,
+    this.detail,
+  });
+
+  final String key;
+  final String label;
+  final bool passed;
+  final String? detail;
 }

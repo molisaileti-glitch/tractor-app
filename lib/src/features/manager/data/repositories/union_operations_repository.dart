@@ -291,14 +291,71 @@ class UnionOperationsRepository extends ChangeNotifier {
     }
   }
 
-  Future<void> approveRequest(String id) async {
+  Future<void> refreshRequestDetail(String id) async {
+    final token = _accessToken;
+    if (token == null || token.isEmpty) return;
+    try {
+      _mechanizationActionError = null;
+      final response = await mobileApiClient.request(
+        token: token,
+        requestId: id,
+      );
+      final request = _requestFromJson(_dataMap(response));
+      if (request != null) _upsertRequest(request);
+      notifyListeners();
+    } on KwanzaTrackApiException catch (error) {
+      _mechanizationActionError = error.message;
+      notifyListeners();
+    }
+  }
+
+  Future<void> registerRequest({
+    required String farmerId,
+    required String plotId,
+    required String serviceTypeId,
+    required num requestedAcres,
+    required DateTime preferredDate,
+    required String preferredWindow,
+    required String priority,
+    String? notes,
+  }) async {
+    final token = _accessToken;
+    if (token == null || token.isEmpty) return;
+    try {
+      _mechanizationActionError = null;
+      final response = await mobileApiClient.createRequest(
+        token: token,
+        farmerId: farmerId,
+        plotId: plotId,
+        serviceTypeId: serviceTypeId,
+        requestedAcres: requestedAcres,
+        preferredDate: _dateOnly(preferredDate),
+        preferredWindow: preferredWindow,
+        priority: priority,
+        notes: notes,
+      );
+      final request = _requestFromJson(_dataMap(response));
+      if (request != null) _upsertRequest(request);
+      notifyListeners();
+    } on KwanzaTrackApiException catch (error) {
+      _mechanizationActionError = error.message;
+      notifyListeners();
+    }
+  }
+
+  Future<void> approveRequest({
+    required String id,
+    required num estimateAmount,
+    required String priority,
+    String? note,
+  }) async {
     if (await _tryRemoteRequestUpdate(
       () => mobileApiClient.approveRequest(
         token: _accessToken!,
         requestId: id,
-        estimateAmount: 300000,
-        priority: 'high',
-        note: 'Priority farmer group',
+        estimateAmount: estimateAmount,
+        priority: priority,
+        note: note,
       ),
     )) {
       return;
@@ -438,6 +495,39 @@ class UnionOperationsRepository extends ChangeNotifier {
     );
     notifyListeners();
     return jobId;
+  }
+
+  Future<RequestAvailabilityResult?> checkRequestAvailability({
+    required DateTime date,
+    required String tractorId,
+    required String operatorId,
+  }) async {
+    final token = _accessToken;
+    if (token == null || token.isEmpty) return null;
+    try {
+      _mechanizationActionError = null;
+      final response = await mobileApiClient.availability(
+        token: token,
+        date: _dateOnly(date),
+        tractorId: tractorId,
+        operatorId: operatorId,
+      );
+      final data = _dataMap(response);
+      final tractor = _availabilityItems(data['tractor']);
+      final operator = _availabilityItems(data['operator']);
+      final result = RequestAvailabilityResult(
+        isAvailable: tractor.isEmpty && operator.isEmpty,
+        tractorConflicts: tractor,
+        operatorConflicts: operator,
+        loadHours: _number(data, const ['load_hours']) ?? 0,
+      );
+      notifyListeners();
+      return result;
+    } on KwanzaTrackApiException catch (error) {
+      _mechanizationActionError = error.message;
+      notifyListeners();
+      return null;
+    }
   }
 
   Future<void> dispatchJob(String jobId) async {
@@ -697,6 +787,7 @@ class UnionOperationsRepository extends ChangeNotifier {
     required String jobId,
     int rating = 5,
     String? note,
+    bool? dispute,
   }) async {
     await _tryRemoteJobUpdate(
       () => mobileApiClient.confirmJob(
@@ -704,6 +795,7 @@ class UnionOperationsRepository extends ChangeNotifier {
         jobId: jobId,
         rating: rating,
         note: note,
+        dispute: dispute,
       ),
     );
   }
@@ -1479,6 +1571,24 @@ class UnionOperationsRepository extends ChangeNotifier {
   List<String> _stringList(Object? value) {
     if (value is List) return value.map((item) => item.toString()).toList();
     return const [];
+  }
+
+  List<String> _availabilityItems(Object? value) {
+    if (value is! List) return const [];
+    return value.map((item) {
+      if (item is Map) {
+        final map = _stringKeyedMap(item);
+        return _text(map, const [
+              'reference',
+              'label',
+              'name',
+              'status',
+              'id',
+            ]) ??
+            item.toString();
+      }
+      return item.toString();
+    }).toList();
   }
 
   DateTime? _dateTime(Object? value) {

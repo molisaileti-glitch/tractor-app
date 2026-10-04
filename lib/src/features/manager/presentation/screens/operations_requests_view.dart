@@ -57,11 +57,26 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Service Requests',
-          style: Theme.of(
-            context,
-          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Service Requests',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            FilledButton.icon(
+              onPressed: _showRegisterSheet,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 44),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+              ),
+              icon: const Icon(Icons.add),
+              label: const Text('Register'),
+            ),
+          ],
         ),
         const SizedBox(height: 14),
         _RemoteRequestsBanner(
@@ -146,6 +161,7 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
   }
 
   void _openRequest(BuildContext context, String id) {
+    unawaited(widget.repository.refreshRequestDetail(id));
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => OperationsRequestDetailScreen(
@@ -164,6 +180,14 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
       _remoteRequestsError = widget.repository.mechanizationActionError;
       _loadingRemoteRequests = false;
     });
+  }
+
+  void _showRegisterSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _RegisterRequestSheet(repository: widget.repository),
+    );
   }
 }
 
@@ -396,8 +420,11 @@ class OperationsRequestDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final request = repository.requestById(requestId);
-    return Scaffold(
+    return AnimatedBuilder(
+      animation: repository,
+      builder: (context, _) {
+        final request = repository.requestById(requestId);
+        return Scaffold(
       body: Stack(
         children: [
           Positioned.fill(
@@ -530,16 +557,8 @@ class OperationsRequestDetailScreen extends StatelessWidget {
                                   label: const Text('Reject'),
                                 ),
                                 OutlinedButton.icon(
-                                  onPressed: () {
-                                    unawaited(
-                                      repository.returnRequest(
-                                        id: request.id,
-                                        reason:
-                                            'Plot boundary crosses the road reserve',
-                                      ),
-                                    );
-                                    Navigator.of(context).pop();
-                                  },
+                                  onPressed: () =>
+                                      _returnForCorrection(context, request),
                                   icon: const Icon(Icons.keyboard_return),
                                   label: const Text('Return'),
                                 ),
@@ -564,16 +583,8 @@ class OperationsRequestDetailScreen extends StatelessWidget {
                                   label: const Text('Schedule Service'),
                                 ),
                                 OutlinedButton.icon(
-                                  onPressed: () {
-                                    unawaited(
-                                      repository.cancelRequest(
-                                        id: request.id,
-                                        reason: 'Farmer withdrew',
-                                        notes: '',
-                                      ),
-                                    );
-                                    Navigator.of(context).pop();
-                                  },
+                                  onPressed: () =>
+                                      _cancelRequest(context, request),
                                   icon: const Icon(Icons.cancel_outlined),
                                   label: const Text('Cancel'),
                                 ),
@@ -587,16 +598,8 @@ class OperationsRequestDetailScreen extends StatelessWidget {
                               children: [
                                 const Text('This request has been scheduled.'),
                                 OutlinedButton.icon(
-                                  onPressed: () {
-                                    unawaited(
-                                      repository.cancelRequest(
-                                        id: request.id,
-                                        reason: 'Farmer withdrew',
-                                        notes: '',
-                                      ),
-                                    );
-                                    Navigator.of(context).pop();
-                                  },
+                                  onPressed: () =>
+                                      _cancelRequest(context, request),
                                   icon: const Icon(Icons.cancel_outlined),
                                   label: const Text('Cancel'),
                                 ),
@@ -621,11 +624,36 @@ class OperationsRequestDetailScreen extends StatelessWidget {
           ),
         ],
       ),
+        );
+      },
     );
   }
 
   void _approve(BuildContext context, String id) {
-    unawaited(repository.approveRequest(id));
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _ApproveRequestSheet(
+        onSubmit: ({
+          required num amount,
+          required String priority,
+          String? note,
+        }) {
+          unawaited(
+            repository.approveRequest(
+              id: id,
+              estimateAmount: amount,
+              priority: priority,
+              note: note,
+            ),
+          );
+          _showSchedulePrompt(context, id);
+        },
+      ),
+    );
+  }
+
+  void _showSchedulePrompt(BuildContext context, String id) {
     showDialog<void>(
       context: context,
       builder: (_) => AlertDialog(
@@ -646,6 +674,72 @@ class OperationsRequestDetailScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _returnForCorrection(
+    BuildContext context,
+    OperationsServiceRequest request,
+  ) async {
+    final reason = await _askForText(
+      context,
+      title: 'Return For Correction',
+      label: 'Reason',
+    );
+    if (reason == null || reason.trim().isEmpty) return;
+    unawaited(
+      repository.returnRequest(id: request.id, reason: reason.trim()),
+    );
+    if (context.mounted) Navigator.of(context).pop();
+  }
+
+  Future<void> _cancelRequest(
+    BuildContext context,
+    OperationsServiceRequest request,
+  ) async {
+    final reason = await _askForText(
+      context,
+      title: 'Cancel Request',
+      label: 'Reason',
+    );
+    if (reason == null || reason.trim().isEmpty) return;
+    unawaited(
+      repository.cancelRequest(
+        id: request.id,
+        reason: reason.trim(),
+        notes: '',
+      ),
+    );
+    if (context.mounted) Navigator.of(context).pop();
+  }
+
+  Future<String?> _askForText(
+    BuildContext context, {
+    required String title,
+    required String label,
+  }) {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLines: 3,
+          decoration: InputDecoration(labelText: label),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text),
+            child: const Text('Submit'),
+          ),
+        ],
+      ),
+    ).whenComplete(controller.dispose);
   }
 
   void _openSchedule(BuildContext context, String id) {
@@ -739,6 +833,304 @@ class _BoundaryMapPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _BoundaryMapPainter oldDelegate) {
     return oldDelegate.color != color || oldDelegate.pointCount != pointCount;
+  }
+}
+
+typedef _ApproveSubmit =
+    void Function({
+      required num amount,
+      required String priority,
+      String? note,
+    });
+
+class _ApproveRequestSheet extends StatefulWidget {
+  const _ApproveRequestSheet({required this.onSubmit});
+
+  final _ApproveSubmit onSubmit;
+
+  @override
+  State<_ApproveRequestSheet> createState() => _ApproveRequestSheetState();
+}
+
+class _ApproveRequestSheetState extends State<_ApproveRequestSheet> {
+  final _amountController = TextEditingController();
+  final _noteController = TextEditingController();
+  String _priority = 'normal';
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        20,
+        20,
+        MediaQuery.viewInsetsOf(context).bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Approve Request',
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _amountController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'Estimate amount'),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            value: _priority,
+            decoration: const InputDecoration(labelText: 'Priority'),
+            items: const [
+              DropdownMenuItem(value: 'normal', child: Text('Normal')),
+              DropdownMenuItem(value: 'high', child: Text('High')),
+              DropdownMenuItem(value: 'urgent', child: Text('Urgent')),
+            ],
+            onChanged: (value) =>
+                setState(() => _priority = value ?? _priority),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _noteController,
+            maxLines: 2,
+            decoration: const InputDecoration(labelText: 'Review note'),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: _submit,
+                  child: const Text('Approve'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _submit() {
+    final amount = num.tryParse(_amountController.text.trim());
+    if (amount == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid estimate amount.')),
+      );
+      return;
+    }
+    Navigator.of(context).pop();
+    widget.onSubmit(
+      amount: amount,
+      priority: _priority,
+      note: _noteController.text.trim().isEmpty
+          ? null
+          : _noteController.text.trim(),
+    );
+  }
+}
+
+class _RegisterRequestSheet extends StatefulWidget {
+  const _RegisterRequestSheet({required this.repository});
+
+  final UnionOperationsRepository repository;
+
+  @override
+  State<_RegisterRequestSheet> createState() => _RegisterRequestSheetState();
+}
+
+class _RegisterRequestSheetState extends State<_RegisterRequestSheet> {
+  final _farmerIdController = TextEditingController();
+  final _plotIdController = TextEditingController();
+  final _serviceTypeIdController = TextEditingController();
+  final _acresController = TextEditingController();
+  final _notesController = TextEditingController();
+  DateTime _date = DateTime.now().add(const Duration(days: 1));
+  String _window = 'morning';
+  String _priority = 'normal';
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _farmerIdController.dispose();
+    _plotIdController.dispose();
+    _serviceTypeIdController.dispose();
+    _acresController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        20,
+        20,
+        MediaQuery.viewInsetsOf(context).bottom + 20,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Register Service Request',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _farmerIdController,
+              decoration: const InputDecoration(labelText: 'Farmer ID'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _plotIdController,
+              decoration: const InputDecoration(labelText: 'Plot ID'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _serviceTypeIdController,
+              decoration: const InputDecoration(labelText: 'Service type ID'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _acresController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(labelText: 'Requested acres'),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: _pickDate,
+              icon: const Icon(Icons.calendar_month_outlined),
+              label: Text('Preferred date: ${formatDate(_date)}'),
+            ),
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              value: _window,
+              decoration: const InputDecoration(labelText: 'Preferred window'),
+              items: const [
+                DropdownMenuItem(value: 'morning', child: Text('Morning')),
+                DropdownMenuItem(value: 'afternoon', child: Text('Afternoon')),
+                DropdownMenuItem(value: 'full_day', child: Text('Full day')),
+              ],
+              onChanged: (value) => setState(() => _window = value ?? _window),
+            ),
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              value: _priority,
+              decoration: const InputDecoration(labelText: 'Priority'),
+              items: const [
+                DropdownMenuItem(value: 'normal', child: Text('Normal')),
+                DropdownMenuItem(value: 'high', child: Text('High')),
+                DropdownMenuItem(value: 'urgent', child: Text('Urgent')),
+              ],
+              onChanged: (value) =>
+                  setState(() => _priority = value ?? _priority),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _notesController,
+              maxLines: 2,
+              decoration: const InputDecoration(labelText: 'Notes'),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _submitting
+                        ? null
+                        : () => Navigator.of(context).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: _submitting ? null : _submit,
+                    child: Text(_submitting ? 'Registering...' : 'Register'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickDate() async {
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: _date,
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2027, 12, 31),
+    );
+    if (selected == null) return;
+    setState(() => _date = selected);
+  }
+
+  Future<void> _submit() async {
+    final farmerId = _farmerIdController.text.trim();
+    final plotId = _plotIdController.text.trim();
+    final serviceTypeId = _serviceTypeIdController.text.trim();
+    final acres = num.tryParse(_acresController.text.trim());
+    if (farmerId.isEmpty ||
+        plotId.isEmpty ||
+        serviceTypeId.isEmpty ||
+        acres == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Fill all required IDs and acres.')),
+      );
+      return;
+    }
+    setState(() => _submitting = true);
+    await widget.repository.registerRequest(
+      farmerId: farmerId,
+      plotId: plotId,
+      serviceTypeId: serviceTypeId,
+      requestedAcres: acres,
+      preferredDate: _date,
+      preferredWindow: _window,
+      priority: _priority,
+      notes: _notesController.text.trim().isEmpty
+          ? null
+          : _notesController.text.trim(),
+    );
+    if (!mounted) return;
+    setState(() => _submitting = false);
+    final error = widget.repository.mechanizationActionError;
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error)),
+      );
+      return;
+    }
+    Navigator.of(context).pop();
   }
 }
 

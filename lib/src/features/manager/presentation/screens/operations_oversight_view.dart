@@ -138,11 +138,19 @@ class _OverrideCard extends StatelessWidget {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: isPending
-                      ? () => repository.decideOverride(
-                          overrideId: item.id,
-                          approve: false,
-                          note: 'Operator must move to the plot',
-                        )
+                      ? () async {
+                          final note = await _promptNote(
+                            context,
+                            title: 'Deny Override',
+                            label: 'Decision note',
+                          );
+                          if (note == null || note.trim().isEmpty) return;
+                          await repository.decideOverride(
+                            overrideId: item.id,
+                            approve: false,
+                            note: note.trim(),
+                          );
+                        }
                       : null,
                   icon: const Icon(Icons.close),
                   label: const Text('Deny'),
@@ -152,11 +160,19 @@ class _OverrideCard extends StatelessWidget {
               Expanded(
                 child: FilledButton.icon(
                   onPressed: isPending
-                      ? () => repository.decideOverride(
-                          overrideId: item.id,
-                          approve: true,
-                          note: 'Confirmed by phone with the farmer',
-                        )
+                      ? () async {
+                          final note = await _promptNote(
+                            context,
+                            title: 'Approve Override',
+                            label: 'Decision note',
+                          );
+                          if (note == null || note.trim().isEmpty) return;
+                          await repository.decideOverride(
+                            overrideId: item.id,
+                            approve: true,
+                            note: note.trim(),
+                          );
+                        }
                       : null,
                   icon: const Icon(Icons.check),
                   label: const Text('Approve'),
@@ -240,10 +256,18 @@ class _ExceptionCard extends StatelessWidget {
               Expanded(
                 child: FilledButton.icon(
                   onPressed: canResolve
-                      ? () => repository.resolveException(
-                          exceptionId: item.id,
-                          remarks: 'Resolved from union dashboard',
-                        )
+                      ? () async {
+                          final note = await _promptNote(
+                            context,
+                            title: 'Resolve Exception',
+                            label: 'Resolution note',
+                          );
+                          if (note == null || note.trim().isEmpty) return;
+                          await repository.resolveException(
+                            exceptionId: item.id,
+                            remarks: note.trim(),
+                          );
+                        }
                       : null,
                   icon: const Icon(Icons.done_all),
                   label: const Text('Resolve'),
@@ -285,6 +309,36 @@ class _SectionHeader extends StatelessWidget {
       ],
     );
   }
+}
+
+Future<String?> _promptNote(
+  BuildContext context, {
+  required String title,
+  required String label,
+}) {
+  final controller = TextEditingController();
+  return showDialog<String>(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: Text(title),
+      content: TextField(
+        controller: controller,
+        autofocus: true,
+        maxLines: 3,
+        decoration: InputDecoration(labelText: label),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(controller.text),
+          child: const Text('Submit'),
+        ),
+      ],
+    ),
+  ).whenComplete(controller.dispose);
 }
 
 class _ActionError extends StatelessWidget {

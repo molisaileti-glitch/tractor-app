@@ -25,7 +25,9 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
   DateTime _date = DateTime.now();
   TimeOfDay _time = const TimeOfDay(hour: 8, minute: 0);
   int _duration = 4;
+  bool _checkingAvailability = false;
   bool _submitting = false;
+  RequestAvailabilityResult? _availability;
 
   @override
   void initState() {
@@ -77,7 +79,10 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
                     tractor: tractor,
                     selected: _tractorId == tractor.id,
                     onTap: tractor.status.canSchedule
-                        ? () => setState(() => _tractorId = tractor.id)
+                        ? () => setState(() {
+                            _tractorId = tractor.id;
+                            _availability = null;
+                          })
                         : null,
                   ),
                   const SizedBox(height: 10),
@@ -88,7 +93,10 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
                     operator: operator,
                     selected: _operatorId == operator.id,
                     onTap: operator.status.canSchedule
-                        ? () => setState(() => _operatorId = operator.id)
+                        ? () => setState(() {
+                            _operatorId = operator.id;
+                            _availability = null;
+                          })
                         : null,
                   ),
                   const SizedBox(height: 10),
@@ -133,6 +141,53 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
                   ),
                 ),
                 const SizedBox(height: 18),
+                OutlinedButton.icon(
+                  onPressed: _tractorId == null ||
+                          _operatorId == null ||
+                          _checkingAvailability
+                      ? null
+                      : _checkAvailability,
+                  icon: _checkingAvailability
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.event_available_outlined),
+                  label: Text(
+                    _checkingAvailability
+                        ? 'Checking availability...'
+                        : 'Check Availability',
+                  ),
+                ),
+                if (_availability != null) ...[
+                  const SizedBox(height: 10),
+                  OperationsCard(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          _availability!.isAvailable
+                              ? Icons.check_circle_outline
+                              : Icons.warning_amber_outlined,
+                          color: _availability!.isAvailable
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context).colorScheme.error,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            _availability!.summary,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 18),
                 FilledButton.icon(
                   onPressed: _tractorId == null ||
                           _operatorId == null ||
@@ -164,16 +219,51 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
       lastDate: DateTime(2027, 12, 31),
     );
     if (selected == null) return;
-    setState(() => _date = selected);
+    setState(() {
+      _date = selected;
+      _availability = null;
+    });
   }
 
   Future<void> _pickTime() async {
     final selected = await showTimePicker(context: context, initialTime: _time);
     if (selected == null) return;
-    setState(() => _time = selected);
+    setState(() {
+      _time = selected;
+      _availability = null;
+    });
+  }
+
+  Future<RequestAvailabilityResult?> _checkAvailability() async {
+    if (_tractorId == null || _operatorId == null) return null;
+    setState(() => _checkingAvailability = true);
+    final result = await widget.repository.checkRequestAvailability(
+      date: _date,
+      tractorId: _tractorId!,
+      operatorId: _operatorId!,
+    );
+    if (!mounted) return result;
+    setState(() {
+      _availability = result;
+      _checkingAvailability = false;
+    });
+    if (result == null && widget.repository.mechanizationActionError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(widget.repository.mechanizationActionError!)),
+      );
+    }
+    return result;
   }
 
   Future<void> _confirmSchedule() async {
+    final availability = _availability ?? await _checkAvailability();
+    if (!mounted) return;
+    if (availability != null && !availability.isAvailable) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(availability.summary)),
+      );
+      return;
+    }
     final scheduledAt = DateTime(
       _date.year,
       _date.month,

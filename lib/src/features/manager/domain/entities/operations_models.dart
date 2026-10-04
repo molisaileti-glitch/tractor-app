@@ -391,3 +391,32 @@ class MechanizationException {
   final String? detail;
   final DateTime? openedAt;
 }
+
+class RequestAvailabilityResult {
+  const RequestAvailabilityResult({
+    required this.isAvailable,
+    required this.tractorConflicts,
+    required this.operatorConflicts,
+    required this.loadHours,
+  });
+
+  final bool isAvailable;
+  final List<String> tractorConflicts;
+  final List<String> operatorConflicts;
+  final num loadHours;
+
+  String get summary {
+    if (isAvailable) {
+      return loadHours == 0
+          ? 'Selected tractor and operator are available.'
+          : 'Available. Operator load: $loadHours hours.';
+    }
+    final issues = [
+      if (tractorConflicts.isNotEmpty)
+        'tractor: ${tractorConflicts.join(', ')}',
+      if (operatorConflicts.isNotEmpty)
+        'operator: ${operatorConflicts.join(', ')}',
+    ];
+    return issues.isEmpty ? 'Not available.' : 'Conflict on ${issues.join('; ')}';
+  }
+}

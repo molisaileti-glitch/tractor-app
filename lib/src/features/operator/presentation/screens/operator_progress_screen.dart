@@ -19,6 +19,9 @@ class OperatorProgressScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final job = repository.jobById(jobId);
+    final duration = job.startedAt == null
+        ? null
+        : (job.finishedAt ?? DateTime.now()).difference(job.startedAt!);
     return Scaffold(
       appBar: AppBar(title: Text(job.serviceType.label.toUpperCase())),
       body: SingleChildScrollView(
@@ -44,14 +47,23 @@ class OperatorProgressScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      const Expanded(
-                        child: _Metric(label: 'Duration', value: '02:14:32'),
+                      Expanded(
+                        child: _Metric(
+                          label: 'Duration',
+                          value: duration == null
+                              ? 'Pending'
+                              : _formatDuration(duration),
+                        ),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 14),
-                const OperatorMapCard(showTrack: true, label: 'WORK TRACK'),
+                OperatorMapCard(
+                  job: job,
+                  showTrack: true,
+                  label: 'WORK TRACK',
+                ),
                 const SizedBox(height: 14),
                 const OperatorCard(
                   child: Row(
@@ -105,6 +117,19 @@ class OperatorProgressScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatDuration(Duration duration) {
+    final hours = duration.inHours.toString().padLeft(2, '0');
+    final minutes = duration.inMinutes
+        .remainder(60)
+        .toString()
+        .padLeft(2, '0');
+    final seconds = duration.inSeconds
+        .remainder(60)
+        .toString()
+        .padLeft(2, '0');
+    return '$hours:$minutes:$seconds';
   }
 
   Future<void> _pause(BuildContext context, OperatorJob job) async {

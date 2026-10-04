@@ -197,11 +197,7 @@ class _JobCard extends StatelessWidget {
                 title: const Text('Manual farmer confirm'),
                 onTap: () {
                   Navigator.of(context).pop();
-                  repository.confirmJob(
-                    jobId: job.id,
-                    rating: 5,
-                    note: 'Confirmed by phone',
-                  );
+                  _showConfirmDialog(context);
                 },
               ),
               ListTile(
@@ -345,7 +341,7 @@ class _JobCard extends StatelessWidget {
               controller: noteController,
               decoration: const InputDecoration(
                 labelText: 'Note',
-                hintText: 'Matches the trail',
+                hintText: 'Add verification note',
               ),
               minLines: 2,
               maxLines: 3,
@@ -382,6 +378,84 @@ class _JobCard extends StatelessWidget {
       note: input.note.isEmpty ? null : input.note,
     );
   }
+
+  Future<void> _showConfirmDialog(BuildContext context) async {
+    var rating = 5;
+    var dispute = false;
+    final noteController = TextEditingController();
+    final input = await showDialog<_ConfirmJobInput>(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Manual Farmer Confirm'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<int>(
+                initialValue: rating,
+                decoration: const InputDecoration(labelText: 'Rating'),
+                items: [1, 2, 3, 4, 5]
+                    .map(
+                      (value) => DropdownMenuItem(
+                        value: value,
+                        child: Text('$value'),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) setState(() => rating = value);
+                },
+              ),
+              const SizedBox(height: 12),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: dispute,
+                title: const Text('Farmer disputes this job'),
+                onChanged: (value) => setState(() => dispute = value),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: noteController,
+                decoration: InputDecoration(
+                  labelText: dispute ? 'Dispute note' : 'Confirmation note',
+                ),
+                minLines: 2,
+                maxLines: 3,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final note = noteController.text.trim();
+                if (dispute && note.isEmpty) return;
+                Navigator.of(context).pop(
+                  _ConfirmJobInput(
+                    rating: rating,
+                    note: note,
+                    dispute: dispute,
+                  ),
+                );
+              },
+              child: const Text('Submit'),
+            ),
+          ],
+        ),
+      ),
+    );
+    noteController.dispose();
+    if (input == null) return;
+    repository.confirmJob(
+      jobId: job.id,
+      rating: input.rating,
+      note: input.note.isEmpty ? null : input.note,
+      dispute: input.dispute,
+    );
+  }
 }
 
 class _VerifyJobInput {
@@ -389,6 +463,18 @@ class _VerifyJobInput {
 
   final num verifiedAcres;
   final String note;
+}
+
+class _ConfirmJobInput {
+  const _ConfirmJobInput({
+    required this.rating,
+    required this.note,
+    required this.dispute,
+  });
+
+  final int rating;
+  final String note;
+  final bool dispute;
 }
 
 class RescheduleJobScreen extends StatefulWidget {
