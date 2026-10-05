@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/presentation/app_components.dart';
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/operator_local_repository.dart';
 import '../widgets/operator_widgets.dart';
@@ -107,12 +108,11 @@ class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
                   label: const Text('Add Photo'),
                 ),
                 const SizedBox(height: 16),
-                FilledButton.icon(
+                AppGlowButton(
                   onPressed: _submitting ? null : _submit,
-                  icon: const Icon(Icons.send_outlined),
-                  label: Text(
-                    _submitting ? 'Submitting...' : 'Submit Completed Work',
-                  ),
+                  loading: _submitting,
+                  icon: Icons.lock_outline,
+                  label: _submitting ? 'Submitting...' : 'Finish Job',
                 ),
               ],
             ),
@@ -123,14 +123,24 @@ class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
   }
 
   Future<void> _submit() async {
-    final messenger = ScaffoldMessenger.of(context);
     final area = double.tryParse(_areaController.text.trim());
     if (area == null || area <= 0) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Enter the reported acres completed.')),
+      await showAppErrorDialog(
+        context,
+        title: 'Missing acres',
+        message: 'Enter the reported acres completed before submitting.',
       );
       return;
     }
+    final confirmed = await showAppConfirmationDialog(
+      context,
+      title: 'Submit completed work?',
+      message:
+          'This will send the job completion details to the union for review.',
+      confirmLabel: 'Submit',
+    );
+    if (!confirmed || !mounted) return;
+
     final endHourMeter = num.tryParse(_endHourMeterController.text.trim());
     final fuelUsed = num.tryParse(_fuelUsedController.text.trim());
     setState(() => _submitting = true);
@@ -144,19 +154,21 @@ class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
     if (!mounted) return;
     setState(() => _submitting = false);
     if (!ok) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
+      await showAppErrorDialog(
+        context,
+        title: 'Could not submit',
+        message:
             widget.repository.lastActionError ??
-                'Completed work could not be submitted.',
-          ),
-        ),
+            'Completed work could not be submitted.',
       );
       return;
     }
-    messenger.showSnackBar(
-      const SnackBar(content: Text('Completed work submitted')),
+    await showAppSuccessDialog(
+      context,
+      title: 'Work submitted',
+      message: 'Completed work was sent successfully.',
     );
+    if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (_) => OperatorFarmerConfirmationScreen(
@@ -298,12 +310,11 @@ class _OperatorFarmerConfirmationScreenState
                   ),
                 ),
                 const SizedBox(height: 16),
-                FilledButton.icon(
+                AppPrimaryButton(
                   onPressed: _submitting ? null : _submit,
-                  icon: const Icon(Icons.verified_outlined),
-                  label: Text(
-                    _submitting ? 'Submitting...' : 'Submit Confirmation',
-                  ),
+                  loading: _submitting,
+                  icon: Icons.verified_outlined,
+                  label: _submitting ? 'Submitting...' : 'Submit Confirmation',
                 ),
                 const SizedBox(height: 10),
                 TextButton(
@@ -322,45 +333,63 @@ class _OperatorFarmerConfirmationScreenState
   }
 
   Future<void> _requestOtp() async {
-    final messenger = ScaffoldMessenger.of(context);
     setState(() => _sendingOtp = true);
     final ok = await widget.repository.requestFarmerOtp(widget.jobId);
     if (!mounted) return;
     setState(() => _sendingOtp = false);
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          ok
-              ? 'OTP request sent.'
-              : widget.repository.lastActionError ?? 'Could not send OTP.',
-        ),
-      ),
+    if (ok) {
+      await showAppSuccessDialog(
+        context,
+        title: 'OTP requested',
+        message: 'The farmer confirmation OTP request was sent.',
+      );
+      return;
+    }
+    await showAppErrorDialog(
+      context,
+      title: 'Could not send OTP',
+      message: widget.repository.lastActionError ?? 'Could not send OTP.',
     );
   }
 
   Future<void> _submit() async {
-    final messenger = ScaffoldMessenger.of(context);
     final pin = _pinController.text.trim();
     final code = _codeController.text.trim();
     final note = _noteController.text.trim();
     if (_method == 'pin' && pin.isEmpty) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Enter the farmer PIN.')),
+      await showAppErrorDialog(
+        context,
+        title: 'PIN required',
+        message: 'Enter the farmer PIN before submitting confirmation.',
       );
       return;
     }
     if (_method == 'otp' && code.isEmpty) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Enter the OTP code.')),
+      await showAppErrorDialog(
+        context,
+        title: 'OTP required',
+        message: 'Enter the OTP code before submitting confirmation.',
       );
       return;
     }
     if (_dispute && note.isEmpty) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Enter a dispute note.')),
+      await showAppErrorDialog(
+        context,
+        title: 'Dispute note required',
+        message: 'Enter a dispute note so the union understands the issue.',
       );
       return;
     }
+
+    final confirmed = await showAppConfirmationDialog(
+      context,
+      title: _dispute ? 'Submit farmer dispute?' : 'Submit farmer confirmation?',
+      message: _dispute
+          ? 'This will record the farmer dispute against this completed job.'
+          : 'This will record the farmer confirmation for this completed job.',
+      confirmLabel: 'Submit',
+    );
+    if (!confirmed || !mounted) return;
 
     setState(() => _submitting = true);
     final ok = await widget.repository.confirmFarmer(
@@ -375,26 +404,23 @@ class _OperatorFarmerConfirmationScreenState
     if (!mounted) return;
     setState(() => _submitting = false);
     if (!ok) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            widget.repository.lastActionError ??
-                'Farmer confirmation failed.',
-          ),
-        ),
+      await showAppErrorDialog(
+        context,
+        title: 'Confirmation failed',
+        message:
+            widget.repository.lastActionError ?? 'Farmer confirmation failed.',
       );
       return;
     }
-    Navigator.of(context).popUntil((route) => route.isFirst);
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          _dispute
-              ? 'Farmer dispute recorded.'
-              : 'Farmer confirmation recorded.',
-        ),
-      ),
+    await showAppSuccessDialog(
+      context,
+      title: _dispute ? 'Dispute recorded' : 'Farmer confirmed',
+      message: _dispute
+          ? 'The farmer dispute was recorded successfully.'
+          : 'The farmer confirmation was recorded successfully.',
     );
+    if (!mounted) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 }
 

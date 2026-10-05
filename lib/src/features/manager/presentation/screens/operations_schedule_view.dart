@@ -46,17 +46,6 @@ class _OperationsScheduleViewState extends State<OperationsScheduleView> {
               onPressed: _pickDate,
               icon: const Icon(Icons.keyboard_arrow_down),
             ),
-            const Spacer(),
-            IconButton(
-              tooltip: 'Filter',
-              onPressed: () {},
-              icon: const Icon(Icons.tune),
-            ),
-            IconButton(
-              tooltip: 'Search',
-              onPressed: () {},
-              icon: const Icon(Icons.search),
-            ),
           ],
         ),
         const SizedBox(height: 8),

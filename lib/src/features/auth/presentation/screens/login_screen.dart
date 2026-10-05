@@ -1,5 +1,9 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 
+import '../../../../core/presentation/app_components.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../data/remote/auth_remote_data_source.dart';
 import '../../data/repositories/auth_local_repository.dart';
 import '../../domain/entities/auth_session.dart';
@@ -30,13 +34,18 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  static const _deepGreen = Color(0xFF173B2A);
-  static const _fieldGreen = Color(0xFF2F6F4E);
-  static const _cream = Color(0xFFFFF8E8);
-  static const _deviceName = 'Shamba Bora Mobile';
+  static const _deviceName = 'Kwanza Track Mobile';
+  static const _dialCodes = [
+    _CountryDialCode(flag: '\u{1F1F9}\u{1F1FF}', country: 'Tanzania', dialCode: '+255'),
+    _CountryDialCode(flag: '\u{1F1F0}\u{1F1EA}', country: 'Kenya', dialCode: '+254'),
+    _CountryDialCode(flag: '\u{1F1FA}\u{1F1EC}', country: 'Uganda', dialCode: '+256'),
+    _CountryDialCode(flag: '\u{1F1F7}\u{1F1FC}', country: 'Rwanda', dialCode: '+250'),
+    _CountryDialCode(flag: '\u{1F1E7}\u{1F1EE}', country: 'Burundi', dialCode: '+257'),
+  ];
 
-  final _identifierController = TextEditingController(text: '+255 ');
+  final _identifierController = TextEditingController();
   final _passwordController = TextEditingController();
+  _CountryDialCode _selectedDialCode = _dialCodes.first;
   bool _obscurePassword = true;
   bool _sendingOtp = false;
   String? _loginError;
@@ -74,12 +83,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       _LoginPanel(
                         identifierController: _identifierController,
                         passwordController: _passwordController,
+                        selectedDialCode: _selectedDialCode,
+                        dialCodes: _dialCodes,
                         obscurePassword: _obscurePassword,
                         isLoading: _sendingOtp,
                         errorText: _loginError,
                         onTogglePassword: () => setState(
                           () => _obscurePassword = !_obscurePassword,
                         ),
+                        onDialCodeChanged: (value) =>
+                            setState(() => _selectedDialCode = value),
                         onSendOtp: _sendOtp,
                       ),
                     ],
@@ -94,13 +107,16 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _sendOtp() async {
-    final identifier = _identifierController.text.trim();
+    final identifier = _normalizedIdentifier();
     final password = _passwordController.text;
     setState(() => _loginError = null);
 
+    if (identifier.isEmpty) {
+      setState(() => _loginError = 'Enter your phone number or email.');
+      return;
+    }
     if (password.trim().isEmpty) {
-      _challengeId = null;
-      _openOtp(identifier.isEmpty ? '+255' : identifier);
+      setState(() => _loginError = 'Enter your password to request an OTP.');
       return;
     }
 
@@ -124,6 +140,17 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  String _normalizedIdentifier() {
+    final raw = _identifierController.text.trim();
+    if (raw.isEmpty) return '';
+    if (raw.contains('@')) return raw;
+    if (raw.startsWith('+')) return raw.replaceAll(RegExp(r'\s+'), '');
+    var digits = raw.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('0')) digits = digits.substring(1);
+    if (digits.isEmpty) return '';
+    return '${_selectedDialCode.dialCode}$digits';
+  }
+
   void _openOtp(String phoneNumber) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -138,38 +165,23 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<String?> _verifyCode(String code) async {
-    if (_challengeId != null) {
-      try {
-        final session = await widget.repository.verifyRemoteOtp(
-          challengeId: _challengeId!,
-          code: code,
-          deviceName: _deviceName,
-        );
-        if (!mounted) return null;
-        _openWorkspaceForSession(session);
-        return null;
-      } on AuthRemoteException catch (error) {
-        return error.message;
-      }
+    final challengeId = _challengeId;
+    if (challengeId == null) {
+      return 'Your OTP session expired. Please request a new code.';
     }
 
-    final VoidCallback? route = switch (code) {
-      '101650' => widget.onOpenOperations,
-      '101651' => widget.onOpenOperator,
-      '101652' => widget.onOpenFarmer,
-      '101653' => widget.onOpenTechnician,
-      _ => null,
-    };
-
-    if (route == null) return 'Invalid or expired code. Please try again.';
-
-    await widget.repository.signIn(
-      phoneOrEmail: _identifierController.text.trim(),
-      password: 'otp:$code',
-    );
-    if (!mounted) return null;
-    route();
-    return null;
+    try {
+      final session = await widget.repository.verifyRemoteOtp(
+        challengeId: challengeId,
+        code: code,
+        deviceName: _deviceName,
+      );
+      if (!mounted) return null;
+      _openWorkspaceForSession(session);
+      return null;
+    } on AuthRemoteException catch (error) {
+      return error.message;
+    }
   }
 
   Future<String?> _resendCode() async {
@@ -229,40 +241,51 @@ class _LoginPanel extends StatelessWidget {
   const _LoginPanel({
     required this.identifierController,
     required this.passwordController,
+    required this.selectedDialCode,
+    required this.dialCodes,
     required this.obscurePassword,
     required this.isLoading,
     required this.errorText,
     required this.onTogglePassword,
+    required this.onDialCodeChanged,
     required this.onSendOtp,
   });
 
   final TextEditingController identifierController;
   final TextEditingController passwordController;
+  final _CountryDialCode selectedDialCode;
+  final List<_CountryDialCode> dialCodes;
   final bool obscurePassword;
   final bool isLoading;
   final String? errorText;
   final VoidCallback onTogglePassword;
+  final ValueChanged<_CountryDialCode> onDialCodeChanged;
   final Future<void> Function() onSendOtp;
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.18),
-            blurRadius: 28,
-            offset: const Offset(0, 16),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(28),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.58),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.54)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.16),
+                blurRadius: 30,
+                offset: const Offset(0, 16),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(22, 22, 22, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 22, 22, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
             Center(
               child: Text(
                 'Login',
@@ -273,15 +296,16 @@ class _LoginPanel extends StatelessWidget {
             ),
             const SizedBox(height: 26),
             Text(
-              'Welcome back',
+              'Your Phone Number',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.w900,
-                color: _LoginScreenState._deepGreen,
+                color: AppColors.text,
+                height: 1.08,
               ),
             ),
             const SizedBox(height: 6),
             Text(
-              'Sign in to continue managing mechanization work.',
+              'We will use this number to verify your identity and send secure work notifications.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Colors.black.withValues(alpha: 0.62),
                 height: 1.35,
@@ -289,21 +313,27 @@ class _LoginPanel extends StatelessWidget {
             ),
             const SizedBox(height: 22),
             Text(
-              'Phone number / Email',
+              'Phone Number / Email',
               style: Theme.of(
                 context,
               ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 8),
-            TextField(
+            _PhoneIdentityPicker(
               controller: identifierController,
-              keyboardType: TextInputType.emailAddress,
-              style: const TextStyle(fontWeight: FontWeight.w800),
-              decoration: const InputDecoration(
-                hintText: '+255 7XX XXX XXX or name@union.tz',
-                prefixIcon: Icon(Icons.alternate_email_outlined),
-              ),
+              selectedDialCode: selectedDialCode,
+              dialCodes: dialCodes,
+              onDialCodeChanged: onDialCodeChanged,
               onSubmitted: (_) => onSendOtp(),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'This number will be used for OTP verification and account notifications.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.mutedText,
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
             const SizedBox(height: 14),
             Text(
@@ -319,6 +349,7 @@ class _LoginPanel extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.w800),
               decoration: InputDecoration(
                 hintText: 'Enter password',
+                hintStyle: const TextStyle(fontWeight: FontWeight.w400),
                 prefixIcon: const Icon(Icons.lock_outline),
                 suffixIcon: IconButton(
                   tooltip: obscurePassword ? 'Show password' : 'Hide password',
@@ -343,32 +374,15 @@ class _LoginPanel extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 22),
-            Tooltip(
-              message: 'Send OTP',
-              child: FilledButton(
-                onPressed: isLoading ? null : onSendOtp,
-                style: FilledButton.styleFrom(
-                  backgroundColor: _LoginScreenState._deepGreen,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size.fromHeight(56),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  textStyle: const TextStyle(fontWeight: FontWeight.w900),
-                ),
-                child: isLoading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text('Continue'),
-              ),
+            AppGlowButton(
+              onPressed: onSendOtp,
+              loading: isLoading,
+              label: 'Continue',
+              trailing: Icons.arrow_forward,
             ),
-          ],
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -383,10 +397,16 @@ class _AuthImageBackground extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        Image.asset(
-          'assets/images/tractor.jpeg',
-          fit: BoxFit.cover,
-          alignment: Alignment.topCenter,
+        ImageFiltered(
+          imageFilter: ui.ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+          child: Transform.scale(
+            scale: 1.04,
+            child: Image.asset(
+              'assets/images/tractor.jpeg',
+              fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
+            ),
+          ),
         ),
         DecoratedBox(
           decoration: BoxDecoration(
@@ -395,8 +415,8 @@ class _AuthImageBackground extends StatelessWidget {
               end: Alignment.bottomCenter,
               colors: [
                 Colors.black.withValues(alpha: 0.20),
-                _LoginScreenState._deepGreen.withValues(alpha: 0.32),
-                _LoginScreenState._deepGreen.withValues(alpha: 0.74),
+                AppColors.deepGreen.withValues(alpha: 0.32),
+                AppColors.deepGreen.withValues(alpha: 0.74),
               ],
               stops: const [0, 0.45, 1],
             ),
@@ -419,18 +439,18 @@ class _BrandLockup extends StatelessWidget {
           width: 32,
           height: 32,
           decoration: BoxDecoration(
-            color: _LoginScreenState._cream,
+            color: AppColors.cream,
             borderRadius: BorderRadius.circular(999),
           ),
           child: const Icon(
             Icons.agriculture,
-            color: _LoginScreenState._fieldGreen,
+            color: AppColors.fieldGreen,
             size: 19,
           ),
         ),
         const SizedBox(width: 10),
         Text(
-          'Shamba Bora',
+          'Kwanza Track',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
             color: Colors.white,
             fontWeight: FontWeight.w900,
@@ -452,8 +472,115 @@ class _BackButton extends StatelessWidget {
       tooltip: 'Back',
       onPressed: onPressed,
       icon: const Icon(Icons.arrow_back),
-      color: const Color(0xFF17201A),
+      color: AppColors.text,
       style: IconButton.styleFrom(backgroundColor: Colors.white),
     );
   }
+}
+
+class _PhoneIdentityPicker extends StatelessWidget {
+  const _PhoneIdentityPicker({
+    required this.controller,
+    required this.selectedDialCode,
+    required this.dialCodes,
+    required this.onDialCodeChanged,
+    required this.onSubmitted,
+  });
+
+  final TextEditingController controller;
+  final _CountryDialCode selectedDialCode;
+  final List<_CountryDialCode> dialCodes;
+  final ValueChanged<_CountryDialCode> onDialCodeChanged;
+  final ValueChanged<String> onSubmitted;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.66),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.10)),
+      ),
+      child: Row(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 12),
+            child: PopupMenuButton<_CountryDialCode>(
+              tooltip: 'Country code',
+              initialValue: selectedDialCode,
+              onSelected: onDialCodeChanged,
+              itemBuilder: (context) => [
+                for (final code in dialCodes)
+                  PopupMenuItem(
+                    value: code,
+                    child: Text(
+                      '${code.flag} ${code.country} ${code.dialCode}',
+                    ),
+                  ),
+              ],
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 16),
+                child: Row(
+                  children: [
+                    Text(
+                      selectedDialCode.flag,
+                      style: const TextStyle(fontSize: 24),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      selectedDialCode.dialCode,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.keyboard_arrow_down,
+                      color: Colors.black.withValues(alpha: 0.54),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          SizedBox(
+            height: 58,
+            child: VerticalDivider(
+              width: 1,
+              color: Colors.black.withValues(alpha: 0.10),
+            ),
+          ),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              keyboardType: TextInputType.phone,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+              decoration: const InputDecoration(
+                hintText: '7XX XXX XXX or email',
+                hintStyle: TextStyle(fontWeight: FontWeight.w400),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                filled: false,
+              ),
+              onSubmitted: onSubmitted,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CountryDialCode {
+  const _CountryDialCode({
+    required this.flag,
+    required this.country,
+    required this.dialCode,
+  });
+
+  final String flag;
+  final String country;
+  final String dialCode;
 }

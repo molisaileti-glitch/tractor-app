@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'core/network/kwanza_track_mobile_api_client.dart';
+import 'core/presentation/app_components.dart';
 import 'core/presentation/app_welcome_screen.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/data/repositories/auth_local_repository.dart';
@@ -32,6 +34,8 @@ class TractorApp extends StatefulWidget {
 }
 
 class _TractorAppState extends State<TractorApp> {
+  final GlobalKey<ScaffoldMessengerState> _messengerKey =
+      GlobalKey<ScaffoldMessengerState>();
   final AuthLocalRepository authRepository = AuthLocalRepository();
   final FarmerLocalRepository farmerRepository = FarmerLocalRepository.seeded();
   final UnionOperationsRepository operationsRepository =
@@ -45,14 +49,24 @@ class _TractorAppState extends State<TractorApp> {
   @override
   void initState() {
     super.initState();
+    KwanzaTrackMobileApiClient.onUnauthorized = _handleSessionExpired;
     _restoreSavedSession();
+  }
+
+  @override
+  void dispose() {
+    if (KwanzaTrackMobileApiClient.onUnauthorized == _handleSessionExpired) {
+      KwanzaTrackMobileApiClient.onUnauthorized = null;
+    }
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Shamba Bora',
+      title: 'Kwanza Track',
       debugShowCheckedModeBanner: false,
+      scaffoldMessengerKey: _messengerKey,
       theme: AppTheme.light(),
       home: switch (_workspace) {
         _Workspace.welcome => AppWelcomeScreen(
@@ -75,30 +89,59 @@ class _TractorAppState extends State<TractorApp> {
         ),
         _Workspace.farmer => FarmerShell(
           repository: farmerRepository,
-          onLogout: _logout,
+          onLogout: _confirmLogout,
         ),
         _Workspace.operations => OperationsShell(
           repository: operationsRepository,
-          onLogout: _logout,
+          onLogout: _confirmLogout,
         ),
         _Workspace.operator => OperatorShell(
           repository: operatorRepository,
-          onLogout: _logout,
+          onLogout: _confirmLogout,
         ),
         _Workspace.technician => TechnicianShell(
           operationsRepository: operationsRepository,
           technicianRepository: technicianRepository,
-          onLogout: _logout,
+          onLogout: _confirmLogout,
         ),
       },
     );
   }
 
-  void _logout() {
+  Future<void> _confirmLogout() async {
+    final confirmed = await showAppConfirmationDialog(
+      context,
+      title: 'Log out?',
+      message: 'You will need to sign in again to continue using the app.',
+      confirmLabel: 'Log out',
+      danger: true,
+    );
+    if (!confirmed) return;
+    await _logout();
+  }
+
+  Future<void> _logout() async {
     operationsRepository.setMechanizationAccessToken(null);
     operatorRepository.setMechanizationAccessToken(null);
-    authRepository.signOut();
+    await authRepository.signOut();
+    if (!mounted) return;
     setState(() => _workspace = _Workspace.login);
+  }
+
+  Future<void> _handleSessionExpired() async {
+    if (!mounted) return;
+    operationsRepository.setMechanizationAccessToken(null);
+    operatorRepository.setMechanizationAccessToken(null);
+    await authRepository.signOut();
+    if (!mounted) return;
+    setState(() => _workspace = _Workspace.login);
+    _messengerKey.currentState
+      ?..clearSnackBars()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Your session expired. Please sign in again.'),
+        ),
+      );
   }
 
   void _openOperations() {
@@ -123,7 +166,13 @@ class _TractorAppState extends State<TractorApp> {
   }
 
   Future<void> _restoreSavedSession() async {
-    final session = await authRepository.restoreSavedSession();
+    final AuthSession session;
+    try {
+      session = await authRepository.restoreSavedSession();
+    } catch (_) {
+      await authRepository.signOut();
+      return;
+    }
     if (!mounted || !session.isSignedIn) return;
     _openWorkspaceForSession(session);
   }

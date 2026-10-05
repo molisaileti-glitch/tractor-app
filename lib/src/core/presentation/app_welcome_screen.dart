@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'app_components.dart';
+import '../theme/app_theme.dart';
+
 class AppWelcomeScreen extends StatelessWidget {
   const AppWelcomeScreen({super.key, required this.onContinue});
 
@@ -23,8 +26,8 @@ class AppWelcomeScreen extends StatelessWidget {
                 end: Alignment.bottomCenter,
                 colors: [
                   Colors.black.withValues(alpha: 0.20),
-                  const Color(0xFF173B2A).withValues(alpha: 0.32),
-                  const Color(0xFF173B2A).withValues(alpha: 0.78),
+                  AppColors.deepGreen.withValues(alpha: 0.32),
+                  AppColors.deepGreen.withValues(alpha: 0.78),
                 ],
                 stops: const [0.0, 0.45, 1.0],
               ),
@@ -46,7 +49,7 @@ class AppWelcomeScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Text(
-                            'Shamba Bora',
+                            'Kwanza Track',
                             textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.displaySmall
                                 ?.copyWith(
@@ -57,7 +60,7 @@ class AppWelcomeScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            'Tractor services planned from real farm plots.',
+                            'Mechanization work planned from real farm plots.',
                             textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.titleLarge
                                 ?.copyWith(
@@ -68,7 +71,7 @@ class AppWelcomeScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            'Register land boundaries, request mechanization, track assigned operators, and confirm completed work even before full backend sync.',
+                            'Schedule tractors, guide operators, verify field work, and close jobs with clear accountability.',
                             textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.bodyLarge
                                 ?.copyWith(
@@ -82,21 +85,10 @@ class AppWelcomeScreen extends StatelessWidget {
                           const SizedBox(height: 20),
                           const _TrustRow(),
                           const SizedBox(height: 22),
-                          FilledButton.icon(
+                          AppGlowButton(
                             onPressed: onContinue,
-                            icon: const Icon(Icons.arrow_forward),
-                            label: const Text('Get started'),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: const Color(0xFF2F6F4E),
-                              foregroundColor: const Color(0xFFFFF8E8),
-                              minimumSize: const Size.fromHeight(56),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              textStyle: const TextStyle(
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
+                            icon: Icons.arrow_forward,
+                            label: 'Get started',
                           ),
                         ],
                       ),
@@ -127,12 +119,12 @@ class _BrandMark extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.agriculture, color: Color(0xFF2F6F4E), size: 20),
+            Icon(Icons.agriculture, color: AppColors.fieldGreen, size: 20),
             SizedBox(width: 8),
             Text(
               'Mechanization Management',
               style: TextStyle(
-                color: Color(0xFF214634),
+                color: AppColors.deepGreen,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -153,9 +145,9 @@ class _TrustRow extends StatelessWidget {
       spacing: 8,
       runSpacing: 8,
       children: const [
-        _TrustChip(icon: Icons.offline_bolt_outlined, label: 'Offline first'),
         _TrustChip(icon: Icons.gps_fixed, label: 'GPS verified'),
         _TrustChip(icon: Icons.groups_outlined, label: 'Union managed'),
+        _TrustChip(icon: Icons.route_outlined, label: 'Route guided'),
       ],
     );
   }
@@ -182,12 +174,12 @@ class _TrustChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: const Color(0xFF2F6F4E)),
+            Icon(icon, size: 16, color: AppColors.fieldGreen),
             const SizedBox(width: 6),
             Text(
               label,
               style: const TextStyle(
-                color: Color(0xFF274935),
+                color: AppColors.deepGreen,
                 fontWeight: FontWeight.w800,
               ),
             ),

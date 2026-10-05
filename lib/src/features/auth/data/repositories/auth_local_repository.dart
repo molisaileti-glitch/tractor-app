@@ -36,7 +36,8 @@ class AuthLocalRepository extends ChangeNotifier implements AuthRepository {
       final token = await secureStorage.read(key: _accessTokenKey);
       if (token == null || token.isEmpty) return _currentSession;
       return await refreshRemoteSession(token: token);
-    } on AuthRemoteException {
+    } on AuthRemoteException catch (error) {
+      if (!error.isSessionExpired) rethrow;
       await secureStorage.delete(key: _accessTokenKey);
       _currentSession = const AuthSession(status: AuthSessionStatus.signedOut);
       notifyListeners();
@@ -90,20 +91,8 @@ class AuthLocalRepository extends ChangeNotifier implements AuthRepository {
   Future<AuthSession> signIn({
     required String phoneOrEmail,
     required String password,
-  }) async {
-    final normalized = phoneOrEmail.trim().toLowerCase();
-    final farmer = _farmers.where((candidate) {
-      return candidate.phoneNumber == phoneOrEmail.trim() ||
-          candidate.email?.toLowerCase() == normalized;
-    }).firstOrNull;
-
-    _currentSession = AuthSession(
-      status: AuthSessionStatus.signedIn,
-      displayName: farmer?.toEntity().fullName ?? 'Asha Manager',
-      role: farmer == null ? 'manager' : 'farmer',
-    );
-    notifyListeners();
-    return _currentSession;
+  }) {
+    throw UnsupportedError('Password sign-in is not available in online mode.');
   }
 
   @override
@@ -118,7 +107,7 @@ class AuthLocalRepository extends ChangeNotifier implements AuthRepository {
       lastName: farmerProfile.lastName,
       phoneNumber: farmerProfile.phoneNumber,
       email: farmerProfile.email,
-      passwordHash: _offlinePasswordMarker(password),
+      passwordHash: 'remote-only',
       membershipNumber: farmerProfile.membershipNumber,
       village: farmerProfile.village,
       sex: farmerProfile.sex,
@@ -152,10 +141,6 @@ class AuthLocalRepository extends ChangeNotifier implements AuthRepository {
         // The local app should still return to Login even if remote logout fails.
       }
     }
-  }
-
-  String _offlinePasswordMarker(String password) {
-    return 'offline-demo:${password.length}';
   }
 
   Future<void> _persistAccessToken(String? token) async {

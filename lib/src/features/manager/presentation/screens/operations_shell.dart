@@ -78,6 +78,7 @@ class _OperationsShellState extends State<OperationsShell> {
                           widget.repository.mechanizationUserName ??
                           'Union staff',
                       child: _navList(),
+                      onLogout: widget.onLogout,
                     )
                   : null,
               body: Row(
@@ -113,18 +114,6 @@ class _OperationsShellState extends State<OperationsShell> {
                   ),
                 ],
               ),
-              bottomNavigationBar: compact
-                  ? SafeArea(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
-                        child: OutlinedButton.icon(
-                          onPressed: widget.onLogout,
-                          icon: const Icon(Icons.logout),
-                          label: const Text('Logout'),
-                        ),
-                      ),
-                    )
-                  : null,
             );
           },
         );
@@ -186,10 +175,15 @@ class _OperationsShellState extends State<OperationsShell> {
 }
 
 class _OperationsDrawer extends StatelessWidget {
-  const _OperationsDrawer({required this.subtitle, required this.child});
+  const _OperationsDrawer({
+    required this.subtitle,
+    required this.child,
+    required this.onLogout,
+  });
 
   final String subtitle;
   final Widget child;
+  final VoidCallback onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -202,6 +196,8 @@ class _OperationsDrawer extends StatelessWidget {
               subtitle: Text(subtitle),
             ),
             Expanded(child: child),
+            const Divider(height: 1),
+            _LogoutButton(onPressed: onLogout),
           ],
         ),
       ),

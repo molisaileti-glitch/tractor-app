@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_theme.dart';
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/operator_local_repository.dart';
 import '../../domain/entities/operator_job.dart';
@@ -45,12 +46,8 @@ class OperatorJobsScreen extends StatelessWidget {
                     child: Text(
                       'Good morning, $displayName',
                       style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.w900),
+                          ?.copyWith(fontWeight: FontWeight.w700),
                     ),
-                  ),
-                  IconButton.filledTonal(
-                    onPressed: () {},
-                    icon: const Icon(Icons.notifications_none),
                   ),
                 ],
               ),
@@ -64,25 +61,40 @@ class OperatorJobsScreen extends StatelessWidget {
                   onRetry: repository.refreshMechanizationData,
                 ),
               ],
-              const SizedBox(height: 16),
-              Row(
+              const SizedBox(height: 18),
+              _DashboardToolGrid(
                 children: [
-                  _MetricTile(
+                  _DashboardToolCard(
                     value: '${repository.jobs.length}',
-                    label: 'Assigned',
+                    label: 'Assigned jobs',
+                    detail: 'All backend assignments',
                     icon: Icons.assignment_outlined,
+                    tint: const Color(0xFFEAF2FF),
+                    iconColor: const Color(0xFF2563EB),
                   ),
-                  const SizedBox(width: 10),
-                  _MetricTile(
-                    value: '${repository.history.length}',
-                    label: 'Done',
-                    icon: Icons.task_alt,
-                  ),
-                  const SizedBox(width: 10),
-                  _MetricTile(
+                  _DashboardToolCard(
                     value: '$totalTodayJobs',
                     label: 'Today',
+                    detail: 'Scheduled for this date',
                     icon: Icons.today_outlined,
+                    tint: AppColors.mint,
+                    iconColor: AppColors.fieldGreen,
+                  ),
+                  _DashboardToolCard(
+                    value: '${activeJobs.length}',
+                    label: 'Active',
+                    detail: 'Not yet closed',
+                    icon: Icons.route_outlined,
+                    tint: const Color(0xFFFFF4E6),
+                    iconColor: AppColors.tractorOrange,
+                  ),
+                  _DashboardToolCard(
+                    value: '${repository.history.length}',
+                    label: 'Completed',
+                    detail: 'Finished jobs',
+                    icon: Icons.task_alt_outlined,
+                    tint: const Color(0xFFF0ECFF),
+                    iconColor: AppColors.purple,
                   ),
                 ],
               ),
@@ -92,7 +104,7 @@ class OperatorJobsScreen extends StatelessWidget {
                   Text(
                     'FOCUS JOB',
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   const Spacer(),
@@ -121,7 +133,7 @@ class OperatorJobsScreen extends StatelessWidget {
               Text(
                 "TODAY'S REMAINING SCHEDULE",
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 10),
@@ -139,7 +151,7 @@ class OperatorJobsScreen extends StatelessWidget {
               Text(
                 'OTHER ACTIVE ASSIGNMENTS',
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 10),
@@ -218,7 +230,7 @@ class _SyncNotice extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(fontWeight: FontWeight.w800),
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
           IconButton(
@@ -272,7 +284,7 @@ class _EmptyQueueCard extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(fontWeight: FontWeight.w800),
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -281,40 +293,105 @@ class _EmptyQueueCard extends StatelessWidget {
   }
 }
 
-class _MetricTile extends StatelessWidget {
-  const _MetricTile({
-    required this.value,
-    required this.label,
-    required this.icon,
-  });
+class _DashboardToolGrid extends StatelessWidget {
+  const _DashboardToolGrid({required this.children});
 
-  final String value;
-  final String label;
-  final IconData icon;
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: OperatorCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final spacing = constraints.maxWidth < 380 ? 10.0 : 12.0;
+        final width = (constraints.maxWidth - spacing) / 2;
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
           children: [
-            Icon(icon, color: Theme.of(context).colorScheme.primary),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            Text(label),
+            for (final child in children) SizedBox(width: width, child: child),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 }
 
+class _DashboardToolCard extends StatelessWidget {
+  const _DashboardToolCard({
+    required this.value,
+    required this.label,
+    required this.detail,
+    required this.icon,
+    required this.tint,
+    required this.iconColor,
+  });
+
+  final String value;
+  final String label;
+  final String detail;
+  final IconData icon;
+  final Color tint;
+  final Color iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 148,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: tint,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.74)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.82),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Icon(icon, color: iconColor),
+          ),
+          const Spacer(),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: AppColors.text,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: AppColors.text,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            detail,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: AppColors.mutedText,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 class _OperatorJobCard extends StatelessWidget {
   const _OperatorJobCard({
     required this.job,
@@ -329,17 +406,38 @@ class _OperatorJobCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return OperatorCard(
+    return Container(
+      padding: EdgeInsets.all(emphasis ? 20 : 18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: emphasis
+              ? AppColors.fieldGreen.withValues(alpha: 0.22)
+              : Colors.black.withValues(alpha: 0.06),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: emphasis
+                ? AppColors.fieldGreen.withValues(alpha: 0.10)
+                : Colors.black.withValues(alpha: 0.04),
+            blurRadius: emphasis ? 24 : 16,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               CircleAvatar(
-                backgroundColor: theme.colorScheme.secondary.withValues(
-                  alpha: 0.16,
+                radius: emphasis ? 26 : 22,
+                backgroundColor: AppColors.fieldGreen.withValues(alpha: 0.12),
+                child: const Icon(
+                  Icons.agriculture,
+                  color: AppColors.fieldGreen,
                 ),
-                child: const Icon(Icons.agriculture),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -350,7 +448,7 @@ class _OperatorJobCard extends StatelessWidget {
                       job.reference ?? job.id,
                       style: theme.textTheme.labelLarge?.copyWith(
                         color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     Text(
@@ -358,7 +456,7 @@ class _OperatorJobCard extends StatelessWidget {
                       style: (emphasis
                               ? theme.textTheme.titleLarge
                               : theme.textTheme.titleMedium)
-                          ?.copyWith(fontWeight: FontWeight.w900),
+                          ?.copyWith(fontWeight: FontWeight.w700),
                     ),
                   ],
                 ),
@@ -366,7 +464,7 @@ class _OperatorJobCard extends StatelessWidget {
               OperatorStatusPill(status: job.status),
             ],
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: emphasis ? 18 : 14),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -462,7 +560,7 @@ class _MiniChip extends StatelessWidget {
           Flexible(
             child: Text(
               label,
-              style: const TextStyle(fontWeight: FontWeight.w800),
+              style: const TextStyle(fontWeight: FontWeight.w600),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -494,7 +592,7 @@ class _Line extends StatelessWidget {
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(fontWeight: FontWeight.w800),
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
         ],

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/union_operations_repository.dart';
@@ -19,7 +20,6 @@ class OperationsRequestsView extends StatefulWidget {
 
 class _OperationsRequestsViewState extends State<OperationsRequestsView> {
   OperationsRequestStatus? _status = OperationsRequestStatus.pending;
-  String _query = '';
   bool _loadingRemoteRequests = false;
   String? _remoteRequestsError;
 
@@ -33,7 +33,6 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
   Widget build(BuildContext context) {
     final requests = widget.repository
         .requestsByStatus(_status)
-        .where((request) => _matchesQuery(request))
         .toList();
     final pendingCount = widget.repository
         .requestsByStatus(OperationsRequestStatus.pending)
@@ -82,68 +81,60 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
         _RemoteRequestsBanner(
           isLoading: _loadingRemoteRequests,
           error: _remoteRequestsError ?? widget.repository.mechanizationActionError,
-          count: widget.repository.requests.length,
           onRefresh: _loadRemoteRequests,
         ),
         const SizedBox(height: 12),
-        TextField(
-          decoration: const InputDecoration(
-            prefixIcon: Icon(Icons.search),
-            hintText: 'Search farmer, request or location',
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _FilterChip(
+                label: 'Pending $pendingCount',
+                selected: _status == OperationsRequestStatus.pending,
+                onSelected: () =>
+                    setState(() => _status = OperationsRequestStatus.pending),
+              ),
+              _FilterChip(
+                label: 'Approved $approvedCount',
+                selected: _status == OperationsRequestStatus.approved,
+                onSelected: () =>
+                    setState(() => _status = OperationsRequestStatus.approved),
+              ),
+              _FilterChip(
+                label: 'Rejected $rejectedCount',
+                selected: _status == OperationsRequestStatus.rejected,
+                onSelected: () =>
+                    setState(() => _status = OperationsRequestStatus.rejected),
+              ),
+              _FilterChip(
+                label: 'Returned $returnedCount',
+                selected: _status == OperationsRequestStatus.returned,
+                onSelected: () =>
+                    setState(() => _status = OperationsRequestStatus.returned),
+              ),
+              _FilterChip(
+                label: 'Scheduled $scheduledCount',
+                selected: _status == OperationsRequestStatus.scheduled,
+                onSelected: () =>
+                    setState(() => _status = OperationsRequestStatus.scheduled),
+              ),
+              _FilterChip(
+                label: 'Cancelled $cancelledCount',
+                selected: _status == OperationsRequestStatus.cancelled,
+                onSelected: () =>
+                    setState(() => _status = OperationsRequestStatus.cancelled),
+              ),
+              _FilterChip(
+                label: 'All ${widget.repository.requests.length}',
+                selected: _status == null,
+                onSelected: () => setState(() => _status = null),
+              ),
+            ],
           ),
-          onChanged: (value) => setState(() => _query = value),
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            ChoiceChip(
-              label: Text('Pending $pendingCount'),
-              selected: _status == OperationsRequestStatus.pending,
-              onSelected: (_) =>
-                  setState(() => _status = OperationsRequestStatus.pending),
-            ),
-            ChoiceChip(
-              label: Text('Approved $approvedCount'),
-              selected: _status == OperationsRequestStatus.approved,
-              onSelected: (_) =>
-                  setState(() => _status = OperationsRequestStatus.approved),
-            ),
-            ChoiceChip(
-              label: Text('Rejected $rejectedCount'),
-              selected: _status == OperationsRequestStatus.rejected,
-              onSelected: (_) =>
-                  setState(() => _status = OperationsRequestStatus.rejected),
-            ),
-            ChoiceChip(
-              label: Text('Returned $returnedCount'),
-              selected: _status == OperationsRequestStatus.returned,
-              onSelected: (_) =>
-                  setState(() => _status = OperationsRequestStatus.returned),
-            ),
-            ChoiceChip(
-              label: Text('Scheduled $scheduledCount'),
-              selected: _status == OperationsRequestStatus.scheduled,
-              onSelected: (_) =>
-                  setState(() => _status = OperationsRequestStatus.scheduled),
-            ),
-            ChoiceChip(
-              label: Text('Cancelled $cancelledCount'),
-              selected: _status == OperationsRequestStatus.cancelled,
-              onSelected: (_) =>
-                  setState(() => _status = OperationsRequestStatus.cancelled),
-            ),
-            ChoiceChip(
-              label: Text('All ${widget.repository.requests.length}'),
-              selected: _status == null,
-              onSelected: (_) => setState(() => _status = null),
-            ),
-          ],
         ),
         const SizedBox(height: 14),
         if (requests.isEmpty)
-          const OperationsCard(child: Text('No requests found.'))
+          const _RequestsEmptyState(message: 'No requests found.')
         else
           _RequestCardGrid(
             requests: requests,
@@ -151,13 +142,6 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
           ),
       ],
     );
-  }
-
-  bool _matchesQuery(OperationsServiceRequest request) {
-    final text =
-        '${request.id} ${request.farmerName} ${request.plot.name} ${request.plot.location}'
-            .toLowerCase();
-    return text.contains(_query.toLowerCase().trim());
   }
 
   void _openRequest(BuildContext context, String id) {
@@ -191,32 +175,64 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
   }
 }
 
+class _RequestsEmptyState extends StatelessWidget {
+  const _RequestsEmptyState({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 260,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.inbox_outlined,
+              size: 44,
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.45),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: Colors.black.withValues(alpha: 0.62),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _RemoteRequestsBanner extends StatelessWidget {
   const _RemoteRequestsBanner({
     required this.isLoading,
     required this.error,
-    required this.count,
     required this.onRefresh,
   });
 
   final bool isLoading;
   final String? error;
-  final int count;
   final VoidCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
+    if (!isLoading && error == null) return const SizedBox.shrink();
+
     final theme = Theme.of(context);
     final color = error != null
         ? const Color(0xFFC8872B)
         : theme.colorScheme.primary;
     final text = isLoading
-        ? 'Checking backend service requests...'
+        ? 'Refreshing service requests...'
         : error != null
-        ? 'Backend requests unavailable - $error'
-        : count == 0
-        ? 'Waiting for backend service requests.'
-        : 'Backend connected - $count service requests loaded';
+        ? 'Service requests unavailable - $error'
+        : '';
 
     return Container(
       width: double.infinity,
@@ -249,6 +265,30 @@ class _RemoteRequestsBanner extends StatelessWidget {
             icon: const Icon(Icons.refresh),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: selected,
+        onSelected: (_) => onSelected(),
       ),
     );
   }
@@ -428,15 +468,7 @@ class OperationsRequestDetailScreen extends StatelessWidget {
       body: Stack(
         children: [
           Positioned.fill(
-            child: Container(
-              color: const Color(0xFF1D3028),
-              child: CustomPaint(
-                painter: _BoundaryMapPainter(
-                  color: Theme.of(context).colorScheme.primary,
-                  pointCount: request.plot.boundaryPoints.length,
-                ),
-              ),
-            ),
+            child: _RequestPlotMap(request: request),
           ),
           SafeArea(
             child: Padding(
@@ -761,78 +793,6 @@ class OperationsRequestDetailScreen extends StatelessWidget {
       builder: (_) =>
           _RejectRequestSheet(repository: repository, request: request),
     );
-  }
-}
-
-class _BoundaryMapPainter extends CustomPainter {
-  const _BoundaryMapPainter({required this.color, required this.pointCount});
-
-  final Color color;
-  final int pointCount;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final roadPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.12)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
-    for (var i = 0; i < 7; i++) {
-      final y = size.height * (0.16 + i * 0.11);
-      canvas.drawLine(
-        Offset(size.width * 0.04, y),
-        Offset(size.width * 0.96, y + size.height * 0.10),
-        roadPaint,
-      );
-    }
-    for (var i = 0; i < 5; i++) {
-      final x = size.width * (0.12 + i * 0.19);
-      canvas.drawLine(
-        Offset(x, size.height * 0.08),
-        Offset(x + size.width * 0.10, size.height * 0.92),
-        roadPaint,
-      );
-    }
-
-    final boundary = Path()
-      ..moveTo(size.width * 0.24, size.height * 0.66)
-      ..lineTo(size.width * 0.40, size.height * 0.31)
-      ..lineTo(size.width * 0.56, size.height * 0.42)
-      ..lineTo(size.width * 0.72, size.height * 0.40)
-      ..lineTo(size.width * 0.80, size.height * 0.56)
-      ..lineTo(size.width * 0.62, size.height * 0.76)
-      ..lineTo(size.width * 0.36, size.height * 0.82)
-      ..close();
-
-    final fill = Paint()..color = color.withValues(alpha: 0.22);
-    final stroke = Paint()
-      ..color = const Color(0xFF8FD39D)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-    canvas.drawPath(boundary, fill);
-    canvas.drawPath(boundary, stroke);
-
-    final points = [
-      Offset(size.width * 0.24, size.height * 0.66),
-      Offset(size.width * 0.40, size.height * 0.31),
-      Offset(size.width * 0.72, size.height * 0.40),
-      Offset(size.width * 0.36, size.height * 0.82),
-    ];
-    final markerFill = Paint()..color = const Color(0xFFFFF8E8);
-    final markerStroke = Paint()
-      ..color = const Color(0xFF8FD39D)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3;
-    for (final point in points.take(pointCount.clamp(0, 4))) {
-      canvas.drawCircle(point, 7, markerFill);
-      canvas.drawCircle(point, 7, markerStroke);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _BoundaryMapPainter oldDelegate) {
-    return oldDelegate.color != color || oldDelegate.pointCount != pointCount;
   }
 }
 
@@ -1224,6 +1184,75 @@ class _RejectRequestSheetState extends State<_RejectRequestSheet> {
         ],
       ),
     );
+  }
+}
+
+class _RequestPlotMap extends StatelessWidget {
+  const _RequestPlotMap({required this.request});
+
+  final OperationsServiceRequest request;
+
+  @override
+  Widget build(BuildContext context) {
+    final points = request.plot.boundaryPoints
+        .map((point) => LatLng(point.latitude, point.longitude))
+        .toList();
+    if (points.isEmpty) {
+      return Container(
+        color: const Color(0xFF1D3028),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.all(24),
+        child: const Text(
+          'No plot coordinates returned for this request.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        ),
+      );
+    }
+
+    final center = _center(points);
+    return GoogleMap(
+      initialCameraPosition: CameraPosition(
+        target: center,
+        zoom: points.length >= 3 ? 16 : 15,
+      ),
+      markers: {
+        Marker(
+          markerId: MarkerId('request-plot-${request.id}'),
+          position: center,
+          infoWindow: InfoWindow(
+            title: request.plot.name,
+            snippet: request.farmerName,
+          ),
+        ),
+      },
+      polygons: {
+        if (points.length >= 3)
+          Polygon(
+            polygonId: PolygonId('request-boundary-${request.id}'),
+            points: points,
+            fillColor: Theme.of(context).colorScheme.primary.withValues(
+              alpha: 0.16,
+            ),
+            strokeColor: Theme.of(context).colorScheme.primary,
+            strokeWidth: 3,
+          ),
+      },
+      mapToolbarEnabled: false,
+      myLocationButtonEnabled: false,
+      zoomControlsEnabled: false,
+      compassEnabled: true,
+    );
+  }
+
+  LatLng _center(List<LatLng> points) {
+    final latitude =
+        points.fold<double>(0, (sum, point) => sum + point.latitude) /
+        points.length;
+    final longitude =
+        points.fold<double>(0, (sum, point) => sum + point.longitude) /
+        points.length;
+    return LatLng(latitude, longitude);
   }
 }
 

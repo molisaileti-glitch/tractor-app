@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_theme.dart';
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/union_operations_repository.dart';
 import '../../domain/entities/operations_models.dart';
@@ -60,7 +61,7 @@ class OperationsDashboardView extends StatelessWidget {
               value: '${repository.completedTodayCount}',
               label: 'Completed',
               icon: Icons.task_alt,
-              color: const Color(0xFF2F6F4E),
+              color: AppColors.fieldGreen,
             ),
             _CompactMetricCard(
               value: '${repository.pendingOverrideCount}',
@@ -203,11 +204,11 @@ class _MetricWrap extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = constraints.maxWidth < 420 ? 1 : 3;
-        final width = (constraints.maxWidth - (columns - 1) * 10) / columns;
+        final columns = constraints.maxWidth < 520 ? 1 : 2;
+        final width = (constraints.maxWidth - (columns - 1) * 12) / columns;
         return Wrap(
-          spacing: 10,
-          runSpacing: 10,
+          spacing: 12,
+          runSpacing: 12,
           children: children
               .map((child) => SizedBox(width: width, child: child))
               .toList(),
@@ -232,25 +233,49 @@ class _CompactMetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return OperationsCard(
+    return Container(
+      height: 136,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(icon, color: color, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                value,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  color: color,
-                ),
-              ),
-            ],
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Icon(icon, color: color, size: 22),
           ),
-          const SizedBox(height: 4),
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+          const Spacer(),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: AppColors.text,
+            ),
+          ),
         ],
       ),
     );

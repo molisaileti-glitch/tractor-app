@@ -1,5 +1,10 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
+import '../../../../core/presentation/app_components.dart';
+import '../../../../core/theme/app_theme.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
   const OtpVerificationScreen({
@@ -20,10 +25,6 @@ class OtpVerificationScreen extends StatefulWidget {
 }
 
 class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
-  static const _deepGreen = Color(0xFF173B2A);
-  static const _fieldGreen = Color(0xFF2F6F4E);
-  static const _cream = Color(0xFFFFF8E8);
-
   final _controllers = List.generate(6, (_) => TextEditingController());
   final _focusNodes = List.generate(6, (_) => FocusNode());
   bool _verifying = false;
@@ -95,7 +96,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         LengthLimitingTextInputFormatter(1),
       ],
       style: const TextStyle(
-        color: _deepGreen,
+        color: AppColors.deepGreen,
         fontWeight: FontWeight.w900,
         fontSize: 20,
       ),
@@ -110,7 +111,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: _fieldGreen, width: 1.5),
+          borderSide: const BorderSide(color: AppColors.fieldGreen, width: 1.5),
         ),
       ),
       onChanged: (value) {
@@ -142,6 +143,13 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       });
       return;
     }
+    await showAppSuccessDialog(
+      context,
+      title: 'Verified',
+      message: 'Your OTP was verified successfully.',
+      buttonLabel: 'Continue',
+    );
+    if (!mounted) return;
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
@@ -186,23 +194,28 @@ class _OtpPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.18),
-            blurRadius: 28,
-            offset: const Offset(0, 16),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(28),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.58),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.54)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.16),
+                blurRadius: 30,
+                offset: const Offset(0, 16),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(22, 22, 22, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 22, 22, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
             Center(
               child: Text(
                 'OTP',
@@ -216,7 +229,7 @@ class _OtpPanel extends StatelessWidget {
               'Enter the 6-digit code sent to your phone',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.w900,
-                color: _OtpVerificationScreenState._deepGreen,
+                color: AppColors.deepGreen,
                 height: 1.10,
               ),
             ),
@@ -249,25 +262,20 @@ class _OtpPanel extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 26),
-            FilledButton(
-              onPressed: verifying ? null : onVerify,
-              style: FilledButton.styleFrom(
-                backgroundColor: _OtpVerificationScreenState._deepGreen,
-                foregroundColor: Colors.white,
-                minimumSize: const Size.fromHeight(56),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                textStyle: const TextStyle(fontWeight: FontWeight.w900),
-              ),
-              child: Text(verifying ? 'Verifying...' : 'Continue'),
+            AppGlowButton(
+              onPressed: onVerify,
+              loading: verifying,
+              label: verifying ? 'Verifying...' : 'Continue',
+              trailing: Icons.arrow_forward,
             ),
             const SizedBox(height: 10),
             TextButton(
               onPressed: resending || verifying ? null : onResend,
               child: Text(resending ? 'Sending...' : 'Resend code'),
             ),
-          ],
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -282,10 +290,16 @@ class _OtpImageBackground extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        Image.asset(
-          'assets/images/tractor.jpeg',
-          fit: BoxFit.cover,
-          alignment: Alignment.topCenter,
+        ImageFiltered(
+          imageFilter: ui.ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+          child: Transform.scale(
+            scale: 1.04,
+            child: Image.asset(
+              'assets/images/tractor.jpeg',
+              fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
+            ),
+          ),
         ),
         DecoratedBox(
           decoration: BoxDecoration(
@@ -294,8 +308,8 @@ class _OtpImageBackground extends StatelessWidget {
               end: Alignment.bottomCenter,
               colors: [
                 Colors.black.withValues(alpha: 0.20),
-                _OtpVerificationScreenState._deepGreen.withValues(alpha: 0.32),
-                _OtpVerificationScreenState._deepGreen.withValues(alpha: 0.74),
+                AppColors.deepGreen.withValues(alpha: 0.32),
+                AppColors.deepGreen.withValues(alpha: 0.74),
               ],
               stops: const [0, 0.45, 1],
             ),
@@ -318,18 +332,18 @@ class _BrandLockup extends StatelessWidget {
           width: 32,
           height: 32,
           decoration: BoxDecoration(
-            color: _OtpVerificationScreenState._cream,
+            color: AppColors.cream,
             borderRadius: BorderRadius.circular(999),
           ),
           child: const Icon(
             Icons.agriculture,
-            color: _OtpVerificationScreenState._fieldGreen,
+            color: AppColors.fieldGreen,
             size: 19,
           ),
         ),
         const SizedBox(width: 10),
         Text(
-          'Shamba Bora',
+          'Kwanza Track',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
             color: Colors.white,
             fontWeight: FontWeight.w900,
@@ -351,7 +365,7 @@ class _BackButton extends StatelessWidget {
       tooltip: 'Back',
       onPressed: onPressed,
       icon: const Icon(Icons.arrow_back),
-      color: const Color(0xFF17201A),
+      color: AppColors.text,
       style: IconButton.styleFrom(backgroundColor: Colors.white),
     );
   }

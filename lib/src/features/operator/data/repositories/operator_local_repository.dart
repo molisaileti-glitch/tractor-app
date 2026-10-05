@@ -285,15 +285,18 @@ class OperatorLocalRepository extends ChangeNotifier {
   }) async {
     final token = _accessToken;
     if (token == null || token.isEmpty) {
+      _lastActionError = 'Your session has expired. Please sign in again.';
+      notifyListeners();
       return const OperatorStartCheckResult(
-        canStart: true,
+        canStart: false,
         overrideAllowed: false,
-        failed: [],
+        failed: ['session'],
         checks: [
           OperatorStartCheckItem(
-            key: 'offline',
-            label: 'Offline mode',
-            passed: true,
+            key: 'session',
+            label: 'Signed in with a valid session',
+            passed: false,
+            detail: 'Please sign in again to continue.',
           ),
         ],
       );
@@ -665,9 +668,9 @@ class OperatorLocalRepository extends ChangeNotifier {
   }) async {
     final token = _accessToken;
     if (token == null || token.isEmpty) {
-      final job = offline();
-      _replace(job.id, job);
-      return true;
+      _lastActionError = 'Your session has expired. Please sign in again.';
+      notifyListeners();
+      return false;
     }
 
     try {
@@ -687,7 +690,11 @@ class OperatorLocalRepository extends ChangeNotifier {
     Future<Map<String, Object?>> Function(String token) action,
   ) async {
     final token = _accessToken;
-    if (token == null || token.isEmpty) return true;
+    if (token == null || token.isEmpty) {
+      _lastActionError = 'Your session has expired. Please sign in again.';
+      notifyListeners();
+      return false;
+    }
     try {
       _lastActionError = null;
       await action(token);

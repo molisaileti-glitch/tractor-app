@@ -7,6 +7,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/operator_job.dart';
 
 const _googleDirectionsApiKey = 'AIzaSyAARTXTKRaYC011X_ruaKhK_R4uzgWtt0U';
@@ -20,12 +21,18 @@ class OperatorCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final card = Card(
-      child: Padding(padding: const EdgeInsets.all(16), child: child),
+      color: Colors.white,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.black.withValues(alpha: 0.06)),
+      ),
+      child: Padding(padding: const EdgeInsets.all(18), child: child),
     );
     if (onTap == null) return card;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(16),
       child: card,
     );
   }
@@ -39,15 +46,13 @@ class OperatorStatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = switch (status) {
-      OperatorJobStatus.scheduled => Theme.of(context).colorScheme.tertiary,
+      OperatorJobStatus.scheduled => AppColors.info,
       OperatorJobStatus.assigned => const Color(0xFF64748B),
       OperatorJobStatus.dispatched => const Color(0xFF7B4BD2),
       OperatorJobStatus.enRoute => const Color(0xFF7B4BD2),
       OperatorJobStatus.arrived => const Color(0xFF0EA5E9),
-      OperatorJobStatus.inProgress => Theme.of(context).colorScheme.primary,
-      OperatorJobStatus.completedPendingConfirmation => Theme.of(
-        context,
-      ).colorScheme.secondary,
+      OperatorJobStatus.inProgress => AppColors.fieldGreen,
+      OperatorJobStatus.completedPendingConfirmation => AppColors.warning,
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -350,7 +355,7 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
     );
     final farmIcon = await _makeMarkerIcon(
       icon: Icons.landscape,
-      color: const Color(0xFF2F6F4E),
+      color: AppColors.fieldGreen,
     );
     if (!mounted) return;
     setState(() {
@@ -424,8 +429,8 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
               for (final point in job.plot.boundaryPoints)
                 LatLng(point.latitude, point.longitude),
             ],
-            fillColor: const Color(0xFF2F6F4E).withValues(alpha: 0.14),
-            strokeColor: const Color(0xFF2F6F4E),
+            fillColor: AppColors.fieldGreen.withValues(alpha: 0.14),
+            strokeColor: AppColors.fieldGreen,
             strokeWidth: 2,
           ),
     };

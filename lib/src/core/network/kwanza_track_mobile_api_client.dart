@@ -9,6 +9,14 @@ class KwanzaTrackApiException implements Exception {
   final String? code;
   final int? statusCode;
 
+  bool get isSessionExpired =>
+      statusCode == 401 ||
+      statusCode == 419 ||
+      code == 'unauthenticated' ||
+      code == 'unauthorized' ||
+      code == 'token_expired' ||
+      code == 'session_expired';
+
   @override
   String toString() => message;
 }
@@ -18,6 +26,8 @@ class KwanzaTrackMobileApiClient {
     this.baseUrl = 'http://161.35.65.228',
     this.apiPrefix = '/api/v1/mech',
   });
+
+  static FutureOr<void> Function()? onUnauthorized;
 
   final String baseUrl;
   final String apiPrefix;
@@ -796,6 +806,9 @@ class KwanzaTrackMobileApiClient {
           ? <String, Object?>{}
           : _map(jsonDecode(responseBody));
       if (response.statusCode < 200 || response.statusCode >= 300) {
+        if (response.statusCode == 401 || response.statusCode == 419) {
+          await onUnauthorized?.call();
+        }
         throw KwanzaTrackApiException(
           decoded['message']?.toString() ??
               'Request failed with HTTP ${response.statusCode}.',

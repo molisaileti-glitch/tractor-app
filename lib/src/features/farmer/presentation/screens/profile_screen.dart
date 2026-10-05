@@ -55,23 +55,21 @@ class ProfileScreen extends StatelessWidget {
               ],
             ),
           ),
-          const SectionHeader(title: 'Offline first'),
+          const SectionHeader(title: 'Account data'),
           InfoCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _ProfileRow(
-                  icon: Icons.cloud_off_outlined,
-                  title: 'No backend connected',
-                  subtitle:
-                      'Farmer data is kept in a local repository for now.',
+                  icon: Icons.cloud_done_outlined,
+                  title: 'Online account',
+                  subtitle: 'Sign in regularly to keep your token fresh.',
                 ),
                 const Divider(height: 28),
                 _ProfileRow(
                   icon: Icons.sync_outlined,
-                  title: 'Ready for sync queue',
-                  subtitle:
-                      'Requests, plots and disputes are modeled separately.',
+                  title: 'Requests and disputes',
+                  subtitle: 'Service activity is handled through the server.',
                 ),
               ],
             ),

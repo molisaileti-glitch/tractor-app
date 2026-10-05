@@ -7,11 +7,9 @@ class OperatorProfileScreen extends StatelessWidget {
   const OperatorProfileScreen({
     super.key,
     required this.repository,
-    required this.onLogout,
   });
 
   final OperatorLocalRepository repository;
-  final VoidCallback onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +31,7 @@ class OperatorProfileScreen extends StatelessWidget {
               Text(
                 'Profile',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 14),
@@ -55,7 +53,7 @@ class OperatorProfileScreen extends StatelessWidget {
                           Text(
                             name,
                             style: Theme.of(context).textTheme.titleLarge
-                                ?.copyWith(fontWeight: FontWeight.w900),
+                                ?.copyWith(fontWeight: FontWeight.w700),
                           ),
                           Text(email == null || email.isEmpty
                               ? role
@@ -87,12 +85,6 @@ class OperatorProfileScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: onLogout,
-                icon: const Icon(Icons.logout),
-                label: const Text('Logout'),
               ),
             ],
           ),
@@ -127,8 +119,8 @@ class _ProfileLine extends StatelessWidget {
               Text(
                 title,
                 style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+                context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 4),
               Text(subtitle),

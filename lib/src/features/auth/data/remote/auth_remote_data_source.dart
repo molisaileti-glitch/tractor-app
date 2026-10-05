@@ -8,10 +8,19 @@ import '../models/auth_challenge_model.dart';
 import '../models/auth_verified_session_model.dart';
 
 class AuthRemoteException implements Exception {
-  const AuthRemoteException(this.message, {this.code});
+  const AuthRemoteException(this.message, {this.code, this.statusCode});
 
   final String message;
   final String? code;
+  final int? statusCode;
+
+  bool get isSessionExpired =>
+      statusCode == 401 ||
+      statusCode == 419 ||
+      code == 'unauthenticated' ||
+      code == 'unauthorized' ||
+      code == 'token_expired' ||
+      code == 'session_expired';
 
   @override
   String toString() => message;
@@ -155,6 +164,7 @@ class AuthRemoteDataSource {
           decoded['message']?.toString() ??
               'Authentication failed with HTTP ${response.statusCode}.',
           code: decoded['code']?.toString(),
+          statusCode: response.statusCode,
         );
       }
       if (decoded['success'] == false) {

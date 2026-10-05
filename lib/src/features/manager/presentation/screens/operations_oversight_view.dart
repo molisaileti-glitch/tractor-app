@@ -5,13 +5,23 @@ import '../../data/repositories/union_operations_repository.dart';
 import '../../domain/entities/operations_models.dart';
 import '../widgets/operations_widgets.dart';
 
-class OperationsOversightView extends StatelessWidget {
+enum _OversightTab { overrides, exceptions }
+
+class OperationsOversightView extends StatefulWidget {
   const OperationsOversightView({super.key, required this.repository});
 
   final UnionOperationsRepository repository;
 
   @override
+  State<OperationsOversightView> createState() => _OperationsOversightViewState();
+}
+
+class _OperationsOversightViewState extends State<OperationsOversightView> {
+  _OversightTab _tab = _OversightTab.overrides;
+
+  @override
   Widget build(BuildContext context) {
+    final repository = widget.repository;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -39,34 +49,156 @@ class OperationsOversightView extends StatelessWidget {
           _ActionError(message: repository.mechanizationActionError!),
         ],
         const SizedBox(height: 18),
-        _SectionHeader(
-          icon: Icons.rule_folder_outlined,
-          title: 'Overrides',
-          count: repository.overrides.length,
-        ),
-        const SizedBox(height: 10),
-        if (repository.overrides.isEmpty)
-          const OperationsCard(child: Text('No overrides found.'))
-        else
-          for (final item in repository.overrides) ...[
-            _OverrideCard(repository: repository, item: item),
-            const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _OversightTabButton(
+                selected: _tab == _OversightTab.overrides,
+                icon: Icons.rule_folder_outlined,
+                label: 'Overrides',
+                count: repository.overrides.length,
+                onTap: () => setState(() => _tab = _OversightTab.overrides),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _OversightTabButton(
+                selected: _tab == _OversightTab.exceptions,
+                icon: Icons.report_problem_outlined,
+                label: 'Exceptions',
+                count: repository.exceptions.length,
+                onTap: () => setState(() => _tab = _OversightTab.exceptions),
+              ),
+            ),
           ],
-        const SizedBox(height: 12),
-        _SectionHeader(
-          icon: Icons.report_problem_outlined,
-          title: 'Exceptions',
-          count: repository.exceptions.length,
         ),
-        const SizedBox(height: 10),
-        if (repository.exceptions.isEmpty)
-          const OperationsCard(child: Text('No exceptions found.'))
-        else
-          for (final item in repository.exceptions) ...[
-            _ExceptionCard(repository: repository, item: item),
-            const SizedBox(height: 12),
-          ],
+        const SizedBox(height: 16),
+        switch (_tab) {
+          _OversightTab.overrides => repository.overrides.isEmpty
+              ? const _OversightEmptyState(
+                  icon: Icons.rule_folder_outlined,
+                  message: 'No overrides found.',
+                )
+              : Column(
+                  children: [
+                    for (final item in repository.overrides) ...[
+                      _OverrideCard(repository: repository, item: item),
+                      const SizedBox(height: 12),
+                    ],
+                  ],
+                ),
+          _OversightTab.exceptions => repository.exceptions.isEmpty
+              ? const _OversightEmptyState(
+                  icon: Icons.report_problem_outlined,
+                  message: 'No exceptions found.',
+                )
+              : Column(
+                  children: [
+                    for (final item in repository.exceptions) ...[
+                      _ExceptionCard(repository: repository, item: item),
+                      const SizedBox(height: 12),
+                    ],
+                  ],
+                ),
+        },
       ],
+    );
+  }
+}
+
+class _OversightTabButton extends StatelessWidget {
+  const _OversightTabButton({
+    required this.selected,
+    required this.icon,
+    required this.label,
+    required this.count,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final IconData icon;
+  final String label;
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected
+        ? Theme.of(context).colorScheme.primary
+        : Colors.black.withValues(alpha: 0.58);
+    return Material(
+      color: selected
+          ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.12)
+          : Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 58),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected
+                  ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.28)
+                  : Colors.black.withValues(alpha: 0.08),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  '$label $count',
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OversightEmptyState extends StatelessWidget {
+  const _OversightEmptyState({required this.icon, required this.message});
+
+  final IconData icon;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 280,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 46,
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.42),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: Colors.black.withValues(alpha: 0.62),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -277,36 +409,6 @@ class _ExceptionCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.icon,
-    required this.title,
-    required this.count,
-  });
-
-  final IconData icon;
-  final String title;
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 20),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
-        ),
-        const SizedBox(width: 8),
-        _SmallStatus(label: '$count'),
-      ],
     );
   }
 }
