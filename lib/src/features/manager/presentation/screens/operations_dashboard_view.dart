@@ -204,7 +204,7 @@ class _MetricWrap extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = constraints.maxWidth < 520 ? 1 : 2;
+        final columns = constraints.maxWidth >= 840 ? 3 : 2;
         final width = (constraints.maxWidth - (columns - 1) * 12) / columns;
         return Wrap(
           spacing: 12,

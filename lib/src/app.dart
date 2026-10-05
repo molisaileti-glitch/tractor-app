@@ -34,6 +34,7 @@ class TractorApp extends StatefulWidget {
 }
 
 class _TractorAppState extends State<TractorApp> {
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   final GlobalKey<ScaffoldMessengerState> _messengerKey =
       GlobalKey<ScaffoldMessengerState>();
   final AuthLocalRepository authRepository = AuthLocalRepository();
@@ -66,6 +67,7 @@ class _TractorAppState extends State<TractorApp> {
     return MaterialApp(
       title: 'Kwanza Track',
       debugShowCheckedModeBanner: false,
+      navigatorKey: _navigatorKey,
       scaffoldMessengerKey: _messengerKey,
       theme: AppTheme.light(),
       home: switch (_workspace) {
@@ -109,8 +111,10 @@ class _TractorAppState extends State<TractorApp> {
   }
 
   Future<void> _confirmLogout() async {
+    final dialogContext = _navigatorKey.currentContext;
+    if (dialogContext == null) return;
     final confirmed = await showAppConfirmationDialog(
-      context,
+      dialogContext,
       title: 'Log out?',
       message: 'You will need to sign in again to continue using the app.',
       confirmLabel: 'Log out',
