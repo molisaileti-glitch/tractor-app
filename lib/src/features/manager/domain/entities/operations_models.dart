@@ -128,6 +128,7 @@ class OperationsServiceRequest {
     required this.plot,
     required this.preferredDate,
     required this.status,
+    this.farmerPhone,
     this.notes,
     this.rejectionReason,
     this.rejectionNotes,
@@ -139,6 +140,7 @@ class OperationsServiceRequest {
   final FarmPlot plot;
   final DateTime preferredDate;
   final OperationsRequestStatus status;
+  final String? farmerPhone;
   final String? notes;
   final String? rejectionReason;
   final String? rejectionNotes;
@@ -155,6 +157,7 @@ class OperationsServiceRequest {
       plot: plot,
       preferredDate: preferredDate,
       status: status ?? this.status,
+      farmerPhone: farmerPhone,
       notes: notes,
       rejectionReason: rejectionReason ?? this.rejectionReason,
       rejectionNotes: rejectionNotes ?? this.rejectionNotes,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/presentation/components/components.dart';
 import '../../../manager/data/repositories/union_operations_repository.dart';
 import '../../data/repositories/technician_local_repository.dart';
 import 'technician_home_screen.dart';
@@ -54,7 +55,11 @@ class _TechnicianShellState extends State<TechnicianShell> {
       ]),
       builder: (context, _) {
         return Scaffold(
-          body: SafeArea(child: screens[_selectedIndex]),
+          body: SafeArea(
+            child: widget.operationsRepository.isSyncingMechanization
+                ? const AppScreenSkeleton()
+                : screens[_selectedIndex],
+          ),
           bottomNavigationBar: NavigationBar(
             selectedIndex: _selectedIndex,
             onDestinationSelected: (index) {

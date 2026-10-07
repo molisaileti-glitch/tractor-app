@@ -21,24 +21,25 @@ class _OperatorScheduleScreenState extends State<OperatorScheduleScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedDate = _initialDate();
+    _selectedDate = DateTime.now();
   }
 
   @override
   Widget build(BuildContext context) {
     final jobs = widget.repository.jobs.toList()
       ..sort((first, second) => first.scheduledAt.compareTo(second.scheduledAt));
-    return Scaffold(
-      appBar: AppBar(title: const Text('Schedule')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 620),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+    final selectedCount = jobs
+        .where((job) => _sameDate(job.scheduledAt, _selectedDate))
+        .length;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1180),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
                 Row(
                   children: [
                     Text(
@@ -51,56 +52,48 @@ class _OperatorScheduleScreenState extends State<OperatorScheduleScreen> {
                       onPressed: _pickDate,
                       icon: const Icon(Icons.keyboard_arrow_down),
                     ),
-                    const Spacer(),
-                    IconButton(
-                      tooltip: 'Refresh schedule',
-                      onPressed: widget.repository.refreshMechanizationData,
-                      icon: const Icon(Icons.refresh),
-                    ),
-                    IconButton(
-                      tooltip: 'Today',
-                      onPressed: () =>
-                          setState(() => _selectedDate = DateTime.now()),
-                      icon: const Icon(Icons.today_outlined),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 8),
                 _OperatorWeekStrip(
                   selectedDate: _selectedDate,
-                  jobs: widget.repository.jobs,
                   onDateSelected: (date) =>
                       setState(() => _selectedDate = date),
                 ),
                 const SizedBox(height: 12),
-                if (jobs.isEmpty)
-                  const OperatorCard(
-                    child: Text(
-                      'No assigned jobs found.',
-                      style: TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                  )
-                else ...[
-                  _CalendarLegend(jobs: jobs, selectedDate: _selectedDate),
-                  const SizedBox(height: 10),
-                  _OperatorCalendarBoard(
-                    selectedDate: _selectedDate,
-                    jobs: jobs,
-                    onOpen: (job) => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => OperatorJobDetailScreen(
-                          repository: widget.repository,
-                          jobId: job.id,
+                OperatorCard(
+                  child: Row(
+                    children: [
+                      const Icon(Icons.event_note_outlined),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          selectedCount == 0
+                              ? 'No assignments on ${formatShortDate(_selectedDate)}.'
+                              : '$selectedCount assignment${selectedCount == 1 ? '' : 's'} on ${formatShortDate(_selectedDate)}.',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _OperatorCalendarBoard(
+                  selectedDate: _selectedDate,
+                  jobs: jobs,
+                  onOpen: (job) => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => OperatorJobDetailScreen(
+                        repository: widget.repository,
+                        jobId: job.id,
                       ),
                     ),
                   ),
-                ],
+                ),
               ],
             ),
           ),
         ),
-      ),
     );
   }
 
@@ -108,17 +101,6 @@ class _OperatorScheduleScreenState extends State<OperatorScheduleScreen> {
     return first.year == second.year &&
         first.month == second.month &&
         first.day == second.day;
-  }
-
-  DateTime _initialDate() {
-    final today = DateTime.now();
-    for (final job in widget.repository.jobs) {
-      if (_sameDate(job.scheduledAt, today)) return today;
-    }
-    if (widget.repository.jobs.isEmpty) return today;
-    return widget.repository.jobs
-        .map((job) => job.scheduledAt)
-        .reduce((first, second) => first.isBefore(second) ? first : second);
   }
 
   Future<void> _pickDate() async {
@@ -136,12 +118,10 @@ class _OperatorScheduleScreenState extends State<OperatorScheduleScreen> {
 class _OperatorWeekStrip extends StatelessWidget {
   const _OperatorWeekStrip({
     required this.selectedDate,
-    required this.jobs,
     required this.onDateSelected,
   });
 
   final DateTime selectedDate;
-  final List<OperatorJob> jobs;
   final ValueChanged<DateTime> onDateSelected;
 
   @override
@@ -189,13 +169,6 @@ class _OperatorWeekStrip extends StatelessWidget {
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(height: 3),
-                    _JobDot(
-                      visible: jobs.any(
-                        (job) => _sameDate(job.scheduledAt, day),
-                      ),
-                      selected: _sameDate(day, selectedDate),
-                    ),
                   ],
                 ),
               ),
@@ -216,65 +189,6 @@ class _OperatorWeekStrip extends StatelessWidget {
   }
 }
 
-class _JobDot extends StatelessWidget {
-  const _JobDot({required this.visible, required this.selected});
-
-  final bool visible;
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 6,
-      child: visible
-          ? Icon(
-              Icons.circle,
-              size: 6,
-              color: selected
-                  ? Colors.white
-                  : Theme.of(context).colorScheme.primary,
-            )
-          : null,
-    );
-  }
-}
-
-class _CalendarLegend extends StatelessWidget {
-  const _CalendarLegend({required this.jobs, required this.selectedDate});
-
-  final List<OperatorJob> jobs;
-  final DateTime selectedDate;
-
-  @override
-  Widget build(BuildContext context) {
-    final selectedCount = jobs
-        .where((job) => _sameDate(job.scheduledAt, selectedDate))
-        .length;
-    return OperatorCard(
-      child: Row(
-        children: [
-          const Icon(Icons.event_note_outlined),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              selectedCount == 0
-                  ? 'No assignment on ${formatShortDate(selectedDate)}.'
-                  : '$selectedCount assignment${selectedCount == 1 ? '' : 's'} on ${formatShortDate(selectedDate)}.',
-              style: const TextStyle(fontWeight: FontWeight.w800),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  bool _sameDate(DateTime first, DateTime second) {
-    return first.year == second.year &&
-        first.month == second.month &&
-        first.day == second.day;
-  }
-}
-
 class _OperatorCalendarBoard extends StatelessWidget {
   const _OperatorCalendarBoard({
     required this.selectedDate,
@@ -283,7 +197,7 @@ class _OperatorCalendarBoard extends StatelessWidget {
   });
 
   static const double _timeColumnWidth = 54;
-  static const double _rowHeight = 72;
+  static const double _rowHeight = 74;
 
   final DateTime selectedDate;
   final List<OperatorJob> jobs;
@@ -312,10 +226,7 @@ class _OperatorCalendarBoard extends StatelessWidget {
               const SizedBox(width: _timeColumnWidth),
               for (final day in days)
                 Expanded(
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(8),
-                    onTap: () {},
-                    child: Container(
+                  child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
                         color: _sameDate(day, selectedDate)
@@ -346,7 +257,6 @@ class _OperatorCalendarBoard extends StatelessWidget {
                           ),
                         ],
                       ),
-                    ),
                   ),
                 ),
             ],
@@ -502,7 +412,7 @@ class _PositionedJobBlock extends StatelessWidget {
       top: top + 4,
       left: left,
       width: columnWidth - 8,
-      height: height.clamp(52, 260).toDouble(),
+      height: height.clamp(54, 280).toDouble(),
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
         onTap: () => onOpen(job),
@@ -529,18 +439,8 @@ class _PositionedJobBlock extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  job.reference ?? job.id,
+                  '${job.serviceType.label} - ${job.farmerName}',
                   maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  job.farmerName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  '${job.plot.name} - ${job.serviceType.label}',
-                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
                 if (job.tractorLabel != null)
@@ -549,6 +449,16 @@ class _PositionedJobBlock extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
+                Text(
+                  '${job.plot.name} - ${job.serviceType.label}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  job.status.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),

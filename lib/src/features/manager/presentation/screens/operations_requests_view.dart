@@ -358,13 +358,13 @@ class _RequestPreviewCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      request.id,
+                      request.serviceType.label,
                       style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 3),
-                    Text(request.farmerName),
+                    Text('${request.farmerName} - ${request.plot.name}'),
                   ],
                 ),
               ),
@@ -372,13 +372,21 @@ class _RequestPreviewCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          _MiniFact(icon: Icons.spa_outlined, text: request.serviceType.label),
-          const SizedBox(height: 8),
-          _MiniFact(icon: Icons.location_on_outlined, text: request.plot.name),
-          const SizedBox(height: 8),
           _MiniFact(
             icon: Icons.calendar_today_outlined,
             text: formatDate(request.preferredDate),
+          ),
+          const SizedBox(height: 8),
+          _MiniFact(
+            icon: Icons.landscape_outlined,
+            text: '${request.plot.areaHectares.toStringAsFixed(1)} hectares',
+          ),
+          const SizedBox(height: 8),
+          _MiniFact(
+            icon: Icons.location_on_outlined,
+            text: request.plot.location.isEmpty
+                ? request.plot.name
+                : request.plot.location,
           ),
           const SizedBox(height: 14),
           Container(
@@ -491,8 +499,8 @@ class OperationsRequestDetailScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(18),
                       ),
                       child: Text(
-                        'Request ${request.id}',
-                        style: const TextStyle(fontWeight: FontWeight.w900),
+                        'Service request',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                     ),
                   ),
@@ -541,9 +549,9 @@ class OperationsRequestDetailScreen extends StatelessWidget {
                             children: [
                               Expanded(
                                 child: Text(
-                                  request.id,
+                                  '${request.serviceType.label} for ${request.farmerName}',
                                   style: Theme.of(context).textTheme.titleLarge
-                                      ?.copyWith(fontWeight: FontWeight.w900),
+                                      ?.copyWith(fontWeight: FontWeight.w700),
                                 ),
                               ),
                               OperationsStatusChip.request(

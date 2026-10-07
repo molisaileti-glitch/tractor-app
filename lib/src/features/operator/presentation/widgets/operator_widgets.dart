@@ -4,13 +4,19 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/operator_job.dart';
 
-const _googleDirectionsApiKey = 'AIzaSyAARTXTKRaYC011X_ruaKhK_R4uzgWtt0U';
+const _googleRoutesAndroidApiKey =
+    'AIzaSyAARTXTKRaYC011X_ruaKhK_R4uzgWtt0U';
+const _googleRoutesIosApiKey = 'AIzaSyARbOp7_7i56wwdstWxPxy-lVH2ERjHdQ0';
+const _applicationId = 'com.example.tractor';
+const _androidCertSha1 = '40F065D6613192655D59990520E93ED368DC45B7';
 
 class OperatorCard extends StatelessWidget {
   const OperatorCard({super.key, required this.child, this.onTap});
@@ -87,6 +93,7 @@ class OperatorMapCard extends StatefulWidget {
     this.showTrack = false,
     this.routeFromLatitude,
     this.routeFromLongitude,
+    this.routeEnabled = false,
     this.label = 'ASSIGNED FARM',
     this.fill = false,
   });
@@ -97,6 +104,7 @@ class OperatorMapCard extends StatefulWidget {
   final bool showTrack;
   final double? routeFromLatitude;
   final double? routeFromLongitude;
+  final bool routeEnabled;
   final String label;
   final bool fill;
 
@@ -109,6 +117,7 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
   BitmapDescriptor? _tractorMarkerIcon;
   BitmapDescriptor? _farmMarkerIcon;
   List<LatLng> _routePoints = const [];
+  String? _routeSummary;
   String? _routeKey;
   bool _loadingRoute = false;
   String? _routeError;
@@ -171,6 +180,11 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
               mapToolbarEnabled: false,
               myLocationButtonEnabled: false,
               zoomControlsEnabled: false,
+              gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                Factory<EagerGestureRecognizer>(
+                  () => EagerGestureRecognizer(),
+                ),
+              },
               onMapCreated: (controller) {
                 _controller = controller;
                 unawaited(_fitMap(mappedJobs, routeStart, routeDestination));
@@ -182,51 +196,38 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
       fit: StackFit.expand,
       children: [
         map,
-        Positioned(
-          left: 12,
-          top: 12,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(999),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.10),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.agriculture, size: 18),
-                  const SizedBox(width: 6),
-                  Text(
-                    widget.label,
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        if (_loadingRoute)
-          const Positioned(
+        if (_routeSummary != null && _routePoints.isNotEmpty)
+          Positioned(
             right: 12,
             top: 12,
             child: DecoratedBox(
-              decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E40AF),
+                borderRadius: BorderRadius.circular(999),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
               child: Padding(
-                padding: EdgeInsets.all(9),
-                child: SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.directions_car, size: 16, color: Colors.white),
+                    const SizedBox(width: 6),
+                    Text(
+                      _routeSummary!,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -263,6 +264,39 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
                         _routeError!,
                         style: Theme.of(context).textTheme.labelMedium
                             ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        if (widget.routeEnabled && routeStart == null && mappedJobs.isNotEmpty)
+          Positioned(
+            left: 12,
+            right: 12,
+            bottom: 12,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.10),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const Padding(
+                padding: EdgeInsets.all(10),
+                child: Row(
+                  children: [
+                    Icon(Icons.location_disabled_outlined, size: 18),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Allow location access and check GPS to calculate the road route.',
                       ),
                     ),
                   ],
@@ -450,6 +484,16 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
           points: _routePoints,
           color: const Color(0xFF2563EB),
           width: 6,
+        )
+      else if (routeStart != null &&
+          routeDestination != null &&
+          widget.routeEnabled)
+        Polyline(
+          polylineId: const PolylineId('fallback-guideline'),
+          points: [routeStart, routeDestination],
+          color: const Color(0xFF60A5FA),
+          width: 3,
+          patterns: [PatternItem.dash(12), PatternItem.gap(8)],
         ),
       for (final job in jobs)
         if (widget.showTrack && job.trackPoints.length >= 2)
@@ -516,15 +560,21 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
   }
 
   Future<void> _loadRouteIfNeeded() async {
+    if (!widget.routeEnabled) return;
     final mappedJobs = [
       if (widget.job != null) widget.job!,
       ...widget.jobs.where((item) => item.id != widget.job?.id),
     ].where((item) => item.plot.boundaryPoints.isNotEmpty).toList();
     final start = _routeStart;
     if (start == null || mappedJobs.isEmpty) {
+      debugPrint(
+        '[Routes API] Waiting: origin=${start == null ? 'missing' : 'ready'}, '
+        'farm=${mappedJobs.isEmpty ? 'missing' : 'ready'}',
+      );
       if (_routePoints.isNotEmpty || _routeError != null || _loadingRoute) {
         setState(() {
           _routePoints = const [];
+          _routeSummary = null;
           _routeKey = null;
           _routeError = null;
           _loadingRoute = false;
@@ -544,62 +594,167 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
       _loadingRoute = true;
       _routeError = null;
       _routePoints = const [];
+      _routeSummary = null;
     });
 
     try {
-      final points = await _fetchDrivingRoute(start, destination);
+      debugPrint(
+        '[Routes API] Requesting ${start.latitude},${start.longitude} -> '
+        '${destination.latitude},${destination.longitude}',
+      );
+      final result = await _fetchDrivingRoute(start, destination);
       if (!mounted || _routeKey != nextKey) return;
       setState(() {
-        _routePoints = points;
+        _routePoints = result.points;
+        _routeSummary = result.summary;
         _loadingRoute = false;
-        _routeError = points.length >= 2
+        _routeError = result.points.length >= 2
             ? null
             : 'No road route was returned for this farm.';
       });
+      debugPrint(
+        '[Routes API] Received ${result.points.length} route points'
+        '${result.summary != null ? ' (${result.summary})' : ''}',
+      );
       unawaited(_fitMap(mappedJobs, start, destination));
-    } catch (_) {
+    } catch (error) {
+      debugPrint('[Routes API] $error');
       if (!mounted || _routeKey != nextKey) return;
       setState(() {
         _routePoints = const [];
+        _routeSummary = null;
         _loadingRoute = false;
         _routeError =
-            'Road route unavailable. Check Directions API access for this key.';
+            'Road route unavailable. Check Routes API access for this app.';
       });
     }
   }
 
-  Future<List<LatLng>> _fetchDrivingRoute(
+  Future<_DrivingRouteResult> _fetchDrivingRoute(
     LatLng origin,
     LatLng destination,
   ) async {
-    final uri = Uri.https('maps.googleapis.com', '/maps/api/directions/json', {
-      'origin': '${origin.latitude},${origin.longitude}',
-      'destination': '${destination.latitude},${destination.longitude}',
-      'mode': 'driving',
-      'key': _googleDirectionsApiKey,
-    });
+    final uri = Uri.https(
+      'routes.googleapis.com',
+      '/directions/v2:computeRoutes',
+    );
+    debugPrint('[Routes API] Endpoint: $uri');
+    final payload = <String, Object?>{
+      'origin': {
+        'location': {
+          'latLng': {
+            'latitude': origin.latitude,
+            'longitude': origin.longitude,
+          },
+        },
+      },
+      'destination': {
+        'location': {
+          'latLng': {
+            'latitude': destination.latitude,
+            'longitude': destination.longitude,
+          },
+        },
+      },
+      'travelMode': 'DRIVE',
+      'routingPreference': 'TRAFFIC_AWARE',
+      'computeAlternativeRoutes': true,
+      'polylineQuality': 'OVERVIEW',
+      'polylineEncoding': 'ENCODED_POLYLINE',
+    };
 
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
     try {
-      final request = await client.getUrl(uri);
+      final request = await client.postUrl(uri);
+      request.headers.contentType = ContentType.json;
+      request.headers.set(
+        'X-Goog-Api-Key',
+        Platform.isIOS ? _googleRoutesIosApiKey : _googleRoutesAndroidApiKey,
+      );
+      request.headers.set(
+        'X-Goog-FieldMask',
+        'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline',
+      );
+      if (Platform.isAndroid) {
+        request.headers.set('X-Android-Package', _applicationId);
+        request.headers.set('X-Android-Cert', _androidCertSha1);
+      } else if (Platform.isIOS) {
+        request.headers.set('X-Ios-Bundle-Identifier', _applicationId);
+      }
+      request.write(jsonEncode(payload));
       final response = await request.close();
       final body = await utf8.decodeStream(response);
+      debugPrint(
+        '[Routes API] Response status=${response.statusCode}; '
+        'bodyBytes=${body.length}',
+      );
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw const SocketException('Directions request failed');
+        throw HttpException(
+          'Routes request failed (${response.statusCode}): $body',
+          uri: uri,
+        );
       }
       final decoded = jsonDecode(body) as Map<String, Object?>;
-      if (decoded['status'] != 'OK') {
-        throw const FormatException('Directions returned no route');
-      }
       final routes = decoded['routes'];
-      if (routes is! List || routes.isEmpty) return const [];
-      final route = routes.first;
-      if (route is! Map<String, Object?>) return const [];
-      final overview = route['overview_polyline'];
-      if (overview is! Map<String, Object?>) return const [];
-      final encoded = overview['points'];
-      if (encoded is! String || encoded.isEmpty) return const [];
-      return _decodePolyline(encoded);
+      if (routes is! List || routes.isEmpty) {
+        return const _DrivingRouteResult(points: []);
+      }
+      final availableRoutes = routes.whereType<Map<String, Object?>>().toList();
+      if (availableRoutes.isEmpty) {
+        return const _DrivingRouteResult(points: []);
+      }
+      availableRoutes.sort((first, second) {
+        final firstDistance =
+            (first['distanceMeters'] as num?)?.toInt() ?? 0x7fffffff;
+        final secondDistance =
+            (second['distanceMeters'] as num?)?.toInt() ?? 0x7fffffff;
+        return firstDistance.compareTo(secondDistance);
+      });
+      final route = availableRoutes.first;
+      final polyline = route['polyline'];
+      if (polyline is! Map<String, Object?>) {
+        return const _DrivingRouteResult(points: []);
+      }
+      final encoded = polyline['encodedPolyline'];
+      if (encoded is! String || encoded.isEmpty) {
+        return const _DrivingRouteResult(points: []);
+      }
+      final points = _decodePolyline(encoded);
+
+      final distanceMeters = (route['distanceMeters'] as num?)?.toInt();
+      final durationStr = route['duration'] as String?;
+      int? durationSeconds;
+      if (durationStr != null && durationStr.endsWith('s')) {
+        durationSeconds = int.tryParse(
+          durationStr.substring(0, durationStr.length - 1),
+        );
+      }
+
+      final summaryParts = <String>[];
+      if (distanceMeters != null) {
+        if (distanceMeters >= 1000) {
+          summaryParts.add(
+            '${(distanceMeters / 1000).toStringAsFixed(1)} km',
+          );
+        } else {
+          summaryParts.add('$distanceMeters m');
+        }
+      }
+      if (durationSeconds != null) {
+        final mins = (durationSeconds / 60).round();
+        if (mins < 1) {
+          summaryParts.add('< 1 min');
+        } else if (mins >= 60) {
+          final hours = mins ~/ 60;
+          final remMins = mins % 60;
+          summaryParts.add('${hours}h ${remMins}m');
+        } else {
+          summaryParts.add('$mins min');
+        }
+      }
+
+      final summary = summaryParts.isEmpty ? null : summaryParts.join(' • ');
+      return _DrivingRouteResult(points: points, summary: summary);
     } finally {
       client.close(force: true);
     }
@@ -661,4 +816,14 @@ class _NoMapCoordinates extends StatelessWidget {
       ),
     );
   }
+}
+
+class _DrivingRouteResult {
+  const _DrivingRouteResult({
+    required this.points,
+    this.summary,
+  });
+
+  final List<LatLng> points;
+  final String? summary;
 }

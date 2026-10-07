@@ -27,9 +27,39 @@ class AppTheme {
       seedColor: seed,
       brightness: Brightness.light,
     );
+    final baseTextTheme = Typography.material2021().black;
+    final textTheme = baseTextTheme.copyWith(
+      headlineLarge: baseTextTheme.headlineLarge?.copyWith(
+        fontWeight: FontWeight.w700,
+      ),
+      headlineMedium: baseTextTheme.headlineMedium?.copyWith(
+        fontWeight: FontWeight.w700,
+      ),
+      headlineSmall: baseTextTheme.headlineSmall?.copyWith(
+        fontWeight: FontWeight.w700,
+      ),
+      titleLarge: baseTextTheme.titleLarge?.copyWith(
+        fontWeight: FontWeight.w700,
+      ),
+      titleMedium: baseTextTheme.titleMedium?.copyWith(
+        fontWeight: FontWeight.w600,
+      ),
+      titleSmall: baseTextTheme.titleSmall?.copyWith(
+        fontWeight: FontWeight.w600,
+      ),
+      bodyLarge: baseTextTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w400),
+      bodyMedium: baseTextTheme.bodyMedium?.copyWith(
+        fontWeight: FontWeight.w400,
+      ),
+      labelLarge: baseTextTheme.labelLarge?.copyWith(
+        fontWeight: FontWeight.w600,
+      ),
+    );
 
     return ThemeData(
       useMaterial3: true,
+      fontFamily: 'Roboto',
+      textTheme: textTheme,
       colorScheme: scheme.copyWith(
         primary: seed,
         secondary: AppColors.warning,
@@ -43,6 +73,11 @@ class AppTheme {
         elevation: 0,
         backgroundColor: AppColors.pageBackground,
         foregroundColor: AppColors.text,
+        titleTextStyle: TextStyle(
+          color: AppColors.text,
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+        ),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: Colors.white,
@@ -55,6 +90,16 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
           side: BorderSide(color: Colors.black.withValues(alpha: 0.06)),
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.white,
+        contentTextStyle: const TextStyle(color: AppColors.text),
+        elevation: 8,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(color: Colors.black.withValues(alpha: 0.08)),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(

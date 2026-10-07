@@ -21,38 +21,112 @@ class TractorsView extends StatelessWidget {
           _PrettyGrid(
             children: [
               for (final tractor in tractors)
-                OperationsCard(
-                  child: Row(
-                    children: [
-                      const Icon(Icons.agriculture),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              tractor.assetNo ?? tractor.id,
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.w900),
-                            ),
-                            Text(tractor.model),
-                            if (tractor.registrationNo != null)
-                              Text(tractor.registrationNo!),
-                            Text('${tractor.operatingHours} operating hours'),
-                            if (tractor.station != null) Text(tractor.station!),
-                            if (tractor.note != null) Text(tractor.note!),
-                          ],
-                        ),
-                      ),
-                      OperationsStatusChip.tractor(
-                        tractorStatus: tractor.status,
-                      ),
-                    ],
-                  ),
-                ),
+                _TractorDirectoryCard(tractor: tractor),
             ],
           ),
       ],
+    );
+  }
+}
+
+class _TractorDirectoryCard extends StatelessWidget {
+  const _TractorDirectoryCard({required this.tractor});
+
+  final TractorAsset tractor;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final title = tractor.assetNo ?? tractor.label ?? tractor.model;
+    final model = [tractor.make, tractor.model]
+        .whereType<String>()
+        .where((value) => value.trim().isNotEmpty)
+        .toSet()
+        .join(' ');
+
+    return OperationsCard(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: theme.colorScheme.primary.withValues(
+                    alpha: 0.10,
+                  ),
+                  child: Icon(
+                    Icons.agriculture_outlined,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      if (model.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(model, style: theme.textTheme.bodyMedium),
+                      ],
+                    ],
+                  ),
+                ),
+                OperationsStatusChip.tractor(tractorStatus: tractor.status),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Divider(
+              color: theme.dividerColor.withValues(alpha: 0.55),
+              height: 1,
+            ),
+            const SizedBox(height: 14),
+            _DirectoryFact(
+              icon: Icons.speed_outlined,
+              text: '${tractor.operatingHours} operating hours',
+            ),
+            if (tractor.registrationNo?.trim().isNotEmpty == true) ...[
+              const SizedBox(height: 9),
+              _DirectoryFact(
+                icon: Icons.pin_outlined,
+                text: tractor.registrationNo!,
+              ),
+            ],
+            if (tractor.station?.trim().isNotEmpty == true) ...[
+              const SizedBox(height: 9),
+              _DirectoryFact(
+                icon: Icons.location_on_outlined,
+                text: tractor.station!,
+              ),
+            ],
+            if (tractor.implementNames.isNotEmpty) ...[
+              const SizedBox(height: 9),
+              _DirectoryFact(
+                icon: Icons.handyman_outlined,
+                text: tractor.implementNames.join(', '),
+              ),
+            ],
+            if (tractor.online != null) ...[
+              const SizedBox(height: 9),
+              _DirectoryFact(
+                icon: tractor.online!
+                    ? Icons.sensors_outlined
+                    : Icons.sensors_off_outlined,
+                text: tractor.online! ? 'Tracker online' : 'Tracker offline',
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
@@ -74,29 +148,11 @@ class OperatorsView extends StatelessWidget {
           _PrettyGrid(
             children: [
               for (final operator in operators)
-                OperationsCard(
-                  child: Row(
-                    children: [
-                      const Icon(Icons.engineering_outlined),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              operator.name,
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.w900),
-                            ),
-                            if (operator.note != null) Text(operator.note!),
-                          ],
-                        ),
-                      ),
-                      OperationsStatusChip.operator(
-                        operatorStatus: operator.status,
-                      ),
-                    ],
-                  ),
+                _OperatorDirectoryCard(
+                  operator: operator,
+                  jobs: repository.jobs
+                      .where((job) => job.operator.id == operator.id)
+                      .toList(),
                 ),
             ],
           ),
@@ -112,11 +168,10 @@ class FarmersView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final farmers = repository.requests
-        .map((request) => '${request.farmerName}|${request.plot.location}')
-        .toSet()
-        .map((item) => item.split('|'))
-        .toList();
+    final farmers = <String, List<OperationsServiceRequest>>{};
+    for (final request in repository.requests) {
+      farmers.putIfAbsent(request.farmerName, () => []).add(request);
+    }
 
     return _DirectoryPage(
       title: 'Farmers',
@@ -126,30 +181,159 @@ class FarmersView extends StatelessWidget {
         else
           _PrettyGrid(
             children: [
-              for (final farmer in farmers)
-                OperationsCard(
-                  child: Row(
-                    children: [
-                      const Icon(Icons.person_outline),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              farmer[0],
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.w900),
-                            ),
-                            Text(farmer[1]),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+              for (final entry in farmers.entries)
+                _FarmerDirectoryCard(
+                  name: entry.key,
+                  requests: entry.value,
                 ),
             ],
           ),
+      ],
+    );
+  }
+}
+
+class _OperatorDirectoryCard extends StatelessWidget {
+  const _OperatorDirectoryCard({required this.operator, required this.jobs});
+
+  final OperatorProfile operator;
+  final List<OperationsJob> jobs;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final activeJobs = jobs.where((job) =>
+        job.status != JobStatus.closed && job.status != JobStatus.cancelled).toList();
+    final currentJob = activeJobs.isEmpty ? null : activeJobs.first;
+    return OperationsCard(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.10),
+                  child: Icon(Icons.engineering_outlined, color: theme.colorScheme.primary),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(operator.name, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                      if (operator.note?.trim().isNotEmpty == true) ...[
+                        const SizedBox(height: 4),
+                        Text(operator.note!, style: theme.textTheme.bodyMedium),
+                      ],
+                    ],
+                  ),
+                ),
+                OperationsStatusChip.operator(operatorStatus: operator.status),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Divider(color: theme.dividerColor.withValues(alpha: 0.55), height: 1),
+            const SizedBox(height: 14),
+            _DirectoryFact(
+              icon: Icons.assignment_outlined,
+              text: '${activeJobs.length} active assignment${activeJobs.length == 1 ? '' : 's'}',
+            ),
+            if (currentJob != null) ...[
+              const SizedBox(height: 9),
+              _DirectoryFact(
+                icon: Icons.agriculture_outlined,
+                text: currentJob.tractor.assetNo ?? currentJob.tractor.label ?? currentJob.tractor.model,
+              ),
+              const SizedBox(height: 9),
+              _DirectoryFact(
+                icon: Icons.location_on_outlined,
+                text: '${currentJob.plot.name} - ${currentJob.serviceType.label}',
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FarmerDirectoryCard extends StatelessWidget {
+  const _FarmerDirectoryCard({required this.name, required this.requests});
+
+  final String name;
+  final List<OperationsServiceRequest> requests;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final latest = requests.first;
+    final phone = requests.map((item) => item.farmerPhone).whereType<String>().firstOrNull;
+    final plots = requests.map((item) => item.plot.name).toSet();
+    final location = requests
+        .map((item) => item.plot.location.trim())
+        .where((item) => item.isNotEmpty)
+        .firstOrNull;
+    return OperationsCard(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.10),
+                  child: Icon(Icons.person_outline, color: theme.colorScheme.primary),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                      if (phone != null) ...[
+                        const SizedBox(height: 4),
+                        Text(phone, style: theme.textTheme.bodyMedium),
+                      ],
+                    ],
+                  ),
+                ),
+                OperationsStatusChip.request(requestStatus: latest.status),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Divider(color: theme.dividerColor.withValues(alpha: 0.55), height: 1),
+            const SizedBox(height: 14),
+            _DirectoryFact(icon: Icons.landscape_outlined, text: '${plots.length} registered plot${plots.length == 1 ? '' : 's'}'),
+            const SizedBox(height: 9),
+            _DirectoryFact(icon: Icons.fact_check_outlined, text: '${requests.length} service request${requests.length == 1 ? '' : 's'}'),
+            const SizedBox(height: 9),
+            _DirectoryFact(icon: Icons.location_on_outlined, text: location ?? latest.plot.name),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DirectoryFact extends StatelessWidget {
+  const _DirectoryFact({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
+        const SizedBox(width: 9),
+        Expanded(child: Text(text)),
       ],
     );
   }

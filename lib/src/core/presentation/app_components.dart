@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
+export 'components/components.dart';
+
 class AppPrimaryButton extends StatelessWidget {
   const AppPrimaryButton({
     super.key,
@@ -117,7 +119,7 @@ class AppGlowButton extends StatelessWidget {
   }
 }
 
-Future<bool> showAppConfirmationDialog(
+Future<bool> legacyShowAppConfirmationDialog(
   BuildContext context, {
   required String title,
   required String message,
@@ -148,13 +150,13 @@ Future<bool> showAppConfirmationDialog(
   return result ?? false;
 }
 
-Future<void> showAppSuccessDialog(
+Future<void> legacyShowAppSuccessDialog(
   BuildContext context, {
   required String title,
   required String message,
   String buttonLabel = 'Done',
 }) {
-  return showAppFeedbackDialog(
+  return legacyShowAppFeedbackDialog(
     context,
     title: title,
     message: message,
@@ -164,13 +166,13 @@ Future<void> showAppSuccessDialog(
   );
 }
 
-Future<void> showAppErrorDialog(
+Future<void> legacyShowAppErrorDialog(
   BuildContext context, {
   required String title,
   required String message,
   String buttonLabel = 'Close',
 }) {
-  return showAppFeedbackDialog(
+  return legacyShowAppFeedbackDialog(
     context,
     title: title,
     message: message,
@@ -180,7 +182,7 @@ Future<void> showAppErrorDialog(
   );
 }
 
-Future<void> showAppFeedbackDialog(
+Future<void> legacyShowAppFeedbackDialog(
   BuildContext context, {
   required String title,
   required String message,

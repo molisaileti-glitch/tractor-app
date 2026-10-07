@@ -51,6 +51,43 @@ class OperationsJobsView extends StatelessWidget {
   }
 }
 
+class _JobFact extends StatelessWidget {
+  const _JobFact({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SizedBox(
+      width: 210,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: theme.colorScheme.primary),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: theme.textTheme.labelSmall),
+                const SizedBox(height: 2),
+                Text(value, style: theme.textTheme.bodyMedium),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _JobCard extends StatelessWidget {
   const _JobCard({required this.repository, required this.job});
 
@@ -68,85 +105,137 @@ class _JobCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tractorLabel =
+        job.tractor.assetNo ?? job.tractor.label ?? job.tractor.model;
     return OperationsCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: Theme.of(
-                  context,
-                ).colorScheme.primary.withValues(alpha: 0.12),
-                child: const Icon(Icons.agriculture),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  job.tractor.id,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              if (_canManage)
-                IconButton(
-                  tooltip: 'Job actions',
-                  onPressed: () => _showActions(context),
-                  icon: const Icon(Icons.more_vert),
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(child: Text('${job.farmerName} · ${job.serviceType.label}')),
-              OperationsStatusChip.job(jobStatus: job.status),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text('${job.plot.name} · ${formatDateTime(job.scheduledAt)}'),
-          if (job.alert != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              job.alert!,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.error,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-          if (_canDispatch) ...[
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: () => repository.dispatchJob(job.id),
-              icon: const Icon(Icons.north_east),
-              label: const Text('Dispatch Job'),
-            ),
-          ],
-          if (job.status == JobStatus.completedPendingConfirmation) ...[
-            const SizedBox(height: 16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _showVerifyDialog(context),
-                    icon: const Icon(Icons.verified_outlined),
-                    label: const Text('Verify'),
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: theme.colorScheme.primary.withValues(
+                    alpha: 0.10,
+                  ),
+                  child: Icon(
+                    Icons.route_outlined,
+                    color: theme.colorScheme.primary,
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: FilledButton.icon(
-                    onPressed: () => repository.closeJob(job.id),
-                    icon: const Icon(Icons.fact_check_outlined),
-                    label: const Text('Close'),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        job.serviceType.label,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${formatDate(job.scheduledAt)} at ${formatTime(job.scheduledAt)}',
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                    ],
                   ),
+                ),
+                OperationsStatusChip.job(jobStatus: job.status),
+                if (_canManage)
+                  IconButton(
+                    tooltip: 'Job actions',
+                    onPressed: () => _showActions(context),
+                    icon: const Icon(Icons.more_vert),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Divider(
+              color: theme.dividerColor.withValues(alpha: 0.55),
+              height: 1,
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 18,
+              runSpacing: 12,
+              children: [
+                _JobFact(
+                  icon: Icons.person_outline,
+                  label: 'Farmer',
+                  value: job.farmerName,
+                ),
+                _JobFact(
+                  icon: Icons.engineering_outlined,
+                  label: 'Operator',
+                  value: job.operator.name,
+                ),
+                _JobFact(
+                  icon: Icons.agriculture_outlined,
+                  label: 'Tractor',
+                  value: tractorLabel,
+                ),
+                _JobFact(
+                  icon: Icons.location_on_outlined,
+                  label: 'Plot',
+                  value: job.plot.name,
                 ),
               ],
             ),
+            if (job.alert != null) ...[
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.error.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  job.alert!,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+              ),
+            ],
+            if (_canDispatch) ...[
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: () => repository.dispatchJob(job.id),
+                icon: const Icon(Icons.north_east),
+                label: const Text('Dispatch Job'),
+              ),
+            ],
+            if (job.status == JobStatus.completedPendingConfirmation) ...[
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showVerifyDialog(context),
+                      icon: const Icon(Icons.verified_outlined),
+                      label: const Text('Verify'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => repository.closeJob(job.id),
+                      icon: const Icon(Icons.fact_check_outlined),
+                      label: const Text('Close'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

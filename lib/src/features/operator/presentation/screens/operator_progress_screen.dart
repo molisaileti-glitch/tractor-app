@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/presentation/components/components.dart';
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/operator_local_repository.dart';
 import '../../domain/entities/operator_job.dart';
@@ -190,13 +191,11 @@ class OperatorProgressScreen extends StatelessWidget {
               ],
             ),
           ),
+          actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () async {
+            AppDialogActions(
+              onCancel: () => Navigator.of(context).pop(),
+              onConfirm: () async {
                 final messenger = ScaffoldMessenger.of(screenContext);
                 final ok = await repository.reportProblem(
                   jobId: job.id,
@@ -215,7 +214,6 @@ class OperatorProgressScreen extends StatelessWidget {
                   ),
                 );
               },
-              child: const Text('Submit'),
             ),
           ],
         ),

@@ -1168,6 +1168,7 @@ class UnionOperationsRepository extends ChangeNotifier {
           _text(farmerJson, const ['name']) ??
           _text(json, const ['farmer_name']) ??
           'Farmer',
+      farmerPhone: _text(farmerJson, const ['phone']),
       serviceType: _serviceType(
         _text(serviceTypeJson, const ['code', 'name']) ??
             _text(json, const ['service_type']),

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/presentation/components/components.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/repositories/operator_local_repository.dart';
 import 'operator_history_screen.dart';
 import 'operator_jobs_screen.dart';
-import 'operator_map_screen.dart';
 import 'operator_profile_screen.dart';
+import 'operator_schedule_screen.dart';
 
 class OperatorShell extends StatefulWidget {
   const OperatorShell({
@@ -27,8 +28,11 @@ class _OperatorShellState extends State<OperatorShell> {
   @override
   Widget build(BuildContext context) {
     final screens = [
-      OperatorJobsScreen(repository: widget.repository),
-      OperatorMapScreen(repository: widget.repository),
+      OperatorJobsScreen(
+        repository: widget.repository,
+        onOpenSchedule: () => setState(() => _selectedIndex = 1),
+      ),
+      OperatorScheduleScreen(repository: widget.repository),
       OperatorHistoryScreen(repository: widget.repository),
       OperatorProfileScreen(repository: widget.repository),
     ];
@@ -51,14 +55,14 @@ class _OperatorShellState extends State<OperatorShell> {
           ),
           drawer: _OperatorDrawer(
             repository: widget.repository,
-            selectedIndex: _selectedIndex,
-            onSelect: (index) {
-              setState(() => _selectedIndex = index);
-              Navigator.of(context).pop();
-            },
             onLogout: widget.onLogout,
           ),
-          body: SafeArea(top: false, child: screens[_selectedIndex]),
+          body: SafeArea(
+            top: false,
+            child: widget.repository.isSyncingMechanization
+                ? const AppScreenSkeleton()
+                : screens[_selectedIndex],
+          ),
           bottomNavigationBar: NavigationBar(
             selectedIndex: _selectedIndex,
             onDestinationSelected: (index) {
@@ -66,14 +70,14 @@ class _OperatorShellState extends State<OperatorShell> {
             },
             destinations: const [
               NavigationDestination(
-                icon: Icon(Icons.agriculture_outlined),
-                selectedIcon: Icon(Icons.agriculture),
-                label: 'Jobs',
+                icon: Icon(Icons.dashboard_outlined),
+                selectedIcon: Icon(Icons.dashboard),
+                label: 'Dashboard',
               ),
               NavigationDestination(
-                icon: Icon(Icons.location_on_outlined),
-                selectedIcon: Icon(Icons.location_on),
-                label: 'Map',
+                icon: Icon(Icons.calendar_month_outlined),
+                selectedIcon: Icon(Icons.calendar_month),
+                label: 'Schedule',
               ),
               NavigationDestination(
                 icon: Icon(Icons.history_outlined),
@@ -95,7 +99,7 @@ class _OperatorShellState extends State<OperatorShell> {
   String _titleForIndex(int index) {
     return switch (index) {
       0 => 'Operator Dashboard',
-      1 => 'Fleet Map',
+      1 => 'Schedule',
       2 => 'Job History',
       _ => 'Profile',
     };
@@ -105,14 +109,10 @@ class _OperatorShellState extends State<OperatorShell> {
 class _OperatorDrawer extends StatelessWidget {
   const _OperatorDrawer({
     required this.repository,
-    required this.selectedIndex,
-    required this.onSelect,
     required this.onLogout,
   });
 
   final OperatorLocalRepository repository;
-  final int selectedIndex;
-  final ValueChanged<int> onSelect;
   final VoidCallback onLogout;
 
   @override
@@ -170,45 +170,7 @@ class _OperatorDrawer extends StatelessWidget {
               ),
             ),
             const Divider(height: 1),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                children: [
-                  _DrawerDestination(
-                    index: 0,
-                    selectedIndex: selectedIndex,
-                    icon: Icons.agriculture_outlined,
-                    selectedIcon: Icons.agriculture,
-                    label: 'Jobs',
-                    onSelect: onSelect,
-                  ),
-                  _DrawerDestination(
-                    index: 1,
-                    selectedIndex: selectedIndex,
-                    icon: Icons.location_on_outlined,
-                    selectedIcon: Icons.location_on,
-                    label: 'Map',
-                    onSelect: onSelect,
-                  ),
-                  _DrawerDestination(
-                    index: 2,
-                    selectedIndex: selectedIndex,
-                    icon: Icons.history_outlined,
-                    selectedIcon: Icons.history,
-                    label: 'History',
-                    onSelect: onSelect,
-                  ),
-                  _DrawerDestination(
-                    index: 3,
-                    selectedIndex: selectedIndex,
-                    icon: Icons.person_outline,
-                    selectedIcon: Icons.person,
-                    label: 'Profile',
-                    onSelect: onSelect,
-                  ),
-                ],
-              ),
-            ),
+            const Spacer(),
             const Divider(height: 1),
             Padding(
               padding: const EdgeInsets.all(12),
@@ -221,35 +183,6 @@ class _OperatorDrawer extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _DrawerDestination extends StatelessWidget {
-  const _DrawerDestination({
-    required this.index,
-    required this.selectedIndex,
-    required this.icon,
-    required this.selectedIcon,
-    required this.label,
-    required this.onSelect,
-  });
-
-  final int index;
-  final int selectedIndex;
-  final IconData icon;
-  final IconData selectedIcon;
-  final String label;
-  final ValueChanged<int> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    final selected = index == selectedIndex;
-    return ListTile(
-      selected: selected,
-      leading: Icon(selected ? selectedIcon : icon),
-      title: Text(label),
-      onTap: () => onSelect(index),
     );
   }
 }

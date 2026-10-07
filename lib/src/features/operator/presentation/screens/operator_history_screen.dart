@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/presentation/components/components.dart';
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/operator_local_repository.dart';
 import '../widgets/operator_widgets.dart';
@@ -11,7 +12,7 @@ class OperatorHistoryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final history = repository.history;
+    final history = repository.pastAssignments;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       child: Align(
@@ -22,12 +23,21 @@ class OperatorHistoryScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'History',
+                'Past assignments',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w900,
                 ),
               ),
               const SizedBox(height: 14),
+              if (history.isEmpty)
+                SizedBox(
+                  height: MediaQuery.sizeOf(context).height * 0.55,
+                  child: const AppEmptyState(
+                    icon: Icons.history_toggle_off_outlined,
+                    title: 'No past assignments yet',
+                    message: 'Completed jobs will appear here.',
+                  ),
+                ),
               for (final job in history) ...[
                 OperatorCard(
                   child: Column(
@@ -49,6 +59,7 @@ class OperatorHistoryScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
                       Text('${job.farmerName} - ${job.plot.name}'),
+                      Text('Scheduled ${formatDateTime(job.scheduledAt)}'),
                       if (job.finishedAt != null)
                         Text('Finished ${formatTime(job.finishedAt!)}'),
                       if (job.areaServicedHectares != null)

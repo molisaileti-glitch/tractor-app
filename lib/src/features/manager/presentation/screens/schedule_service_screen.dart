@@ -61,7 +61,7 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Request #${request.id}',
+                        '${request.serviceType.label} for ${request.farmerName}',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.w900,
                         ),
@@ -338,7 +338,7 @@ class _TractorOption extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    tractor.id,
+                    tractor.assetNo ?? tractor.label ?? tractor.model,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w900,
                     ),

@@ -6,31 +6,34 @@ import '../../data/repositories/operator_local_repository.dart';
 import '../../domain/entities/operator_job.dart';
 import '../widgets/operator_widgets.dart';
 import 'operator_job_detail_screen.dart';
-import 'operator_schedule_screen.dart';
 
 class OperatorJobsScreen extends StatelessWidget {
-  const OperatorJobsScreen({super.key, required this.repository});
+  const OperatorJobsScreen({
+    super.key,
+    required this.repository,
+    required this.onOpenSchedule,
+  });
 
   final OperatorLocalRepository repository;
+  final VoidCallback onOpenSchedule;
 
   @override
   Widget build(BuildContext context) {
     final displayName = repository.operatorName?.split(' ').first ?? 'Operator';
-    final activeJobs = repository.jobs.where((job) => !job.isComplete).toList()
-      ..sort(_sortJobs);
-    final focusJob = activeJobs.firstOrNull;
+    final now = DateTime.now();
+    final currentJobs = repository.jobs.where((job) {
+      if (job.isComplete) return false;
+      final activelyUnderway =
+          job.status == OperatorJobStatus.enRoute ||
+          job.status == OperatorJobStatus.arrived ||
+          job.status == OperatorJobStatus.inProgress;
+      return activelyUnderway || _sameDate(job.scheduledAt, now);
+    }).toList()..sort(_sortJobs);
+    final focusJob = currentJobs.firstOrNull;
     final totalTodayJobs = repository.jobs
         .where((job) => _sameDate(job.scheduledAt, DateTime.now()))
         .length;
-    final todayJobs = repository.jobs
-        .where((job) => _sameDate(job.scheduledAt, DateTime.now()))
-        .where((job) => job.id != focusJob?.id)
-        .toList()
-      ..sort(_sortJobs);
-    final otherAssignments = activeJobs
-        .where((job) => job.id != focusJob?.id)
-        .where((job) => !_sameDate(job.scheduledAt, DateTime.now()))
-        .toList();
+    final activeCount = repository.jobs.where((job) => !job.isComplete).length;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       child: Align(
@@ -51,10 +54,7 @@ class OperatorJobsScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              if (repository.isSyncingMechanization) ...[
-                const SizedBox(height: 12),
-                const LinearProgressIndicator(minHeight: 3),
-              ] else if (repository.mechanizationSyncError != null) ...[
+              if (repository.mechanizationSyncError != null) ...[
                 const SizedBox(height: 12),
                 _SyncNotice(
                   message: repository.mechanizationSyncError!,
@@ -81,7 +81,7 @@ class OperatorJobsScreen extends StatelessWidget {
                     iconColor: AppColors.fieldGreen,
                   ),
                   _DashboardToolCard(
-                    value: '${activeJobs.length}',
+                    value: '$activeCount',
                     label: 'Active',
                     detail: 'Not yet closed',
                     icon: Icons.route_outlined,
@@ -109,12 +109,7 @@ class OperatorJobsScreen extends StatelessWidget {
                   ),
                   const Spacer(),
                   TextButton.icon(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            OperatorScheduleScreen(repository: repository),
-                      ),
-                    ),
+                    onPressed: onOpenSchedule,
                     icon: const Icon(Icons.calendar_month_outlined),
                     label: const Text('View Schedule'),
                   ),
@@ -129,42 +124,6 @@ class OperatorJobsScreen extends StatelessWidget {
                   emphasis: true,
                   onView: () => _openJob(context, focusJob),
                 ),
-              const SizedBox(height: 18),
-              Text(
-                "TODAY'S REMAINING SCHEDULE",
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 10),
-              if (todayJobs.isEmpty)
-                const _EmptyQueueCard(message: 'No other jobs scheduled today.')
-              else
-                for (final job in todayJobs) ...[
-                  _OperatorJobCard(
-                    job: job,
-                    onView: () => _openJob(context, job),
-                  ),
-                  const SizedBox(height: 10),
-                ],
-              const SizedBox(height: 12),
-              Text(
-                'OTHER ACTIVE ASSIGNMENTS',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 10),
-              if (otherAssignments.isEmpty)
-                const _EmptyQueueCard(message: 'No other active assignments.')
-              else
-                for (final job in otherAssignments) ...[
-                  _OperatorJobCard(
-                    job: job,
-                    onView: () => _openJob(context, job),
-                  ),
-                  const SizedBox(height: 10),
-                ],
             ],
           ),
         ),
@@ -249,45 +208,31 @@ class _NoAssignedJobsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const OperatorCard(
-      child: Row(
-        children: [
-          Icon(Icons.assignment_outlined),
-          SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'No assigned mechanization jobs were returned by the API.',
-              style: TextStyle(fontWeight: FontWeight.w800),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 30),
+      child: Center(
+        child: Column(
+          children: [
+            Icon(
+              Icons.event_available_outlined,
+              size: 34,
+              color: Theme.of(context).colorScheme.primary,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EmptyQueueCard extends StatelessWidget {
-  const _EmptyQueueCard({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return OperatorCard(
-      child: Row(
-        children: [
-          Icon(
-            Icons.check_circle_outline,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(fontWeight: FontWeight.w600),
+            const SizedBox(height: 10),
+            Text(
+              'No current assignment',
+              style: Theme.of(context).textTheme.titleMedium,
             ),
-          ),
-        ],
+            const SizedBox(height: 4),
+            Text(
+              'Your active job will appear here when it is ready.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppColors.mutedText,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -336,8 +281,8 @@ class _DashboardToolCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 148,
-      padding: const EdgeInsets.all(16),
+      height: 172,
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: tint,
         borderRadius: BorderRadius.circular(18),

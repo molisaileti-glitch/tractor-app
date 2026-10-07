@@ -83,35 +83,50 @@ class OperationsDashboardView extends StatelessWidget {
           icon: Icons.priority_high_rounded,
         ),
         const SizedBox(height: 10),
-        _AttentionCard(
-          icon: Icons.warning_amber_outlined,
-          text: '${repository.pendingRequestCount} requests awaiting approval',
-          onTap: onOpenRequests,
-        ),
-        const SizedBox(height: 10),
-        _AttentionCard(
-          icon: Icons.build_outlined,
-          text: '${repository.maintenanceCount} tractor under maintenance',
-        ),
-        const SizedBox(height: 10),
-        _AttentionCard(
-          icon: Icons.fact_check_outlined,
-          text: '$awaitingVerification completed jobs awaiting verification',
-          onTap: onOpenJobs,
-        ),
-        const SizedBox(height: 10),
-        _AttentionCard(
-          icon: Icons.rule_folder_outlined,
-          text:
-              '${repository.pendingOverrideCount} start override requests pending',
-          onTap: onOpenOversight,
-        ),
-        const SizedBox(height: 10),
-        _AttentionCard(
-          icon: Icons.report_problem_outlined,
-          text: '${repository.openExceptionCount} open exceptions',
-          onTap: onOpenOversight,
-        ),
+        if (repository.pendingRequestCount > 0) ...[
+          _AttentionCard(
+            icon: Icons.warning_amber_outlined,
+            text: '${repository.pendingRequestCount} requests awaiting approval',
+            onTap: onOpenRequests,
+          ),
+          const SizedBox(height: 10),
+        ],
+        if (repository.maintenanceCount > 0) ...[
+          _AttentionCard(
+            icon: Icons.build_outlined,
+            text: '${repository.maintenanceCount} tractors under maintenance',
+          ),
+          const SizedBox(height: 10),
+        ],
+        if (awaitingVerification > 0) ...[
+          _AttentionCard(
+            icon: Icons.fact_check_outlined,
+            text: '$awaitingVerification completed jobs awaiting verification',
+            onTap: onOpenJobs,
+          ),
+          const SizedBox(height: 10),
+        ],
+        if (repository.pendingOverrideCount > 0) ...[
+          _AttentionCard(
+            icon: Icons.rule_folder_outlined,
+            text:
+                '${repository.pendingOverrideCount} start override requests pending',
+            onTap: onOpenOversight,
+          ),
+          const SizedBox(height: 10),
+        ],
+        if (repository.openExceptionCount > 0)
+          _AttentionCard(
+            icon: Icons.report_problem_outlined,
+            text: '${repository.openExceptionCount} open exceptions',
+            onTap: onOpenOversight,
+          ),
+        if (repository.pendingRequestCount == 0 &&
+            repository.maintenanceCount == 0 &&
+            awaitingVerification == 0 &&
+            repository.pendingOverrideCount == 0 &&
+            repository.openExceptionCount == 0)
+          const _AllClearNotice(),
         const SizedBox(height: 18),
         _DashboardSectionHeader(
           title: "Today's Jobs",
@@ -237,9 +252,9 @@ class _CompactMetricCard extends StatelessWidget {
       height: 136,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: color.withValues(alpha: 0.09),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.74)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -255,7 +270,7 @@ class _CompactMetricCard extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.10),
+              color: Colors.white.withValues(alpha: 0.82),
               borderRadius: BorderRadius.circular(13),
             ),
             child: Icon(icon, color: color, size: 22),
@@ -265,7 +280,7 @@ class _CompactMetricCard extends StatelessWidget {
             value,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.w800,
-              color: color,
+              color: AppColors.text,
             ),
           ),
           const SizedBox(height: 2),
@@ -329,38 +344,126 @@ class _TodayJobCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tractorLabel = job.tractor.assetNo ?? job.tractor.label ?? job.tractor.model;
+    final plotArea = job.plot.areaHectares > 0
+        ? '${job.plot.areaHectares.toStringAsFixed(1)} ha'
+        : null;
     return OperationsCard(
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 58,
-            height: 44,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).colorScheme.primary.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              formatTime(job.scheduledAt),
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w900,
-                color: Theme.of(context).colorScheme.primary,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.09),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.agriculture_outlined,
+                  color: theme.colorScheme.primary,
+                ),
               ),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      job.serviceType.label,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${formatDate(job.scheduledAt)} at ${formatTime(job.scheduledAt)}',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              OperationsStatusChip.job(jobStatus: job.status),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              '${job.serviceType.label} - ${job.tractor.id}',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w800),
-            ),
+          const SizedBox(height: 16),
+          Divider(color: theme.dividerColor.withValues(alpha: 0.55), height: 1),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 18,
+            runSpacing: 12,
+            children: [
+              _JobFact(icon: Icons.person_outline, label: 'Farmer', value: job.farmerName),
+              _JobFact(icon: Icons.engineering_outlined, label: 'Operator', value: job.operator.name),
+              _JobFact(icon: Icons.agriculture_outlined, label: 'Tractor', value: tractorLabel),
+              _JobFact(
+                icon: Icons.location_on_outlined,
+                label: 'Plot',
+                value: [job.plot.name, plotArea].whereType<String>().join(' - '),
+              ),
+            ],
           ),
-          OperationsStatusChip.job(jobStatus: job.status),
         ],
+      ),
+    );
+  }
+}
+
+class _JobFact extends StatelessWidget {
+  const _JobFact({required this.icon, required this.label, required this.value});
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SizedBox(
+      width: 210,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 19, color: theme.colorScheme.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: theme.textTheme.labelSmall),
+                const SizedBox(height: 2),
+                Text(value, style: theme.textTheme.bodyMedium),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AllClearNotice extends StatelessWidget {
+  const _AllClearNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 18),
+      child: Center(
+        child: Column(
+          children: [
+            Icon(Icons.check_circle_outline, color: theme.colorScheme.primary),
+            const SizedBox(height: 8),
+            Text('Nothing needs attention right now.', style: theme.textTheme.bodyLarge),
+          ],
+        ),
       ),
     );
   }

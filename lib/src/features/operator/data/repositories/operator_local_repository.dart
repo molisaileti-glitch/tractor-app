@@ -43,6 +43,21 @@ class OperatorLocalRepository extends ChangeNotifier {
     return _jobs.where((job) => job.isComplete).toList(growable: false);
   }
 
+  List<OperatorJob> get pastAssignments {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final items = _jobs.where((job) {
+      if (job.isComplete) return true;
+      final stillUnderway =
+          job.status == OperatorJobStatus.enRoute ||
+          job.status == OperatorJobStatus.arrived ||
+          job.status == OperatorJobStatus.inProgress;
+      return job.scheduledAt.isBefore(today) && !stillUnderway;
+    }).toList()
+      ..sort((first, second) => second.scheduledAt.compareTo(first.scheduledAt));
+    return List.unmodifiable(items);
+  }
+
   void setMechanizationAccessToken(String? token) {
     final normalized = token?.trim();
     if (_accessToken == normalized) return;
@@ -71,7 +86,7 @@ class OperatorLocalRepository extends ChangeNotifier {
 
     try {
       final today = DateTime.now();
-      final from = _dateOnly(today.subtract(const Duration(days: 2)));
+      final from = _dateOnly(today.subtract(const Duration(days: 90)));
       final to = _dateOnly(today.add(const Duration(days: 7)));
       final responses = await Future.wait<Map<String, Object?>>([
         mobileApiClient.me(token: token),

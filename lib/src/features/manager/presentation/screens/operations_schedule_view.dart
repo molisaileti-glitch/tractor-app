@@ -504,14 +504,13 @@ class _PositionedOperationsJobBlock extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              Text(job.id, maxLines: 1, overflow: TextOverflow.ellipsis),
               Text(
-                job.farmerName,
+                '${job.serviceType.label} - ${job.farmerName}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
               Text(
-                '${job.tractor.assetNo ?? job.tractor.id} - ${job.operator.name}',
+                '${job.tractor.assetNo ?? job.tractor.label ?? job.tractor.model} - ${job.operator.name}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),

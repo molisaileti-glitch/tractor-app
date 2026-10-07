@@ -30,9 +30,7 @@ class OperatorProfileScreen extends StatelessWidget {
             children: [
               Text(
                 'Profile',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+                style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 14),
               OperatorCard(
@@ -52,8 +50,7 @@ class OperatorProfileScreen extends StatelessWidget {
                         children: [
                           Text(
                             name,
-                            style: Theme.of(context).textTheme.titleLarge
-                                ?.copyWith(fontWeight: FontWeight.w700),
+                            style: Theme.of(context).textTheme.titleLarge,
                           ),
                           Text(email == null || email.isEmpty
                               ? role
@@ -118,9 +115,7 @@ class _ProfileLine extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: Theme.of(
-                context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 4),
               Text(subtitle),

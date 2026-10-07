@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/presentation/components/components.dart';
 import '../../data/repositories/union_operations_repository.dart';
 import 'operations_dashboard_view.dart';
 import 'operations_directory_views.dart';
@@ -101,16 +102,20 @@ class _OperationsShellState extends State<OperationsShell> {
                       ),
                     ),
                   Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-                      child: Align(
-                        alignment: Alignment.topCenter,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 1180),
-                          child: _currentView(),
-                        ),
-                      ),
-                    ),
+                    child: widget.repository.isSyncingMechanization
+                        ? const AppScreenSkeleton()
+                        : SingleChildScrollView(
+                            padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+                            child: Align(
+                              alignment: Alignment.topCenter,
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 1180,
+                                ),
+                                child: _currentView(),
+                              ),
+                            ),
+                          ),
                   ),
                 ],
               ),

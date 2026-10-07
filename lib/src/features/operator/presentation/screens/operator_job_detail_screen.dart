@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/presentation/components/components.dart';
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/operator_local_repository.dart';
 import '../../domain/entities/operator_job.dart';
@@ -59,20 +60,16 @@ class OperatorJobDetailScreen extends StatelessWidget {
               ),
             ),
           ),
-          DraggableScrollableSheet(
-            initialChildSize: 0.34,
-            minChildSize: 0.20,
-            maxChildSize: 0.72,
-            snap: true,
-            snapSizes: const [0.20, 0.34, 0.72],
-            builder: (context, scrollController) {
-              return _JobActionSheet(
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 330),
+              child: _JobActionSheet(
                 job: job,
-                scrollController: scrollController,
                 onStartJourney: () => _advance(context, job),
                 onReportProblem: () => _showProblemDialog(context, job),
-              );
-            },
+              ),
+            ),
           ),
         ],
       ),
@@ -178,13 +175,11 @@ class OperatorJobDetailScreen extends StatelessWidget {
               ],
             ),
           ),
+          actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () async {
+            AppDialogActions(
+              onCancel: () => Navigator.of(context).pop(),
+              onConfirm: () async {
                 final messenger = ScaffoldMessenger.of(screenContext);
                 final ok = await repository.reportProblem(
                   jobId: job.id,
@@ -203,7 +198,6 @@ class OperatorJobDetailScreen extends StatelessWidget {
                   ),
                 );
               },
-              child: const Text('Submit'),
             ),
           ],
         ),
@@ -215,13 +209,11 @@ class OperatorJobDetailScreen extends StatelessWidget {
 class _JobActionSheet extends StatelessWidget {
   const _JobActionSheet({
     required this.job,
-    required this.scrollController,
     required this.onStartJourney,
     required this.onReportProblem,
   });
 
   final OperatorJob job;
-  final ScrollController scrollController;
   final VoidCallback onStartJourney;
   final VoidCallback onReportProblem;
 
@@ -237,18 +229,8 @@ class _JobActionSheet extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: SingleChildScrollView(
-          controller: scrollController,
           child: Column(
             children: [
-              Container(
-                width: 48,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-              const SizedBox(height: 16),
               OperatorCard(
                 child: Row(
                   children: [
