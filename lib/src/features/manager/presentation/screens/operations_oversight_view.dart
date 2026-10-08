@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/presentation/components/components.dart';
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/union_operations_repository.dart';
 import '../../domain/entities/operations_models.dart';
@@ -13,7 +14,8 @@ class OperationsOversightView extends StatefulWidget {
   final UnionOperationsRepository repository;
 
   @override
-  State<OperationsOversightView> createState() => _OperationsOversightViewState();
+  State<OperationsOversightView> createState() =>
+      _OperationsOversightViewState();
 }
 
 class _OperationsOversightViewState extends State<OperationsOversightView> {
@@ -74,32 +76,34 @@ class _OperationsOversightViewState extends State<OperationsOversightView> {
         ),
         const SizedBox(height: 16),
         switch (_tab) {
-          _OversightTab.overrides => repository.overrides.isEmpty
-              ? const _OversightEmptyState(
-                  icon: Icons.rule_folder_outlined,
-                  message: 'No overrides found.',
-                )
-              : Column(
-                  children: [
-                    for (final item in repository.overrides) ...[
-                      _OverrideCard(repository: repository, item: item),
-                      const SizedBox(height: 12),
+          _OversightTab.overrides =>
+            repository.overrides.isEmpty
+                ? const _OversightEmptyState(
+                    icon: Icons.rule_folder_outlined,
+                    message: 'No overrides found.',
+                  )
+                : Column(
+                    children: [
+                      for (final item in repository.overrides) ...[
+                        _OverrideCard(repository: repository, item: item),
+                        const SizedBox(height: 12),
+                      ],
                     ],
-                  ],
-                ),
-          _OversightTab.exceptions => repository.exceptions.isEmpty
-              ? const _OversightEmptyState(
-                  icon: Icons.report_problem_outlined,
-                  message: 'No exceptions found.',
-                )
-              : Column(
-                  children: [
-                    for (final item in repository.exceptions) ...[
-                      _ExceptionCard(repository: repository, item: item),
-                      const SizedBox(height: 12),
+                  ),
+          _OversightTab.exceptions =>
+            repository.exceptions.isEmpty
+                ? const _OversightEmptyState(
+                    icon: Icons.report_problem_outlined,
+                    message: 'No exceptions found.',
+                  )
+                : Column(
+                    children: [
+                      for (final item in repository.exceptions) ...[
+                        _ExceptionCard(repository: repository, item: item),
+                        const SizedBox(height: 12),
+                      ],
                     ],
-                  ],
-                ),
+                  ),
         },
       ],
     );
@@ -141,7 +145,9 @@ class _OversightTabButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: selected
-                  ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.28)
+                  ? Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.28)
                   : Colors.black.withValues(alpha: 0.08),
             ),
           ),
@@ -185,7 +191,9 @@ class _OversightEmptyState extends StatelessWidget {
             Icon(
               icon,
               size: 46,
-              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.42),
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.42),
             ),
             const SizedBox(height: 12),
             Text(
@@ -277,6 +285,16 @@ class _OverrideCard extends StatelessWidget {
                             label: 'Decision note',
                           );
                           if (note == null || note.trim().isEmpty) return;
+                          if (!context.mounted) return;
+                          final confirmed = await showAppConfirmationDialog(
+                            context,
+                            title: 'Deny override?',
+                            message:
+                                'The operator will not be able to use this override to start the job.',
+                            confirmLabel: 'Deny',
+                            danger: true,
+                          );
+                          if (!confirmed) return;
                           await repository.decideOverride(
                             overrideId: item.id,
                             approve: false,
@@ -299,6 +317,15 @@ class _OverrideCard extends StatelessWidget {
                             label: 'Decision note',
                           );
                           if (note == null || note.trim().isEmpty) return;
+                          if (!context.mounted) return;
+                          final confirmed = await showAppConfirmationDialog(
+                            context,
+                            title: 'Approve override?',
+                            message:
+                                'The operator may use this approval to bypass the allowed failed start checks until it expires.',
+                            confirmLabel: 'Approve',
+                          );
+                          if (!confirmed) return;
                           await repository.decideOverride(
                             overrideId: item.id,
                             approve: true,
@@ -378,7 +405,18 @@ class _ExceptionCard extends StatelessWidget {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: canAcknowledge
-                      ? () => repository.acknowledgeException(item.id)
+                      ? () async {
+                          final confirmed = await showAppConfirmationDialog(
+                            context,
+                            title: 'Acknowledge exception?',
+                            message:
+                                'This records that the exception has been seen and is being handled.',
+                            confirmLabel: 'Acknowledge',
+                          );
+                          if (confirmed) {
+                            await repository.acknowledgeException(item.id);
+                          }
+                        }
                       : null,
                   icon: const Icon(Icons.visibility_outlined),
                   label: const Text('Ack'),
@@ -395,6 +433,15 @@ class _ExceptionCard extends StatelessWidget {
                             label: 'Resolution note',
                           );
                           if (note == null || note.trim().isEmpty) return;
+                          if (!context.mounted) return;
+                          final confirmed = await showAppConfirmationDialog(
+                            context,
+                            title: 'Resolve exception?',
+                            message:
+                                'Confirm that the issue has been handled. The resolution note will be recorded.',
+                            confirmLabel: 'Resolve',
+                          );
+                          if (!confirmed) return;
                           await repository.resolveException(
                             exceptionId: item.id,
                             remarks: note.trim(),

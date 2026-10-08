@@ -60,11 +60,7 @@ class OperatorProgressScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 14),
-                OperatorMapCard(
-                  job: job,
-                  showTrack: true,
-                  label: 'WORK TRACK',
-                ),
+                OperatorMapCard(job: job, showTrack: true, label: 'WORK TRACK'),
                 const SizedBox(height: 14),
                 const OperatorCard(
                   child: Row(
@@ -122,18 +118,19 @@ class OperatorProgressScreen extends StatelessWidget {
 
   String _formatDuration(Duration duration) {
     final hours = duration.inHours.toString().padLeft(2, '0');
-    final minutes = duration.inMinutes
-        .remainder(60)
-        .toString()
-        .padLeft(2, '0');
-    final seconds = duration.inSeconds
-        .remainder(60)
-        .toString()
-        .padLeft(2, '0');
+    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
     return '$hours:$minutes:$seconds';
   }
 
   Future<void> _pause(BuildContext context, OperatorJob job) async {
+    final confirmed = await showAppConfirmationDialog(
+      context,
+      title: 'Pause work?',
+      message: 'Work time for this job will be paused until you resume.',
+      confirmLabel: 'Pause',
+    );
+    if (!confirmed || !context.mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     final ok = await repository.pauseJob(jobId: job.id, reason: 'Paused');
     messenger.showSnackBar(
@@ -146,6 +143,13 @@ class OperatorProgressScreen extends StatelessWidget {
   }
 
   Future<void> _resume(BuildContext context, OperatorJob job) async {
+    final confirmed = await showAppConfirmationDialog(
+      context,
+      title: 'Resume work?',
+      message: 'Work time will continue for this job.',
+      confirmLabel: 'Resume',
+    );
+    if (!confirmed || !context.mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     final ok = await repository.resumeJob(job.id);
     messenger.showSnackBar(

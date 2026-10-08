@@ -25,55 +25,59 @@ class OperatorJobDetailScreen extends StatelessWidget {
       builder: (context, _) {
         final job = repository.jobById(jobId);
         return Scaffold(
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: OperatorMapCard(job: job, label: 'JOB LOCATION', fill: true),
-          ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(18),
-              child: Row(
-                children: [
-                  IconButton.filledTonal(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Text(
-                        '${job.tractorLabel ?? job.tractorId} - ${job.plot.name}',
-                        style: const TextStyle(fontWeight: FontWeight.w900),
-                      ),
-                    ),
-                  ),
-                ],
+          body: Stack(
+            children: [
+              Positioned.fill(
+                child: OperatorMapCard(
+                  job: job,
+                  label: 'JOB LOCATION',
+                  fill: true,
+                ),
               ),
-            ),
-          ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 330),
-              child: _JobActionSheet(
-                job: job,
-                onStartJourney: () => _advance(context, job),
-                onReportProblem: () => _showProblemDialog(context, job),
+              SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Row(
+                    children: [
+                      IconButton.filledTonal(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Text(
+                            '${job.tractorLabel ?? job.tractorId} - ${job.plot.name}',
+                            style: const TextStyle(fontWeight: FontWeight.w900),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 330),
+                  child: _JobActionSheet(
+                    job: job,
+                    onStartJourney: () => _advance(context, job),
+                    onReportProblem: () => _showProblemDialog(context, job),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
+        );
       },
     );
   }
@@ -108,6 +112,14 @@ class OperatorJobDetailScreen extends StatelessWidget {
   }
 
   Future<void> _acceptAssignment(BuildContext context, OperatorJob job) async {
+    final confirmed = await showAppConfirmationDialog(
+      context,
+      title: 'Accept assignment?',
+      message:
+          'Confirm that you are available to operate ${job.tractorLabel ?? 'the assigned tractor'} for this job.',
+      confirmLabel: 'Accept',
+    );
+    if (!confirmed || !context.mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     final ok = await repository.acceptAssignment(job.id);
     messenger.showSnackBar(
@@ -122,6 +134,14 @@ class OperatorJobDetailScreen extends StatelessWidget {
   }
 
   Future<void> _startJourney(BuildContext context, OperatorJob job) async {
+    final confirmed = await showAppConfirmationDialog(
+      context,
+      title: 'Start journey?',
+      message:
+          'Your assignment will be marked en route and navigation to the farm will begin.',
+      confirmLabel: 'Start Journey',
+    );
+    if (!confirmed || !context.mounted) return;
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final ok = await repository.startJourney(job.id);

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'app_components.dart';
-import '../theme/app_theme.dart';
+import '../../../../core/presentation/components/components.dart';
+import '../../../../core/theme/app_theme.dart';
 
 class AppWelcomeScreen extends StatelessWidget {
   const AppWelcomeScreen({super.key, required this.onContinue});
@@ -41,12 +41,12 @@ class AppWelcomeScreen extends StatelessWidget {
                 children: [
                   const _BrandMark(),
                   const Spacer(),
-                  Align(
-                    alignment: Alignment.bottomCenter,
+                  Center(
                     child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 520),
+                      constraints: const BoxConstraints(maxWidth: 480),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Text(
                             'Kwanza Track',
@@ -55,7 +55,7 @@ class AppWelcomeScreen extends StatelessWidget {
                                 ?.copyWith(
                                   color: Colors.white,
                                   fontWeight: FontWeight.w900,
-                                  height: 0.95,
+                                  height: 1.05,
                                 ),
                           ),
                           const SizedBox(height: 12),
@@ -66,7 +66,7 @@ class AppWelcomeScreen extends StatelessWidget {
                                 ?.copyWith(
                                   color: Colors.white,
                                   fontWeight: FontWeight.w800,
-                                  height: 1.12,
+                                  height: 1.25,
                                 ),
                           ),
                           const SizedBox(height: 10),
@@ -75,16 +75,12 @@ class AppWelcomeScreen extends StatelessWidget {
                             textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.bodyLarge
                                 ?.copyWith(
-                                  color: const Color(
-                                    0xFFFFF8E8,
-                                  ).withValues(alpha: 0.88),
-                                  height: 1.35,
-                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                  height: 1.5,
+                                  fontWeight: FontWeight.w500,
                                 ),
                           ),
-                          const SizedBox(height: 20),
-                          const _TrustRow(),
-                          const SizedBox(height: 22),
+                          const SizedBox(height: 28),
                           AppGlowButton(
                             onPressed: onContinue,
                             icon: Icons.arrow_forward,
@@ -111,7 +107,7 @@ class _BrandMark extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF4D9).withValues(alpha: 0.92),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(999),
       ),
       child: const Padding(
@@ -125,62 +121,7 @@ class _BrandMark extends StatelessWidget {
               'Mechanization Management',
               style: TextStyle(
                 color: AppColors.deepGreen,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TrustRow extends StatelessWidget {
-  const _TrustRow();
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      alignment: WrapAlignment.center,
-      spacing: 8,
-      runSpacing: 8,
-      children: const [
-        _TrustChip(icon: Icons.gps_fixed, label: 'GPS verified'),
-        _TrustChip(icon: Icons.groups_outlined, label: 'Union managed'),
-        _TrustChip(icon: Icons.route_outlined, label: 'Route guided'),
-      ],
-    );
-  }
-}
-
-class _TrustChip extends StatelessWidget {
-  const _TrustChip({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF8E8).withValues(alpha: 0.88),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: const Color(0xFF9B6A20).withValues(alpha: 0.18),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: AppColors.fieldGreen),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: const TextStyle(
-                color: AppColors.deepGreen,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/presentation/components/components.dart';
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/union_operations_repository.dart';
 import '../../domain/entities/operations_models.dart';
@@ -142,7 +143,8 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
                 ),
                 const SizedBox(height: 18),
                 OutlinedButton.icon(
-                  onPressed: _tractorId == null ||
+                  onPressed:
+                      _tractorId == null ||
                           _operatorId == null ||
                           _checkingAvailability
                       ? null
@@ -178,9 +180,7 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
                         Expanded(
                           child: Text(
                             _availability!.summary,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                            ),
+                            style: const TextStyle(fontWeight: FontWeight.w800),
                           ),
                         ),
                       ],
@@ -189,9 +189,8 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
                 ],
                 const SizedBox(height: 18),
                 FilledButton.icon(
-                  onPressed: _tractorId == null ||
-                          _operatorId == null ||
-                          _submitting
+                  onPressed:
+                      _tractorId == null || _operatorId == null || _submitting
                       ? null
                       : _confirmSchedule,
                   icon: _submitting
@@ -201,7 +200,9 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.check),
-                  label: Text(_submitting ? 'Scheduling...' : 'Confirm Schedule'),
+                  label: Text(
+                    _submitting ? 'Scheduling...' : 'Confirm Schedule',
+                  ),
                 ),
               ],
             ),
@@ -259,9 +260,9 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
     final availability = _availability ?? await _checkAvailability();
     if (!mounted) return;
     if (availability != null && !availability.isAvailable) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(availability.summary)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(availability.summary)));
       return;
     }
     final scheduledAt = DateTime(
@@ -271,6 +272,14 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
       _time.hour,
       _time.minute,
     );
+    final confirmed = await showAppConfirmationDialog(
+      context,
+      title: 'Schedule service?',
+      message:
+          'This will assign the selected tractor and operator on ${formatDate(scheduledAt)} at ${formatTime(scheduledAt)}.',
+      confirmLabel: 'Schedule',
+    );
+    if (!confirmed || !mounted) return;
     setState(() => _submitting = true);
     final jobId = await widget.repository.scheduleRequest(
       requestId: widget.requestId,

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import '../../../../core/presentation/components/components.dart';
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/union_operations_repository.dart';
 import '../../domain/entities/operations_models.dart';
@@ -31,9 +32,7 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
 
   @override
   Widget build(BuildContext context) {
-    final requests = widget.repository
-        .requestsByStatus(_status)
-        .toList();
+    final requests = widget.repository.requestsByStatus(_status).toList();
     final pendingCount = widget.repository
         .requestsByStatus(OperationsRequestStatus.pending)
         .length;
@@ -80,7 +79,9 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
         const SizedBox(height: 14),
         _RemoteRequestsBanner(
           isLoading: _loadingRemoteRequests,
-          error: _remoteRequestsError ?? widget.repository.mechanizationActionError,
+          error:
+              _remoteRequestsError ??
+              widget.repository.mechanizationActionError,
           onRefresh: _loadRemoteRequests,
         ),
         const SizedBox(height: 12),
@@ -191,7 +192,9 @@ class _RequestsEmptyState extends StatelessWidget {
             Icon(
               Icons.inbox_outlined,
               size: 44,
-              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.45),
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.45),
             ),
             const SizedBox(height: 12),
             Text(
@@ -473,197 +476,206 @@ class OperationsRequestDetailScreen extends StatelessWidget {
       builder: (context, _) {
         final request = repository.requestById(requestId);
         return Scaffold(
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: _RequestPlotMap(request: request),
-          ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(18),
-              child: Row(
-                children: [
-                  IconButton.filledTonal(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.arrow_back),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
+          body: Stack(
+            children: [
+              Positioned.fill(child: _RequestPlotMap(request: request)),
+              SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Row(
+                    children: [
+                      IconButton.filledTonal(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.arrow_back),
                       ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.92),
-                        borderRadius: BorderRadius.circular(18),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.92),
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Text(
+                            'Service request',
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
                       ),
-                      child: Text(
-                        'Service request',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          DraggableScrollableSheet(
-            initialChildSize: 0.42,
-            minChildSize: 0.22,
-            maxChildSize: 0.78,
-            snap: true,
-            snapSizes: const [0.22, 0.42, 0.78],
-            builder: (context, scrollController) {
-              return Align(
-                alignment: Alignment.bottomCenter,
-                child: Container(
-                  width: double.infinity,
-                  constraints: const BoxConstraints(maxWidth: 760),
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(26),
-                    ),
-                  ),
-                  child: SafeArea(
-                    top: false,
-                    child: SingleChildScrollView(
-                      controller: scrollController,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Center(
-                            child: Container(
-                              width: 48,
-                              height: 5,
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.10),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  '${request.serviceType.label} for ${request.farmerName}',
-                                  style: Theme.of(context).textTheme.titleLarge
-                                      ?.copyWith(fontWeight: FontWeight.w700),
-                                ),
-                              ),
-                              OperationsStatusChip.request(
-                                requestStatus: request.status,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 14),
-                          _Fact(label: 'Farmer', value: request.farmerName),
-                          _Fact(
-                            label: 'Service',
-                            value: request.serviceType.label,
-                          ),
-                          _Fact(
-                            label: 'Preferred Date',
-                            value: formatDate(request.preferredDate),
-                          ),
-                          _Fact(label: 'Plot', value: request.plot.name),
-                          _Fact(
-                            label: 'Area',
-                            value:
-                                '${request.plot.areaHectares.toStringAsFixed(1)} hectares',
-                          ),
-                          _Fact(
-                            label: 'Location',
-                            value: request.plot.location,
-                          ),
-                          const Divider(height: 26),
-                          Text(
-                            request.notes ?? 'No farmer notes added.',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                          const SizedBox(height: 6),
-                          if (request.status == OperationsRequestStatus.pending)
-                            Wrap(
-                              spacing: 10,
-                              runSpacing: 10,
-                              children: [
-                                OutlinedButton.icon(
-                                  onPressed: () =>
-                                      _showRejectSheet(context, request),
-                                  icon: const Icon(Icons.close),
-                                  label: const Text('Reject'),
-                                ),
-                                OutlinedButton.icon(
-                                  onPressed: () =>
-                                      _returnForCorrection(context, request),
-                                  icon: const Icon(Icons.keyboard_return),
-                                  label: const Text('Return'),
-                                ),
-                                FilledButton.icon(
-                                  onPressed: () =>
-                                      _approve(context, request.id),
-                                  icon: const Icon(Icons.check),
-                                  label: const Text('Approve'),
-                                ),
-                              ],
-                            )
-                          else if (request.status ==
-                              OperationsRequestStatus.approved)
-                            Wrap(
-                              spacing: 10,
-                              runSpacing: 10,
-                              children: [
-                                FilledButton.icon(
-                                  onPressed: () =>
-                                      _openSchedule(context, request.id),
-                                  icon: const Icon(Icons.calendar_month_outlined),
-                                  label: const Text('Schedule Service'),
-                                ),
-                                OutlinedButton.icon(
-                                  onPressed: () =>
-                                      _cancelRequest(context, request),
-                                  icon: const Icon(Icons.cancel_outlined),
-                                  label: const Text('Cancel'),
-                                ),
-                              ],
-                            )
-                          else if (request.status ==
-                              OperationsRequestStatus.scheduled)
-                            Wrap(
-                              spacing: 10,
-                              runSpacing: 10,
-                              children: [
-                                const Text('This request has been scheduled.'),
-                                OutlinedButton.icon(
-                                  onPressed: () =>
-                                      _cancelRequest(context, request),
-                                  icon: const Icon(Icons.cancel_outlined),
-                                  label: const Text('Cancel'),
-                                ),
-                              ],
-                            )
-                          else if (request.status ==
-                                  OperationsRequestStatus.cancelled ||
-                              request.status ==
-                                  OperationsRequestStatus.rejected ||
-                              request.status ==
-                                  OperationsRequestStatus.returned)
-                            Text(
-                              '${request.status.label}: ${request.rejectionReason ?? 'No reason recorded.'}',
-                            ),
-                        ],
-                      ),
-                    ),
+                    ],
                   ),
                 ),
-              );
-            },
+              ),
+              DraggableScrollableSheet(
+                initialChildSize: 0.42,
+                minChildSize: 0.22,
+                maxChildSize: 0.78,
+                snap: true,
+                snapSizes: const [0.22, 0.42, 0.78],
+                builder: (context, scrollController) {
+                  return Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Container(
+                      width: double.infinity,
+                      constraints: const BoxConstraints(maxWidth: 760),
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(26),
+                        ),
+                      ),
+                      child: SafeArea(
+                        top: false,
+                        child: SingleChildScrollView(
+                          controller: scrollController,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Center(
+                                child: Container(
+                                  width: 48,
+                                  height: 5,
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.10),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      '${request.serviceType.label} for ${request.farmerName}',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleLarge
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                    ),
+                                  ),
+                                  OperationsStatusChip.request(
+                                    requestStatus: request.status,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 14),
+                              _Fact(label: 'Farmer', value: request.farmerName),
+                              _Fact(
+                                label: 'Service',
+                                value: request.serviceType.label,
+                              ),
+                              _Fact(
+                                label: 'Preferred Date',
+                                value: formatDate(request.preferredDate),
+                              ),
+                              _Fact(label: 'Plot', value: request.plot.name),
+                              _Fact(
+                                label: 'Area',
+                                value:
+                                    '${request.plot.areaHectares.toStringAsFixed(1)} hectares',
+                              ),
+                              _Fact(
+                                label: 'Location',
+                                value: request.plot.location,
+                              ),
+                              const Divider(height: 26),
+                              Text(
+                                request.notes ?? 'No farmer notes added.',
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                              const SizedBox(height: 6),
+                              if (request.status ==
+                                  OperationsRequestStatus.pending)
+                                Wrap(
+                                  spacing: 10,
+                                  runSpacing: 10,
+                                  children: [
+                                    OutlinedButton.icon(
+                                      onPressed: () =>
+                                          _showRejectSheet(context, request),
+                                      icon: const Icon(Icons.close),
+                                      label: const Text('Reject'),
+                                    ),
+                                    OutlinedButton.icon(
+                                      onPressed: () => _returnForCorrection(
+                                        context,
+                                        request,
+                                      ),
+                                      icon: const Icon(Icons.keyboard_return),
+                                      label: const Text('Return'),
+                                    ),
+                                    FilledButton.icon(
+                                      onPressed: () =>
+                                          _approve(context, request.id),
+                                      icon: const Icon(Icons.check),
+                                      label: const Text('Approve'),
+                                    ),
+                                  ],
+                                )
+                              else if (request.status ==
+                                  OperationsRequestStatus.approved)
+                                Wrap(
+                                  spacing: 10,
+                                  runSpacing: 10,
+                                  children: [
+                                    FilledButton.icon(
+                                      onPressed: () =>
+                                          _openSchedule(context, request.id),
+                                      icon: const Icon(
+                                        Icons.calendar_month_outlined,
+                                      ),
+                                      label: const Text('Schedule Service'),
+                                    ),
+                                    OutlinedButton.icon(
+                                      onPressed: () =>
+                                          _cancelRequest(context, request),
+                                      icon: const Icon(Icons.cancel_outlined),
+                                      label: const Text('Cancel'),
+                                    ),
+                                  ],
+                                )
+                              else if (request.status ==
+                                  OperationsRequestStatus.scheduled)
+                                Wrap(
+                                  spacing: 10,
+                                  runSpacing: 10,
+                                  children: [
+                                    const Text(
+                                      'This request has been scheduled.',
+                                    ),
+                                    OutlinedButton.icon(
+                                      onPressed: () =>
+                                          _cancelRequest(context, request),
+                                      icon: const Icon(Icons.cancel_outlined),
+                                      label: const Text('Cancel'),
+                                    ),
+                                  ],
+                                )
+                              else if (request.status ==
+                                      OperationsRequestStatus.cancelled ||
+                                  request.status ==
+                                      OperationsRequestStatus.rejected ||
+                                  request.status ==
+                                      OperationsRequestStatus.returned)
+                                Text(
+                                  '${request.status.label}: ${request.rejectionReason ?? 'No reason recorded.'}',
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
-        ],
-      ),
         );
       },
     );
@@ -674,21 +686,18 @@ class OperationsRequestDetailScreen extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       builder: (_) => _ApproveRequestSheet(
-        onSubmit: ({
-          required num amount,
-          required String priority,
-          String? note,
-        }) {
-          unawaited(
-            repository.approveRequest(
-              id: id,
-              estimateAmount: amount,
-              priority: priority,
-              note: note,
-            ),
-          );
-          _showSchedulePrompt(context, id);
-        },
+        onSubmit:
+            ({required num amount, required String priority, String? note}) {
+              unawaited(
+                repository.approveRequest(
+                  id: id,
+                  estimateAmount: amount,
+                  priority: priority,
+                  note: note,
+                ),
+              );
+              _showSchedulePrompt(context, id);
+            },
       ),
     );
   }
@@ -726,9 +735,16 @@ class OperationsRequestDetailScreen extends StatelessWidget {
       label: 'Reason',
     );
     if (reason == null || reason.trim().isEmpty) return;
-    unawaited(
-      repository.returnRequest(id: request.id, reason: reason.trim()),
+    if (!context.mounted) return;
+    final confirmed = await showAppConfirmationDialog(
+      context,
+      title: 'Return request?',
+      message:
+          'The request will be returned for correction with the reason you entered.',
+      confirmLabel: 'Return',
     );
+    if (!confirmed) return;
+    unawaited(repository.returnRequest(id: request.id, reason: reason.trim()));
     if (context.mounted) Navigator.of(context).pop();
   }
 
@@ -742,6 +758,16 @@ class OperationsRequestDetailScreen extends StatelessWidget {
       label: 'Reason',
     );
     if (reason == null || reason.trim().isEmpty) return;
+    if (!context.mounted) return;
+    final confirmed = await showAppConfirmationDialog(
+      context,
+      title: 'Cancel request?',
+      message:
+          'This request will be cancelled and cannot proceed to scheduling.',
+      confirmLabel: 'Cancel Request',
+      danger: true,
+    );
+    if (!confirmed) return;
     unawaited(
       repository.cancelRequest(
         id: request.id,
@@ -898,7 +924,7 @@ class _ApproveRequestSheetState extends State<_ApproveRequestSheet> {
     );
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     final amount = num.tryParse(_amountController.text.trim());
     if (amount == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -906,6 +932,14 @@ class _ApproveRequestSheetState extends State<_ApproveRequestSheet> {
       );
       return;
     }
+    final confirmed = await showAppConfirmationDialog(
+      context,
+      title: 'Approve request?',
+      message:
+          'Approve this service request with an estimated amount of $amount?',
+      confirmLabel: 'Approve',
+    );
+    if (!confirmed || !mounted) return;
     Navigator.of(context).pop();
     widget.onSubmit(
       amount: amount,
@@ -1076,6 +1110,13 @@ class _RegisterRequestSheetState extends State<_RegisterRequestSheet> {
       );
       return;
     }
+    final confirmed = await showAppConfirmationDialog(
+      context,
+      title: 'Register service request?',
+      message: 'Create a request for $acres acres on ${formatDate(_date)}?',
+      confirmLabel: 'Register',
+    );
+    if (!confirmed || !mounted) return;
     setState(() => _submitting = true);
     await widget.repository.registerRequest(
       farmerId: farmerId,
@@ -1093,9 +1134,9 @@ class _RegisterRequestSheetState extends State<_RegisterRequestSheet> {
     setState(() => _submitting = false);
     final error = widget.repository.mechanizationActionError;
     if (error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error)));
       return;
     }
     Navigator.of(context).pop();
@@ -1173,7 +1214,16 @@ class _RejectRequestSheetState extends State<_RejectRequestSheet> {
               const SizedBox(width: 12),
               Expanded(
                 child: FilledButton(
-                  onPressed: () {
+                  onPressed: () async {
+                    final navigator = Navigator.of(context);
+                    final confirmed = await showAppConfirmationDialog(
+                      context,
+                      title: 'Reject request?',
+                      message: 'This request will be rejected for: $_reason.',
+                      confirmLabel: 'Reject',
+                      danger: true,
+                    );
+                    if (!confirmed) return;
                     unawaited(
                       widget.repository.rejectRequest(
                         id: widget.request.id,
@@ -1181,8 +1231,8 @@ class _RejectRequestSheetState extends State<_RejectRequestSheet> {
                         notes: '',
                       ),
                     );
-                    Navigator.of(context).pop();
-                    Navigator.of(context).pop();
+                    navigator.pop();
+                    navigator.pop();
                   },
                   child: const Text('Reject Request'),
                 ),
@@ -1239,9 +1289,9 @@ class _RequestPlotMap extends StatelessWidget {
           Polygon(
             polygonId: PolygonId('request-boundary-${request.id}'),
             points: points,
-            fillColor: Theme.of(context).colorScheme.primary.withValues(
-              alpha: 0.16,
-            ),
+            fillColor: Theme.of(
+              context,
+            ).colorScheme.primary.withValues(alpha: 0.16),
             strokeColor: Theme.of(context).colorScheme.primary,
             strokeWidth: 3,
           ),

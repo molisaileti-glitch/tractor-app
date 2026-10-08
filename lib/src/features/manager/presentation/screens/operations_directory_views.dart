@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/presentation/components/components.dart';
 import '../../data/repositories/union_operations_repository.dart';
 import '../../domain/entities/operations_models.dart';
 import '../widgets/operations_widgets.dart';
@@ -16,7 +17,11 @@ class TractorsView extends StatelessWidget {
       title: 'Tractors',
       children: [
         if (tractors.isEmpty)
-          const OperationsCard(child: Text('No tractors loaded yet.'))
+          const _DirectoryEmptyState(
+            icon: Icons.agriculture_outlined,
+            title: 'No tractors available',
+            message: 'Registered tractors will appear here.',
+          )
         else
           _PrettyGrid(
             children: [
@@ -143,7 +148,11 @@ class OperatorsView extends StatelessWidget {
       title: 'Operators',
       children: [
         if (operators.isEmpty)
-          const OperationsCard(child: Text('No operators loaded yet.'))
+          const _DirectoryEmptyState(
+            icon: Icons.engineering_outlined,
+            title: 'No operators available',
+            message: 'Registered tractor operators will appear here.',
+          )
         else
           _PrettyGrid(
             children: [
@@ -177,15 +186,16 @@ class FarmersView extends StatelessWidget {
       title: 'Farmers',
       children: [
         if (farmers.isEmpty)
-          const OperationsCard(child: Text('No farmers loaded yet.'))
+          const _DirectoryEmptyState(
+            icon: Icons.groups_outlined,
+            title: 'No farmers available',
+            message: 'Farmers connected to service requests will appear here.',
+          )
         else
           _PrettyGrid(
             children: [
               for (final entry in farmers.entries)
-                _FarmerDirectoryCard(
-                  name: entry.key,
-                  requests: entry.value,
-                ),
+                _FarmerDirectoryCard(name: entry.key, requests: entry.value),
             ],
           ),
       ],
@@ -202,8 +212,13 @@ class _OperatorDirectoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final activeJobs = jobs.where((job) =>
-        job.status != JobStatus.closed && job.status != JobStatus.cancelled).toList();
+    final activeJobs = jobs
+        .where(
+          (job) =>
+              job.status != JobStatus.closed &&
+              job.status != JobStatus.cancelled,
+        )
+        .toList();
     final currentJob = activeJobs.isEmpty ? null : activeJobs.first;
     return OperationsCard(
       child: Padding(
@@ -216,15 +231,25 @@ class _OperatorDirectoryCard extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 24,
-                  backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.10),
-                  child: Icon(Icons.engineering_outlined, color: theme.colorScheme.primary),
+                  backgroundColor: theme.colorScheme.primary.withValues(
+                    alpha: 0.10,
+                  ),
+                  child: Icon(
+                    Icons.engineering_outlined,
+                    color: theme.colorScheme.primary,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(operator.name, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                      Text(
+                        operator.name,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                       if (operator.note?.trim().isNotEmpty == true) ...[
                         const SizedBox(height: 4),
                         Text(operator.note!, style: theme.textTheme.bodyMedium),
@@ -236,22 +261,30 @@ class _OperatorDirectoryCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            Divider(color: theme.dividerColor.withValues(alpha: 0.55), height: 1),
+            Divider(
+              color: theme.dividerColor.withValues(alpha: 0.55),
+              height: 1,
+            ),
             const SizedBox(height: 14),
             _DirectoryFact(
               icon: Icons.assignment_outlined,
-              text: '${activeJobs.length} active assignment${activeJobs.length == 1 ? '' : 's'}',
+              text:
+                  '${activeJobs.length} active assignment${activeJobs.length == 1 ? '' : 's'}',
             ),
             if (currentJob != null) ...[
               const SizedBox(height: 9),
               _DirectoryFact(
                 icon: Icons.agriculture_outlined,
-                text: currentJob.tractor.assetNo ?? currentJob.tractor.label ?? currentJob.tractor.model,
+                text:
+                    currentJob.tractor.assetNo ??
+                    currentJob.tractor.label ??
+                    currentJob.tractor.model,
               ),
               const SizedBox(height: 9),
               _DirectoryFact(
                 icon: Icons.location_on_outlined,
-                text: '${currentJob.plot.name} - ${currentJob.serviceType.label}',
+                text:
+                    '${currentJob.plot.name} - ${currentJob.serviceType.label}',
               ),
             ],
           ],
@@ -271,7 +304,10 @@ class _FarmerDirectoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final latest = requests.first;
-    final phone = requests.map((item) => item.farmerPhone).whereType<String>().firstOrNull;
+    final phone = requests
+        .map((item) => item.farmerPhone)
+        .whereType<String>()
+        .firstOrNull;
     final plots = requests.map((item) => item.plot.name).toSet();
     final location = requests
         .map((item) => item.plot.location.trim())
@@ -287,15 +323,25 @@ class _FarmerDirectoryCard extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 24,
-                  backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.10),
-                  child: Icon(Icons.person_outline, color: theme.colorScheme.primary),
+                  backgroundColor: theme.colorScheme.primary.withValues(
+                    alpha: 0.10,
+                  ),
+                  child: Icon(
+                    Icons.person_outline,
+                    color: theme.colorScheme.primary,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(name, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                      Text(
+                        name,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                       if (phone != null) ...[
                         const SizedBox(height: 4),
                         Text(phone, style: theme.textTheme.bodyMedium),
@@ -307,13 +353,27 @@ class _FarmerDirectoryCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            Divider(color: theme.dividerColor.withValues(alpha: 0.55), height: 1),
+            Divider(
+              color: theme.dividerColor.withValues(alpha: 0.55),
+              height: 1,
+            ),
             const SizedBox(height: 14),
-            _DirectoryFact(icon: Icons.landscape_outlined, text: '${plots.length} registered plot${plots.length == 1 ? '' : 's'}'),
+            _DirectoryFact(
+              icon: Icons.landscape_outlined,
+              text:
+                  '${plots.length} registered plot${plots.length == 1 ? '' : 's'}',
+            ),
             const SizedBox(height: 9),
-            _DirectoryFact(icon: Icons.fact_check_outlined, text: '${requests.length} service request${requests.length == 1 ? '' : 's'}'),
+            _DirectoryFact(
+              icon: Icons.fact_check_outlined,
+              text:
+                  '${requests.length} service request${requests.length == 1 ? '' : 's'}',
+            ),
             const SizedBox(height: 9),
-            _DirectoryFact(icon: Icons.location_on_outlined, text: location ?? latest.plot.name),
+            _DirectoryFact(
+              icon: Icons.location_on_outlined,
+              text: location ?? latest.plot.name,
+            ),
           ],
         ),
       ),
@@ -356,7 +416,12 @@ class MaintenanceView extends StatelessWidget {
         _MaintenanceSummary(repository: repository),
         const SizedBox(height: 16),
         if (blocked.isEmpty)
-          const OperationsCard(child: Text('No blocked tractors loaded yet.'))
+          const _DirectoryEmptyState(
+            icon: Icons.build_circle_outlined,
+            title: 'No tractors need attention',
+            message: 'Tractors blocked from scheduling will appear here.',
+            height: 300,
+          )
         else
           _PrettyGrid(
             children: [
@@ -813,6 +878,28 @@ class _DirectoryPage extends StatelessWidget {
         const SizedBox(height: 14),
         ...children,
       ],
+    );
+  }
+}
+
+class _DirectoryEmptyState extends StatelessWidget {
+  const _DirectoryEmptyState({
+    required this.icon,
+    required this.title,
+    required this.message,
+    this.height = 420,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: height,
+      child: AppEmptyState(icon: icon, title: title, message: message),
     );
   }
 }

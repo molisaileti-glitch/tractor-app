@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/presentation/app_components.dart';
+import '../../../../core/presentation/components/components.dart';
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/operator_local_repository.dart';
 import '../widgets/operator_widgets.dart';
@@ -90,9 +90,7 @@ class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
-                  decoration: const InputDecoration(
-                    labelText: 'Fuel used (L)',
-                  ),
+                  decoration: const InputDecoration(labelText: 'Fuel used (L)'),
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -274,9 +272,7 @@ class _OperatorFarmerConfirmationScreenState
                     controller: _pinController,
                     keyboardType: TextInputType.number,
                     obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Farmer PIN',
-                    ),
+                    decoration: const InputDecoration(labelText: 'Farmer PIN'),
                   ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<int>(
@@ -320,8 +316,9 @@ class _OperatorFarmerConfirmationScreenState
                 TextButton(
                   onPressed: _submitting
                       ? null
-                      : () =>
-                            Navigator.of(context).popUntil((route) => route.isFirst),
+                      : () => Navigator.of(
+                          context,
+                        ).popUntil((route) => route.isFirst),
                   child: const Text('Skip for now'),
                 ),
               ],
@@ -383,7 +380,9 @@ class _OperatorFarmerConfirmationScreenState
 
     final confirmed = await showAppConfirmationDialog(
       context,
-      title: _dispute ? 'Submit farmer dispute?' : 'Submit farmer confirmation?',
+      title: _dispute
+          ? 'Submit farmer dispute?'
+          : 'Submit farmer confirmation?',
       message: _dispute
           ? 'This will record the farmer dispute against this completed job.'
           : 'This will record the farmer confirmation for this completed job.',

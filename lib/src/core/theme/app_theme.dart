@@ -3,15 +3,15 @@ import 'package:flutter/material.dart';
 class AppColors {
   const AppColors._();
 
-  static const deepGreen = Color(0xFF0D3B2A);
-  static const fieldGreen = Color(0xFF16B77A);
-  static const successGreen = Color(0xFF16B77A);
-  static const mint = Color(0xFFE8F8F0);
+  static const deepGreen = Color(0xFF102A30);
+  static const fieldGreen = Color(0xFF16A99A);
+  static const successGreen = Color(0xFF16A99A);
+  static const mint = Color(0xFFE7F7F5);
   static const cream = Color(0xFFFFF8E8);
-  static const pageBackground = Color(0xFFF3F6F2);
+  static const pageBackground = Color(0xFFF5F7FA);
   static const cardBackground = Colors.white;
-  static const text = Color(0xFF111827);
-  static const mutedText = Color(0xFF6B7280);
+  static const text = Color(0xFF172033);
+  static const mutedText = Color(0xFF8492A6);
   static const warning = Color(0xFFC8872B);
   static const info = Color(0xFF277DA1);
   static const danger = Color(0xFFE11D48);
@@ -64,14 +64,14 @@ class AppTheme {
         primary: seed,
         secondary: AppColors.warning,
         tertiary: AppColors.info,
-        surface: const Color(0xFFF8FAF7),
+        surface: Colors.white,
         error: AppColors.danger,
       ),
       scaffoldBackgroundColor: AppColors.pageBackground,
       appBarTheme: const AppBarTheme(
         centerTitle: false,
         elevation: 0,
-        backgroundColor: AppColors.pageBackground,
+        backgroundColor: Colors.white,
         foregroundColor: AppColors.text,
         titleTextStyle: TextStyle(
           color: AppColors.text,
@@ -81,7 +81,7 @@ class AppTheme {
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       cardTheme: CardThemeData(
         color: Colors.white,
@@ -109,7 +109,9 @@ class AppTheme {
           disabledBackgroundColor: AppColors.fieldGreen.withValues(alpha: 0.34),
           disabledForegroundColor: Colors.white.withValues(alpha: 0.72),
           minimumSize: const Size.fromHeight(52),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
           textStyle: const TextStyle(fontWeight: FontWeight.w700),
         ),
       ),
@@ -117,7 +119,9 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.deepGreen,
           minimumSize: const Size.fromHeight(52),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
           textStyle: const TextStyle(fontWeight: FontWeight.w700),
         ),
       ),
@@ -128,13 +132,13 @@ class AppTheme {
           horizontal: 16,
           vertical: 16,
         ),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.10)),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: AppColors.fieldGreen, width: 1.6),
         ),
       ),

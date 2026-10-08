@@ -22,7 +22,16 @@ class OperationsDashboardView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final jobs = repository.jobs.take(3).toList();
+    final now = DateTime.now();
+    final jobs = repository.jobs
+        .where(
+          (job) =>
+              job.scheduledAt.year == now.year &&
+              job.scheduledAt.month == now.month &&
+              job.scheduledAt.day == now.day,
+        )
+        .take(3)
+        .toList();
     final awaitingVerification = repository.jobs
         .where((job) => job.status == JobStatus.completedPendingConfirmation)
         .length;
@@ -86,7 +95,8 @@ class OperationsDashboardView extends StatelessWidget {
         if (repository.pendingRequestCount > 0) ...[
           _AttentionCard(
             icon: Icons.warning_amber_outlined,
-            text: '${repository.pendingRequestCount} requests awaiting approval',
+            text:
+                '${repository.pendingRequestCount} requests awaiting approval',
             onTap: onOpenRequests,
           ),
           const SizedBox(height: 10),
@@ -127,19 +137,18 @@ class OperationsDashboardView extends StatelessWidget {
             repository.pendingOverrideCount == 0 &&
             repository.openExceptionCount == 0)
           const _AllClearNotice(),
-        const SizedBox(height: 18),
-        _DashboardSectionHeader(
-          title: "Today's Jobs",
-          icon: Icons.event_note_outlined,
-        ),
-        const SizedBox(height: 10),
-        if (jobs.isEmpty)
-          const OperationsCard(child: Text('No jobs loaded yet.'))
-        else
+        if (jobs.isNotEmpty) ...[
+          const SizedBox(height: 18),
+          _DashboardSectionHeader(
+            title: "Today's Jobs",
+            icon: Icons.event_note_outlined,
+          ),
+          const SizedBox(height: 10),
           for (final job in jobs) ...[
             _TodayJobCard(job: job),
             if (job != jobs.last) const SizedBox(height: 10),
           ],
+        ],
       ],
     );
   }
@@ -345,7 +354,8 @@ class _TodayJobCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tractorLabel = job.tractor.assetNo ?? job.tractor.label ?? job.tractor.model;
+    final tractorLabel =
+        job.tractor.assetNo ?? job.tractor.label ?? job.tractor.model;
     final plotArea = job.plot.areaHectares > 0
         ? '${job.plot.areaHectares.toStringAsFixed(1)} ha'
         : null;
@@ -399,13 +409,28 @@ class _TodayJobCard extends StatelessWidget {
             spacing: 18,
             runSpacing: 12,
             children: [
-              _JobFact(icon: Icons.person_outline, label: 'Farmer', value: job.farmerName),
-              _JobFact(icon: Icons.engineering_outlined, label: 'Operator', value: job.operator.name),
-              _JobFact(icon: Icons.agriculture_outlined, label: 'Tractor', value: tractorLabel),
+              _JobFact(
+                icon: Icons.person_outline,
+                label: 'Farmer',
+                value: job.farmerName,
+              ),
+              _JobFact(
+                icon: Icons.engineering_outlined,
+                label: 'Operator',
+                value: job.operator.name,
+              ),
+              _JobFact(
+                icon: Icons.agriculture_outlined,
+                label: 'Tractor',
+                value: tractorLabel,
+              ),
               _JobFact(
                 icon: Icons.location_on_outlined,
                 label: 'Plot',
-                value: [job.plot.name, plotArea].whereType<String>().join(' - '),
+                value: [
+                  job.plot.name,
+                  plotArea,
+                ].whereType<String>().join(' - '),
               ),
             ],
           ),
@@ -416,7 +441,11 @@ class _TodayJobCard extends StatelessWidget {
 }
 
 class _JobFact extends StatelessWidget {
-  const _JobFact({required this.icon, required this.label, required this.value});
+  const _JobFact({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
 
   final IconData icon;
   final String label;
@@ -461,7 +490,10 @@ class _AllClearNotice extends StatelessWidget {
           children: [
             Icon(Icons.check_circle_outline, color: theme.colorScheme.primary),
             const SizedBox(height: 8),
-            Text('Nothing needs attention right now.', style: theme.textTheme.bodyLarge),
+            Text(
+              'Nothing needs attention right now.',
+              style: theme.textTheme.bodyLarge,
+            ),
           ],
         ),
       ),

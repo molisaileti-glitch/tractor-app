@@ -3,7 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../../core/presentation/app_components.dart';
+import '../../../../core/presentation/components/components.dart';
 import '../../../../core/theme/app_theme.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
@@ -216,63 +216,63 @@ class _OtpPanel extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-            Center(
-              child: Text(
-                'OTP',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
-              ),
-            ),
-            const SizedBox(height: 28),
-            Text(
-              'Enter the 6-digit code sent to your phone',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w900,
-                color: AppColors.deepGreen,
-                height: 1.10,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'We sent a verification code to $phoneNumber.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.black.withValues(alpha: 0.62),
-                height: 1.35,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                for (var index = 0; index < 6; index++) ...[
-                  Expanded(child: otpBoxBuilder(index: index)),
-                  if (index != 5) const SizedBox(width: 8),
-                ],
-              ],
-            ),
-            if (errorText != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                errorText!,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.error,
-                  fontWeight: FontWeight.w700,
+                Center(
+                  child: Text(
+                    'OTP',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                 ),
-              ),
-            ],
-            const SizedBox(height: 26),
-            AppGlowButton(
-              onPressed: onVerify,
-              loading: verifying,
-              label: verifying ? 'Verifying...' : 'Continue',
-              trailing: Icons.arrow_forward,
-            ),
-            const SizedBox(height: 10),
-            TextButton(
-              onPressed: resending || verifying ? null : onResend,
-              child: Text(resending ? 'Sending...' : 'Resend code'),
-            ),
+                const SizedBox(height: 28),
+                Text(
+                  'Enter the 6-digit code sent to your phone',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.deepGreen,
+                    height: 1.10,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'We sent a verification code to $phoneNumber.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.black.withValues(alpha: 0.62),
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    for (var index = 0; index < 6; index++) ...[
+                      Expanded(child: otpBoxBuilder(index: index)),
+                      if (index != 5) const SizedBox(width: 8),
+                    ],
+                  ],
+                ),
+                if (errorText != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    errorText!,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 26),
+                AppGlowButton(
+                  onPressed: onVerify,
+                  loading: verifying,
+                  label: verifying ? 'Verifying...' : 'Continue',
+                  trailing: Icons.arrow_forward,
+                ),
+                const SizedBox(height: 10),
+                TextButton(
+                  onPressed: resending || verifying ? null : onResend,
+                  child: Text(resending ? 'Sending...' : 'Resend code'),
+                ),
               ],
             ),
           ),

@@ -14,10 +14,10 @@ class UnionOperationsRepository extends ChangeNotifier {
   }) : remoteDataSource =
            remoteDataSource ?? const ServiceOrdersRemoteDataSource(),
        mobileApiClient = mobileApiClient ?? const KwanzaTrackMobileApiClient(),
-       _requests = _seedRequests(),
-       _tractors = _seedTractors(),
-       _operators = _seedOperators(),
-       _jobs = _seedJobs();
+       _requests = [],
+       _tractors = [],
+       _operators = [],
+       _jobs = [];
 
   final ServiceOrdersRemoteDataSource remoteDataSource;
   final KwanzaTrackMobileApiClient mobileApiClient;
@@ -58,12 +58,16 @@ class UnionOperationsRepository extends ChangeNotifier {
     if (_accessToken == normalized) return;
     _accessToken = normalized?.isEmpty == true ? null : normalized;
     _mechanizationSyncError = null;
+    _requests.clear();
+    _tractors.clear();
+    _operators.clear();
+    _jobs.clear();
+    _overrides.clear();
+    _exceptions.clear();
     if (_accessToken == null) {
       _mechanizationUserName = null;
       _dashboardData = const {};
       _remoteBacklogCount = null;
-      _overrides.clear();
-      _exceptions.clear();
       notifyListeners();
       return;
     }
@@ -87,12 +91,7 @@ class UnionOperationsRepository extends ChangeNotifier {
       final responses = await Future.wait<Map<String, Object?>>([
         mobileApiClient.me(token: token),
         mobileApiClient.dashboard(token: token, days: 30),
-        mobileApiClient.calendar(
-          token: token,
-          from: from,
-          to: to,
-          mine: true,
-        ),
+        mobileApiClient.calendar(token: token, from: from, to: to, mine: true),
         mobileApiClient.calendar(
           token: token,
           from: from,
@@ -128,7 +127,8 @@ class UnionOperationsRepository extends ChangeNotifier {
       }
     } catch (error) {
       if (generation == _syncGeneration) {
-        _mechanizationSyncError = 'Could not refresh mechanization data: $error';
+        _mechanizationSyncError =
+            'Could not refresh mechanization data: $error';
       }
     } finally {
       if (generation == _syncGeneration) {
@@ -150,8 +150,8 @@ class UnionOperationsRepository extends ChangeNotifier {
       final tractor = _tractorFromJson(_dataMap(responses[0]));
       if (tractor != null) _upsertTractor(tractor);
 
-      final inspectedToday = responses[1]['success'] == true &&
-          _dataMap(responses[1]).isNotEmpty;
+      final inspectedToday =
+          responses[1]['success'] == true && _dataMap(responses[1]).isNotEmpty;
       final index = _tractors.indexWhere((item) => item.id == tractorId);
       if (index != -1) {
         _tractors[index] = _tractors[index].copyWith(
@@ -721,10 +721,7 @@ class UnionOperationsRepository extends ChangeNotifier {
     );
   }
 
-  Future<void> flagJob({
-    required String jobId,
-    required String reason,
-  }) async {
+  Future<void> flagJob({required String jobId, required String reason}) async {
     if (await _tryRemoteJobUpdate(
       () => mobileApiClient.flagJob(
         token: _accessToken!,
@@ -738,10 +735,7 @@ class UnionOperationsRepository extends ChangeNotifier {
     _replaceJob(jobId, job.copyWith(status: JobStatus.flagged, alert: reason));
   }
 
-  Future<void> unflagJob({
-    required String jobId,
-    required String note,
-  }) async {
+  Future<void> unflagJob({required String jobId, required String note}) async {
     if (await _tryRemoteJobUpdate(
       () => mobileApiClient.unflagJob(
         token: _accessToken!,
@@ -1228,10 +1222,8 @@ class UnionOperationsRepository extends ChangeNotifier {
     final serviceTypeJson = _map(json['service_type']);
     final requestJson = _map(json['request']);
     final status = _jobStatus(json['status']?.toString());
-    final scheduledAt = _dateTimeFromParts(
-          json['scheduled_date'],
-          json['window_start'],
-        ) ??
+    final scheduledAt =
+        _dateTimeFromParts(json['scheduled_date'], json['window_start']) ??
         _dateTime(json['scheduled_at']) ??
         DateTime.now();
     final windowEnd = _dateTimeFromParts(
@@ -1293,7 +1285,8 @@ class UnionOperationsRepository extends ChangeNotifier {
         label: _text(tractorJson, const ['label']),
         model: _text(tractorJson, const ['label', 'asset_no']) ?? tractorId,
         status: _tractorStatus(status),
-        operatingHours: _asInt(json['start_hour_meter']) ??
+        operatingHours:
+            _asInt(json['start_hour_meter']) ??
             _asInt(json['end_hour_meter']) ??
             0,
       ),
@@ -1611,8 +1604,9 @@ class UnionOperationsRepository extends ChangeNotifier {
       'approved' => OperationsRequestStatus.approved,
       'rejected' || 'declined' => OperationsRequestStatus.rejected,
       'returned' || 'returned_to_farmer' => OperationsRequestStatus.returned,
-      'scheduled' || 'dispatched' || 'in_progress' =>
-        OperationsRequestStatus.scheduled,
+      'scheduled' ||
+      'dispatched' ||
+      'in_progress' => OperationsRequestStatus.scheduled,
       'cancelled' || 'canceled' => OperationsRequestStatus.cancelled,
       _ => OperationsRequestStatus.pending,
     };
@@ -1626,8 +1620,9 @@ class UnionOperationsRepository extends ChangeNotifier {
       'en_route' || 'accepted' => JobStatus.enRoute,
       'arrived' => JobStatus.arrived,
       'in_progress' || 'started' || 'working' => JobStatus.inProgress,
-      'completed' || 'awaiting_verification' || 'verified' =>
-        JobStatus.completedPendingConfirmation,
+      'completed' ||
+      'awaiting_verification' ||
+      'verified' => JobStatus.completedPendingConfirmation,
       'flagged' => JobStatus.flagged,
       'closed' || 'confirmed' => JobStatus.closed,
       'cancelled' || 'canceled' => JobStatus.cancelled,
@@ -1646,11 +1641,16 @@ class UnionOperationsRepository extends ChangeNotifier {
     final normalized = value?.toLowerCase().replaceAll('-', '_') ?? '';
     return switch (normalized) {
       'available' || 'active' || 'ready' => TractorStatus.available,
-      'scheduled' || 'assigned' || 'busy' || 'in_use' =>
-        TractorStatus.scheduled,
-      'maintenance' || 'under_maintenance' || 'repair' =>
-        TractorStatus.underMaintenance,
-      'out_of_service' || 'inactive' || 'disabled' => TractorStatus.outOfService,
+      'scheduled' ||
+      'assigned' ||
+      'busy' ||
+      'in_use' => TractorStatus.scheduled,
+      'maintenance' ||
+      'under_maintenance' ||
+      'repair' => TractorStatus.underMaintenance,
+      'out_of_service' ||
+      'inactive' ||
+      'disabled' => TractorStatus.outOfService,
       _ => TractorStatus.available,
     };
   }
@@ -1737,21 +1737,5 @@ class UnionOperationsRepository extends ChangeNotifier {
       previousOperatorName: previousOperatorName,
       newOperatorName: newOperatorName,
     );
-  }
-
-  static List<OperationsServiceRequest> _seedRequests() {
-    return [];
-  }
-
-  static List<TractorAsset> _seedTractors() {
-    return [];
-  }
-
-  static List<OperatorProfile> _seedOperators() {
-    return [];
-  }
-
-  static List<OperationsJob> _seedJobs() {
-    return [];
   }
 }

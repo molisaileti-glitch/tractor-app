@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'core/network/kwanza_track_mobile_api_client.dart';
-import 'core/presentation/app_components.dart';
-import 'core/presentation/app_welcome_screen.dart';
+import 'core/presentation/components/components.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/data/repositories/auth_local_repository.dart';
 import 'features/auth/domain/entities/auth_session.dart';
@@ -11,6 +10,7 @@ import 'features/farmer/data/repositories/farmer_local_repository.dart';
 import 'features/farmer/presentation/screens/farmer_shell.dart';
 import 'features/manager/data/repositories/union_operations_repository.dart';
 import 'features/manager/presentation/screens/operations_shell.dart';
+import 'features/onboarding/presentation/screens/app_welcome_screen.dart';
 import 'features/operator/data/repositories/operator_local_repository.dart';
 import 'features/operator/presentation/screens/operator_shell.dart';
 import 'features/technician/data/repositories/technician_local_repository.dart';
@@ -46,6 +46,7 @@ class _TractorAppState extends State<TractorApp> {
   final TechnicianLocalRepository technicianRepository =
       TechnicianLocalRepository.seeded();
   _Workspace _workspace = _Workspace.welcome;
+  bool _restoringSession = true;
 
   @override
   void initState() {
@@ -70,43 +71,47 @@ class _TractorAppState extends State<TractorApp> {
       navigatorKey: _navigatorKey,
       scaffoldMessengerKey: _messengerKey,
       theme: AppTheme.light(),
-      home: switch (_workspace) {
-        _Workspace.welcome => AppWelcomeScreen(
-          onContinue: () => setState(() => _workspace = _Workspace.login),
-        ),
-        _Workspace.login => LoginScreen(
-          repository: authRepository,
-          onBack: () => setState(() => _workspace = _Workspace.welcome),
-          onOpenFarmer: () => setState(() => _workspace = _Workspace.farmer),
-          onOpenOperations: _openOperations,
-          onOpenOperator: _openOperator,
-          onOpenTechnician: _openTechnician,
-          onCreateFarmerAccount: () =>
-              setState(() => _workspace = _Workspace.registerFarmer),
-        ),
-        _Workspace.registerFarmer => FarmerRegistrationScreen(
-          repository: authRepository,
-          onBack: () => setState(() => _workspace = _Workspace.login),
-          onRegistered: () => setState(() => _workspace = _Workspace.farmer),
-        ),
-        _Workspace.farmer => FarmerShell(
-          repository: farmerRepository,
-          onLogout: _confirmLogout,
-        ),
-        _Workspace.operations => OperationsShell(
-          repository: operationsRepository,
-          onLogout: _confirmLogout,
-        ),
-        _Workspace.operator => OperatorShell(
-          repository: operatorRepository,
-          onLogout: _confirmLogout,
-        ),
-        _Workspace.technician => TechnicianShell(
-          operationsRepository: operationsRepository,
-          technicianRepository: technicianRepository,
-          onLogout: _confirmLogout,
-        ),
-      },
+      home: _restoringSession
+          ? const Scaffold(body: SafeArea(child: AppScreenSkeleton()))
+          : switch (_workspace) {
+              _Workspace.welcome => AppWelcomeScreen(
+                onContinue: () => setState(() => _workspace = _Workspace.login),
+              ),
+              _Workspace.login => LoginScreen(
+                repository: authRepository,
+                onBack: () => setState(() => _workspace = _Workspace.welcome),
+                onOpenFarmer: () =>
+                    setState(() => _workspace = _Workspace.farmer),
+                onOpenOperations: _openOperations,
+                onOpenOperator: _openOperator,
+                onOpenTechnician: _openTechnician,
+                onCreateFarmerAccount: () =>
+                    setState(() => _workspace = _Workspace.registerFarmer),
+              ),
+              _Workspace.registerFarmer => FarmerRegistrationScreen(
+                repository: authRepository,
+                onBack: () => setState(() => _workspace = _Workspace.login),
+                onRegistered: () =>
+                    setState(() => _workspace = _Workspace.farmer),
+              ),
+              _Workspace.farmer => FarmerShell(
+                repository: farmerRepository,
+                onLogout: _confirmLogout,
+              ),
+              _Workspace.operations => OperationsShell(
+                repository: operationsRepository,
+                onLogout: _confirmLogout,
+              ),
+              _Workspace.operator => OperatorShell(
+                repository: operatorRepository,
+                onLogout: _confirmLogout,
+              ),
+              _Workspace.technician => TechnicianShell(
+                operationsRepository: operationsRepository,
+                technicianRepository: technicianRepository,
+                onLogout: _confirmLogout,
+              ),
+            },
     );
   }
 
@@ -170,15 +175,22 @@ class _TractorAppState extends State<TractorApp> {
   }
 
   Future<void> _restoreSavedSession() async {
-    final AuthSession session;
+    AuthSession session = const AuthSession(
+      status: AuthSessionStatus.signedOut,
+    );
     try {
       session = await authRepository.restoreSavedSession();
     } catch (_) {
-      await authRepository.signOut();
+      // Keep the securely stored token after temporary network/server errors.
+      // Only an explicit unauthorized response invalidates it.
+    }
+    if (!mounted) return;
+    if (session.isSignedIn) {
+      _restoringSession = false;
+      _openWorkspaceForSession(session);
       return;
     }
-    if (!mounted || !session.isSignedIn) return;
-    _openWorkspaceForSession(session);
+    setState(() => _restoringSession = false);
   }
 
   void _openWorkspaceForSession(AuthSession session) {

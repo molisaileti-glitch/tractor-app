@@ -362,6 +362,14 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
   }
 
   Future<void> _recordArrival() async {
+    final confirmed = await showAppConfirmationDialog(
+      context,
+      title: 'Record arrival?',
+      message:
+          'Confirm that you and the assigned tractor have arrived at the farm.',
+      confirmLabel: 'Record Arrival',
+    );
+    if (!confirmed || !mounted) return;
     setState(() => _submittingArrival = true);
     final arrived = await widget.repository.arriveJob(
       widget.jobId,
@@ -383,6 +391,14 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
     final location = _geofenceResult?.location;
     final hourMeter = num.tryParse(_hourMeterController.text.trim());
     final implement = _implementController.text.trim();
+    final confirmed = await showAppConfirmationDialog(
+      context,
+      title: 'Start service?',
+      message:
+          'This starts recorded work time for the job. Confirm the safety check has passed and the tractor is ready.',
+      confirmLabel: 'Start Service',
+    );
+    if (!confirmed || !mounted) return;
     setState(() => _submittingStart = true);
     final started = await widget.repository.startJob(
       widget.jobId,
@@ -500,6 +516,17 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
     );
     if (inspection == null) return;
     if (!mounted) return;
+
+    final confirmed = await showAppConfirmationDialog(
+      context,
+      title: 'Submit inspection?',
+      message: inspection.isFit
+          ? 'All checklist items passed. Submit this tractor as fit for work?'
+          : 'Issues were recorded. Submit this tractor as requiring attention?',
+      confirmLabel: 'Submit Inspection',
+      danger: !inspection.isFit,
+    );
+    if (!confirmed || !mounted) return;
 
     setState(() => _submittingInspection = true);
     final ok = await widget.repository.recordInspection(
