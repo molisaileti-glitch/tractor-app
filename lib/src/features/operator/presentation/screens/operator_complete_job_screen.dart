@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/presentation/components/components.dart';
+import '../../../../components/components.dart';
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/operator_local_repository.dart';
 import '../widgets/operator_widgets.dart';
@@ -438,7 +438,9 @@ class _Fact extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: TextStyle(color: Colors.black.withValues(alpha: 0.62)),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
           Text(value, style: const TextStyle(fontWeight: FontWeight.w900)),

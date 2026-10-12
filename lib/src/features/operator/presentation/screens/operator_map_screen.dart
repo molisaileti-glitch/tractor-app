@@ -43,16 +43,16 @@ class OperatorMapScreen extends StatelessWidget {
               if (primaryJob == null)
                 const OperatorCard(
                   child: Text(
-                    'No assigned jobs with map data were returned by the API.',
+                    'No assigned jobs have location information yet.',
                     style: TextStyle(fontWeight: FontWeight.w800),
                   ),
                 )
               else ...[
                 Text(
                   'ASSIGNMENTS ON MAP',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
                 ),
                 const SizedBox(height: 14),
                 for (final job in jobs) ...[

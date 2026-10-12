@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../../../core/location/domain/entities/device_location.dart';
+import '../../../../additional_data/location/domain/entities/device_location.dart';
 import '../../../../core/network/kwanza_track_mobile_api_client.dart';
 import '../../../farmer/domain/entities/farm_plot.dart';
 import '../../../farmer/domain/entities/service_request.dart';

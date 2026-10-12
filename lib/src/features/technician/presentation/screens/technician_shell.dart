@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/presentation/components/components.dart';
+import '../../../../components/components.dart';
 import '../../../manager/data/repositories/union_operations_repository.dart';
 import '../../data/repositories/technician_local_repository.dart';
 import 'technician_home_screen.dart';

@@ -55,7 +55,7 @@ class RequestCard extends StatelessWidget {
                 ? 'Requested: ${formatShortDate(request.requestedOn)}'
                 : formatDateTime(request.scheduledAt!),
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: Colors.black.withValues(alpha: 0.62),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w600,
             ),
           ),

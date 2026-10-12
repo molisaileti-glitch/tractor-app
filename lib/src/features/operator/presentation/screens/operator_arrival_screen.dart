@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/location/data/repositories/geolocator_location_repository.dart';
-import '../../../../core/location/domain/entities/device_location.dart';
-import '../../../../core/location/domain/repositories/location_repository.dart';
-import '../../../../core/location/domain/usecases/check_plot_geofence.dart';
-import '../../../../core/presentation/components/components.dart';
+import '../../../../additional_data/location/data/repositories/geolocator_location_repository.dart';
+import '../../../../additional_data/location/domain/entities/device_location.dart';
+import '../../../../additional_data/location/domain/repositories/location_repository.dart';
+import '../../../../additional_data/location/domain/usecases/check_plot_geofence.dart';
+import '../../../../components/components.dart';
 import '../../data/repositories/operator_local_repository.dart';
 import '../../domain/entities/operator_job.dart';
 import '../widgets/operator_widgets.dart';
@@ -413,7 +413,7 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
         context,
         message:
             widget.repository.lastActionError ??
-            'The backend did not allow this job to start.',
+            'This job could not be started. Review the safety checks and try again.',
         type: AppSnackType.error,
       );
       return;
@@ -1009,7 +1009,9 @@ class _LocationFact extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: TextStyle(color: Colors.black.withValues(alpha: 0.62)),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
           Text(value, style: const TextStyle(fontWeight: FontWeight.w900)),

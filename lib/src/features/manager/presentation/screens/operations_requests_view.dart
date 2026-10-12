@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-import '../../../../core/presentation/components/components.dart';
+import '../../../../components/components.dart';
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/union_operations_repository.dart';
 import '../../domain/entities/operations_models.dart';
@@ -55,26 +55,11 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                'Service Requests',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-            FilledButton.icon(
-              onPressed: _showRegisterSheet,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(0, 44),
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-              ),
-              icon: const Icon(Icons.add),
-              label: const Text('Register'),
-            ),
-          ],
+        Text(
+          'Service Requests',
+          style: Theme.of(
+            context,
+          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
         ),
         const SizedBox(height: 14),
         _RemoteRequestsBanner(
@@ -166,14 +151,6 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
       _loadingRemoteRequests = false;
     });
   }
-
-  void _showRegisterSheet() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => _RegisterRequestSheet(repository: widget.repository),
-    );
-  }
 }
 
 class _RequestsEmptyState extends StatelessWidget {
@@ -201,7 +178,7 @@ class _RequestsEmptyState extends StatelessWidget {
               message,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Colors.black.withValues(alpha: 0.62),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -257,7 +234,7 @@ class _RemoteRequestsBanner extends StatelessWidget {
             child: Text(
               text,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: Colors.black.withValues(alpha: 0.74),
+                color: Theme.of(context).colorScheme.onSurface,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -419,7 +396,7 @@ class _RequestPreviewCard extends StatelessWidget {
             Text(
               request.rejectionReason!,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: Colors.black.withValues(alpha: 0.70),
+                color: Theme.of(context).colorScheme.onSurface,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -451,7 +428,11 @@ class _MiniFact extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 18, color: Colors.black54),
+        Icon(
+          icon,
+          size: 18,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
         const SizedBox(width: 8),
         Expanded(child: Text(text)),
       ],
@@ -475,6 +456,7 @@ class OperationsRequestDetailScreen extends StatelessWidget {
       animation: repository,
       builder: (context, _) {
         final request = repository.requestById(requestId);
+        final requestNotes = _RequestNotes.parse(request.notes);
         return Scaffold(
           body: Stack(
             children: [
@@ -496,7 +478,7 @@ class OperationsRequestDetailScreen extends StatelessWidget {
                             vertical: 12,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.92),
+                            color: Theme.of(context).colorScheme.surface,
                             borderRadius: BorderRadius.circular(18),
                           ),
                           child: Text(
@@ -522,9 +504,9 @@ class OperationsRequestDetailScreen extends StatelessWidget {
                       width: double.infinity,
                       constraints: const BoxConstraints(maxWidth: 760),
                       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.vertical(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surface,
+                        borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(26),
                         ),
                       ),
@@ -582,14 +564,35 @@ class OperationsRequestDetailScreen extends StatelessWidget {
                               ),
                               _Fact(
                                 label: 'Location',
-                                value: request.plot.location,
+                                value: request.plot.location.isEmpty
+                                    ? 'Not provided'
+                                    : request.plot.location,
                               ),
+                              if (requestNotes.amcos != null)
+                                _Fact(
+                                  label: 'AMCOS',
+                                  value: requestNotes.amcos!,
+                                ),
+                              if (requestNotes.mcu != null)
+                                _Fact(label: 'MCU', value: requestNotes.mcu!),
+                              if (requestNotes.season != null)
+                                _Fact(
+                                  label: 'Season',
+                                  value: requestNotes.season!,
+                                ),
+                              if (requestNotes.crop != null)
+                                _Fact(
+                                  label: 'Crop',
+                                  value: requestNotes.crop!,
+                                ),
                               const Divider(height: 26),
-                              Text(
-                                request.notes ?? 'No farmer notes added.',
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                              const SizedBox(height: 6),
+                              if (requestNotes.other.isNotEmpty) ...[
+                                Text(
+                                  requestNotes.other,
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                                const SizedBox(height: 6),
+                              ],
                               if (request.status ==
                                   OperationsRequestStatus.pending)
                                 Wrap(
@@ -1272,15 +1275,19 @@ class _RequestPlotMap extends StatelessWidget {
     return GoogleMap(
       initialCameraPosition: CameraPosition(
         target: center,
-        zoom: points.length >= 3 ? 16 : 15,
+        zoom: points.length >= 3 ? 17 : 18.5,
       ),
+      mapType: MapType.hybrid,
       markers: {
         Marker(
           markerId: MarkerId('request-plot-${request.id}'),
           position: center,
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueGreen,
+          ),
           infoWindow: InfoWindow(
-            title: request.plot.name,
-            snippet: request.farmerName,
+            title: 'Farm: ${request.plot.name}',
+            snippet: '${request.farmerName} - exact request coordinate',
           ),
         ),
       },
@@ -1298,8 +1305,9 @@ class _RequestPlotMap extends StatelessWidget {
       },
       mapToolbarEnabled: false,
       myLocationButtonEnabled: false,
-      zoomControlsEnabled: false,
+      zoomControlsEnabled: true,
       compassEnabled: true,
+      buildingsEnabled: true,
     );
   }
 
@@ -1314,6 +1322,64 @@ class _RequestPlotMap extends StatelessWidget {
   }
 }
 
+class _RequestNotes {
+  const _RequestNotes({
+    this.amcos,
+    this.mcu,
+    this.season,
+    this.crop,
+    required this.other,
+  });
+
+  final String? amcos;
+  final String? mcu;
+  final String? season;
+  final String? crop;
+  final String other;
+
+  factory _RequestNotes.parse(String? notes) {
+    String? amcos;
+    String? mcu;
+    String? season;
+    String? crop;
+    final other = <String>[];
+
+    for (final rawPart in (notes ?? '').split('|')) {
+      final part = rawPart.trim();
+      if (part.isEmpty) continue;
+      final separator = part.indexOf(':');
+      if (separator < 0) {
+        other.add(part);
+        continue;
+      }
+
+      final key = part.substring(0, separator).trim().toLowerCase();
+      final value = part.substring(separator + 1).trim();
+      if (value.isEmpty) continue;
+      switch (key) {
+        case 'amcos':
+          amcos = value;
+        case 'mcu':
+          mcu = value;
+        case 'season':
+          season = value;
+        case 'crop':
+          crop = value;
+        default:
+          other.add(part);
+      }
+    }
+
+    return _RequestNotes(
+      amcos: amcos,
+      mcu: mcu,
+      season: season,
+      crop: crop,
+      other: other.join(' | '),
+    );
+  }
+}
+
 class _Fact extends StatelessWidget {
   const _Fact({required this.label, required this.value});
 
@@ -1324,24 +1390,34 @@ class _Fact extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 9),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(color: Colors.black.withValues(alpha: 0.60)),
-            ),
-          ),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w800),
-            ),
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final labelWidth = constraints.maxWidth * 0.36;
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: labelWidth,
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  value,
+                  textAlign: TextAlign.left,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

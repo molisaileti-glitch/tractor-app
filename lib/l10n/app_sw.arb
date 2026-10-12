@@ -1,0 +1,19 @@
+{
+  "@@locale": "sw",
+  "settings": "Mipangilio",
+  "account": "Akaunti",
+  "appearance": "Mwonekano",
+  "darkMode": "Mandhari meusi",
+  "darkModeDescription": "Tumia mandhari meusi ya KwanzaTrack",
+  "language": "Lugha",
+  "english": "Kiingereza",
+  "swahili": "Kiswahili",
+  "profile": "Wasifu",
+  "assignedJobs": "Kazi ulizopangiwa",
+  "activeAndCompleted": "{active} zinaendelea, {completed} zimekamilika",
+  "dataStatus": "Hali ya taarifa",
+  "updatingInformation": "Taarifa zako zinasasishwa...",
+  "informationUpToDate": "Taarifa zako zimesasishwa.",
+  "operator": "Mwendeshaji wa trekta",
+  "unionStaff": "Afisa wa chama"
+}

@@ -32,6 +32,8 @@ class UnionOperationsRepository extends ChangeNotifier {
   String? _mechanizationSyncError;
   String? _mechanizationActionError;
   String? _mechanizationUserName;
+  String? _mechanizationUserEmail;
+  String? _mechanizationUserRole;
   Map<String, Object?> _dashboardData = const {};
   int? _remoteBacklogCount;
   int _syncGeneration = 0;
@@ -46,6 +48,8 @@ class UnionOperationsRepository extends ChangeNotifier {
   String? get mechanizationSyncError => _mechanizationSyncError;
   String? get mechanizationActionError => _mechanizationActionError;
   String? get mechanizationUserName => _mechanizationUserName;
+  String? get mechanizationUserEmail => _mechanizationUserEmail;
+  String? get mechanizationUserRole => _mechanizationUserRole;
   bool get hasMechanizationToken =>
       _accessToken != null && _accessToken!.isNotEmpty;
 
@@ -66,6 +70,8 @@ class UnionOperationsRepository extends ChangeNotifier {
     _exceptions.clear();
     if (_accessToken == null) {
       _mechanizationUserName = null;
+      _mechanizationUserEmail = null;
+      _mechanizationUserRole = null;
       _dashboardData = const {};
       _remoteBacklogCount = null;
       notifyListeners();
@@ -834,9 +840,9 @@ class UnionOperationsRepository extends ChangeNotifier {
     }
   }
 
-  Future<void> acknowledgeException(String exceptionId) async {
+  Future<bool> acknowledgeException(String exceptionId) async {
     final token = _accessToken;
-    if (token == null || token.isEmpty) return;
+    if (token == null || token.isEmpty) return false;
     try {
       _mechanizationActionError = null;
       await mobileApiClient.acknowledgeException(
@@ -844,9 +850,11 @@ class UnionOperationsRepository extends ChangeNotifier {
         exceptionId: exceptionId,
       );
       await refreshOversightData();
+      return _mechanizationActionError == null;
     } on KwanzaTrackApiException catch (error) {
       _mechanizationActionError = error.message;
       notifyListeners();
+      return false;
     }
   }
 
@@ -887,6 +895,8 @@ class UnionOperationsRepository extends ChangeNotifier {
     final data = _dataMap(response);
     final user = _map(data['user']);
     _mechanizationUserName = user['name']?.toString();
+    _mechanizationUserEmail = user['email']?.toString();
+    _mechanizationUserRole = user['role']?.toString();
   }
 
   void _applyRequestsResponse(

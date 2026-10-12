@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../../l10n/generated/app_localizations.dart';
+import '../../../../shared/application/app_preferences_controller.dart';
+import '../../../../shared/presentation/screens/app_settings_screen.dart';
 import '../../data/repositories/operator_local_repository.dart';
 import '../widgets/operator_widgets.dart';
 
@@ -7,15 +10,17 @@ class OperatorProfileScreen extends StatelessWidget {
   const OperatorProfileScreen({
     super.key,
     required this.repository,
+    required this.preferences,
   });
 
   final OperatorLocalRepository repository;
+  final AppPreferencesController preferences;
 
   @override
   Widget build(BuildContext context) {
-    final name = repository.operatorName ?? 'Operator';
-    final role = repository.operatorRole ?? 'Mechanization operator';
-    final email = repository.operatorEmail;
+    final strings = AppLocalizations.of(context)!;
+    final name = repository.operatorName ?? strings.operator;
+    final role = repository.operatorRole ?? strings.operator;
     final activeJobs = repository.jobs.where((job) => !job.isComplete).length;
     final completedJobs = repository.history.length;
 
@@ -24,61 +29,42 @@ class OperatorProfileScreen extends StatelessWidget {
       child: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 620),
+          constraints: const BoxConstraints(maxWidth: 680),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Profile',
+                strings.profile,
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
-              const SizedBox(height: 14),
-              OperatorCard(
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 28,
-                      backgroundColor: Theme.of(
-                        context,
-                      ).colorScheme.primary.withValues(alpha: 0.12),
-                      child: const Icon(Icons.person),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            name,
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          Text(email == null || email.isEmpty
-                              ? role
-                              : '$role - $email'),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+              const SizedBox(height: 18),
+              AppSettingsScreen(
+                preferences: preferences,
+                name: name,
+                role: role,
+                email: repository.operatorEmail,
+                showTitle: false,
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
               OperatorCard(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _ProfileLine(
                       icon: Icons.assignment_outlined,
-                      title: 'Assigned jobs',
-                      subtitle: '$activeJobs active, $completedJobs completed',
+                      title: strings.assignedJobs,
+                      subtitle: strings.activeAndCompleted(
+                        activeJobs,
+                        completedJobs,
+                      ),
                     ),
                     const Divider(height: 28),
                     _ProfileLine(
-                      icon: Icons.sync_outlined,
-                      title: 'Backend sync',
+                      icon: Icons.cloud_done_outlined,
+                      title: strings.dataStatus,
                       subtitle: repository.isSyncingMechanization
-                          ? 'Refreshing operator data...'
+                          ? strings.updatingInformation
                           : repository.mechanizationSyncError ??
-                                'Using authenticated mechanization API data.',
+                                strings.informationUpToDate,
                     ),
                   ],
                 ),
@@ -113,10 +99,7 @@ class _ProfileLine extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
+              Text(title, style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 4),
               Text(subtitle),
             ],

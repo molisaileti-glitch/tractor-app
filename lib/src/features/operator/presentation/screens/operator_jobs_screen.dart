@@ -67,7 +67,7 @@ class OperatorJobsScreen extends StatelessWidget {
                   _DashboardToolCard(
                     value: '${repository.jobs.length}',
                     label: 'Assigned jobs',
-                    detail: 'All backend assignments',
+                    detail: 'All assignments',
                     icon: Icons.assignment_outlined,
                     tint: const Color(0xFFEAF2FF),
                     iconColor: const Color(0xFF2563EB),
@@ -161,10 +161,8 @@ class OperatorJobsScreen extends StatelessWidget {
   void _openJob(BuildContext context, OperatorJob job) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => OperatorJobDetailScreen(
-          repository: repository,
-          jobId: job.id,
-        ),
+        builder: (_) =>
+            OperatorJobDetailScreen(repository: repository, jobId: job.id),
       ),
     );
   }
@@ -227,8 +225,10 @@ class _NoAssignedJobsCard extends StatelessWidget {
             Text(
               'Your active job will appear here when it is ready.',
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.mutedText,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(
+                color: AppColors.adaptiveMutedText(context),
               ),
             ),
           ],
@@ -280,13 +280,17 @@ class _DashboardToolCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       height: 172,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: tint,
+        color: dark
+            ? Color.alphaBlend(tint.withValues(alpha: 0.12), scheme.surface)
+            : tint,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.74)),
+        border: Border.all(color: scheme.outlineVariant),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -302,7 +306,7 @@ class _DashboardToolCard extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.82),
+              color: scheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(13),
             ),
             child: Icon(icon, color: iconColor),
@@ -312,7 +316,7 @@ class _DashboardToolCard extends StatelessWidget {
             value,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.w700,
-              color: AppColors.text,
+              color: scheme.onSurface,
             ),
           ),
           const SizedBox(height: 2),
@@ -320,7 +324,7 @@ class _DashboardToolCard extends StatelessWidget {
             label,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w700,
-              color: AppColors.text,
+              color: scheme.onSurface,
             ),
           ),
           const SizedBox(height: 3),
@@ -328,15 +332,16 @@ class _DashboardToolCard extends StatelessWidget {
             detail,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppColors.mutedText,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
           ),
         ],
       ),
     );
   }
 }
+
 class _OperatorJobCard extends StatelessWidget {
   const _OperatorJobCard({
     required this.job,
@@ -354,12 +359,12 @@ class _OperatorJobCard extends StatelessWidget {
     return Container(
       padding: EdgeInsets.all(emphasis ? 20 : 18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: emphasis
               ? AppColors.fieldGreen.withValues(alpha: 0.22)
-              : Colors.black.withValues(alpha: 0.06),
+              : theme.colorScheme.outlineVariant,
         ),
         boxShadow: [
           BoxShadow(
@@ -398,10 +403,11 @@ class _OperatorJobCard extends StatelessWidget {
                     ),
                     Text(
                       job.serviceType.label.toUpperCase(),
-                      style: (emphasis
-                              ? theme.textTheme.titleLarge
-                              : theme.textTheme.titleMedium)
-                          ?.copyWith(fontWeight: FontWeight.w700),
+                      style:
+                          (emphasis
+                                  ? theme.textTheme.titleLarge
+                                  : theme.textTheme.titleMedium)
+                              ?.copyWith(fontWeight: FontWeight.w700),
                     ),
                   ],
                 ),
@@ -500,7 +506,11 @@ class _MiniChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: Colors.black.withValues(alpha: 0.62)),
+          Icon(
+            icon,
+            size: 16,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
           const SizedBox(width: 6),
           Flexible(
             child: Text(
@@ -531,7 +541,9 @@ class _Line extends StatelessWidget {
             width: 92,
             child: Text(
               label,
-              style: TextStyle(color: Colors.black.withValues(alpha: 0.62)),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
           Expanded(

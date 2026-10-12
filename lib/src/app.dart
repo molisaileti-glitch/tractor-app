@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'core/network/kwanza_track_mobile_api_client.dart';
-import 'core/presentation/components/components.dart';
+import 'components/components.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/data/repositories/auth_local_repository.dart';
 import 'features/auth/domain/entities/auth_session.dart';
@@ -10,11 +10,13 @@ import 'features/farmer/data/repositories/farmer_local_repository.dart';
 import 'features/farmer/presentation/screens/farmer_shell.dart';
 import 'features/manager/data/repositories/union_operations_repository.dart';
 import 'features/manager/presentation/screens/operations_shell.dart';
-import 'features/onboarding/presentation/screens/app_welcome_screen.dart';
+import 'onboarding/presentation/screens/app_welcome_screen.dart';
 import 'features/operator/data/repositories/operator_local_repository.dart';
 import 'features/operator/presentation/screens/operator_shell.dart';
+import 'shared/application/app_preferences_controller.dart';
 import 'features/technician/data/repositories/technician_local_repository.dart';
 import 'features/technician/presentation/screens/technician_shell.dart';
+import 'l10n/generated/app_localizations.dart';
 
 enum _Workspace {
   welcome,
@@ -45,6 +47,7 @@ class _TractorAppState extends State<TractorApp> {
       OperatorLocalRepository.seeded();
   final TechnicianLocalRepository technicianRepository =
       TechnicianLocalRepository.seeded();
+  final AppPreferencesController preferences = AppPreferencesController();
   _Workspace _workspace = _Workspace.welcome;
   bool _restoringSession = true;
 
@@ -52,6 +55,7 @@ class _TractorAppState extends State<TractorApp> {
   void initState() {
     super.initState();
     KwanzaTrackMobileApiClient.onUnauthorized = _handleSessionExpired;
+    preferences.load();
     _restoreSavedSession();
   }
 
@@ -60,58 +64,70 @@ class _TractorAppState extends State<TractorApp> {
     if (KwanzaTrackMobileApiClient.onUnauthorized == _handleSessionExpired) {
       KwanzaTrackMobileApiClient.onUnauthorized = null;
     }
+    preferences.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Kwanza Track',
-      debugShowCheckedModeBanner: false,
-      navigatorKey: _navigatorKey,
-      scaffoldMessengerKey: _messengerKey,
-      theme: AppTheme.light(),
-      home: _restoringSession
-          ? const Scaffold(body: SafeArea(child: AppScreenSkeleton()))
-          : switch (_workspace) {
-              _Workspace.welcome => AppWelcomeScreen(
-                onContinue: () => setState(() => _workspace = _Workspace.login),
-              ),
-              _Workspace.login => LoginScreen(
-                repository: authRepository,
-                onBack: () => setState(() => _workspace = _Workspace.welcome),
-                onOpenFarmer: () =>
-                    setState(() => _workspace = _Workspace.farmer),
-                onOpenOperations: _openOperations,
-                onOpenOperator: _openOperator,
-                onOpenTechnician: _openTechnician,
-                onCreateFarmerAccount: () =>
-                    setState(() => _workspace = _Workspace.registerFarmer),
-              ),
-              _Workspace.registerFarmer => FarmerRegistrationScreen(
-                repository: authRepository,
-                onBack: () => setState(() => _workspace = _Workspace.login),
-                onRegistered: () =>
-                    setState(() => _workspace = _Workspace.farmer),
-              ),
-              _Workspace.farmer => FarmerShell(
-                repository: farmerRepository,
-                onLogout: _confirmLogout,
-              ),
-              _Workspace.operations => OperationsShell(
-                repository: operationsRepository,
-                onLogout: _confirmLogout,
-              ),
-              _Workspace.operator => OperatorShell(
-                repository: operatorRepository,
-                onLogout: _confirmLogout,
-              ),
-              _Workspace.technician => TechnicianShell(
-                operationsRepository: operationsRepository,
-                technicianRepository: technicianRepository,
-                onLogout: _confirmLogout,
-              ),
-            },
+    return AnimatedBuilder(
+      animation: preferences,
+      builder: (context, _) => MaterialApp(
+        title: 'Kwanza Track',
+        debugShowCheckedModeBanner: false,
+        navigatorKey: _navigatorKey,
+        scaffoldMessengerKey: _messengerKey,
+        theme: AppTheme.light(),
+        darkTheme: AppTheme.dark(),
+        themeMode: preferences.themeMode,
+        locale: preferences.locale,
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: _restoringSession
+            ? const Scaffold(body: SafeArea(child: AppScreenSkeleton()))
+            : switch (_workspace) {
+                _Workspace.welcome => AppWelcomeScreen(
+                  onContinue: () =>
+                      setState(() => _workspace = _Workspace.login),
+                ),
+                _Workspace.login => LoginScreen(
+                  repository: authRepository,
+                  onBack: () => setState(() => _workspace = _Workspace.welcome),
+                  onOpenFarmer: () =>
+                      setState(() => _workspace = _Workspace.farmer),
+                  onOpenOperations: _openOperations,
+                  onOpenOperator: _openOperator,
+                  onOpenTechnician: _openTechnician,
+                  onCreateFarmerAccount: () =>
+                      setState(() => _workspace = _Workspace.registerFarmer),
+                ),
+                _Workspace.registerFarmer => FarmerRegistrationScreen(
+                  repository: authRepository,
+                  onBack: () => setState(() => _workspace = _Workspace.login),
+                  onRegistered: () =>
+                      setState(() => _workspace = _Workspace.farmer),
+                ),
+                _Workspace.farmer => FarmerShell(
+                  repository: farmerRepository,
+                  onLogout: _confirmLogout,
+                ),
+                _Workspace.operations => OperationsShell(
+                  repository: operationsRepository,
+                  preferences: preferences,
+                  onLogout: _confirmLogout,
+                ),
+                _Workspace.operator => OperatorShell(
+                  repository: operatorRepository,
+                  preferences: preferences,
+                  onLogout: _confirmLogout,
+                ),
+                _Workspace.technician => TechnicianShell(
+                  operationsRepository: operationsRepository,
+                  technicianRepository: technicianRepository,
+                  onLogout: _confirmLogout,
+                ),
+              },
+      ),
     );
   }
 

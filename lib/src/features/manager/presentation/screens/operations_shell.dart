@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/presentation/components/components.dart';
+import '../../../../components/components.dart';
+import '../../../../l10n/generated/app_localizations.dart';
+import '../../../../shared/application/app_preferences_controller.dart';
+import '../../../../shared/presentation/screens/app_settings_screen.dart';
 import '../../data/repositories/union_operations_repository.dart';
 import 'operations_dashboard_view.dart';
 import 'operations_directory_views.dart';
@@ -19,7 +22,8 @@ enum OperationsSection {
   operators('Operators', Icons.engineering_outlined),
   farmers('Farmers', Icons.groups_outlined),
   maintenance('Maintenance', Icons.build_outlined),
-  reports('Reports', Icons.bar_chart_outlined);
+  reports('Reports', Icons.bar_chart_outlined),
+  settings('Settings', Icons.settings_outlined);
 
   const OperationsSection(this.label, this.icon);
   final String label;
@@ -30,10 +34,12 @@ class OperationsShell extends StatefulWidget {
   const OperationsShell({
     super.key,
     required this.repository,
+    required this.preferences,
     required this.onLogout,
   });
 
   final UnionOperationsRepository repository;
+  final AppPreferencesController preferences;
   final VoidCallback onLogout;
 
   @override
@@ -41,7 +47,25 @@ class OperationsShell extends StatefulWidget {
 }
 
 class _OperationsShellState extends State<OperationsShell> {
+  static const _primarySections = <OperationsSection>[
+    OperationsSection.dashboard,
+    OperationsSection.requests,
+    OperationsSection.schedule,
+    OperationsSection.jobs,
+    OperationsSection.oversight,
+  ];
+
+  static const _secondarySections = <OperationsSection>[
+    OperationsSection.tractors,
+    OperationsSection.operators,
+    OperationsSection.farmers,
+    OperationsSection.maintenance,
+    OperationsSection.reports,
+    OperationsSection.settings,
+  ];
+
   OperationsSection _section = OperationsSection.dashboard;
+  int _lastPrimaryIndex = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -52,33 +76,13 @@ class _OperationsShellState extends State<OperationsShell> {
           builder: (context, constraints) {
             final compact = constraints.maxWidth < 880;
             return Scaffold(
-              appBar: AppBar(
-                title: const Text('Union Operations'),
-                actions: [
-                  IconButton(
-                    tooltip: 'Refresh',
-                    onPressed: widget.repository.isSyncingMechanization
-                        ? null
-                        : widget.repository.refreshMechanizationData,
-                    icon: const Icon(Icons.sync),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 16),
-                    child: Center(
-                      child: Text(
-                        widget.repository.mechanizationUserName ??
-                            'Union staff',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              appBar: AppBar(title: const Text('Union Operations')),
               drawer: compact
                   ? _OperationsDrawer(
                       subtitle:
                           widget.repository.mechanizationUserName ??
                           'Union staff',
-                      child: _navList(),
+                      child: _navList(sections: _secondarySections),
                       onLogout: widget.onLogout,
                     )
                   : null,
@@ -89,12 +93,16 @@ class _OperationsShellState extends State<OperationsShell> {
                     SizedBox(
                       width: 230,
                       child: Material(
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.surface,
                         child: SafeArea(
                           top: false,
                           child: Column(
                             children: [
-                              Expanded(child: _navList()),
+                              Expanded(
+                                child: _navList(
+                                  sections: OperationsSection.values,
+                                ),
+                              ),
                               _LogoutButton(onPressed: widget.onLogout),
                             ],
                           ),
@@ -119,6 +127,41 @@ class _OperationsShellState extends State<OperationsShell> {
                   ),
                 ],
               ),
+              bottomNavigationBar: compact
+                  ? NavigationBar(
+                      selectedIndex: _lastPrimaryIndex,
+                      onDestinationSelected: (index) {
+                        _selectSection(_primarySections[index]);
+                      },
+                      destinations: const [
+                        NavigationDestination(
+                          icon: Icon(Icons.dashboard_outlined),
+                          selectedIcon: Icon(Icons.dashboard),
+                          label: 'Overview',
+                        ),
+                        NavigationDestination(
+                          icon: Icon(Icons.fact_check_outlined),
+                          selectedIcon: Icon(Icons.fact_check),
+                          label: 'Requests',
+                        ),
+                        NavigationDestination(
+                          icon: Icon(Icons.calendar_month_outlined),
+                          selectedIcon: Icon(Icons.calendar_month),
+                          label: 'Schedule',
+                        ),
+                        NavigationDestination(
+                          icon: Icon(Icons.route_outlined),
+                          selectedIcon: Icon(Icons.route),
+                          label: 'Jobs',
+                        ),
+                        NavigationDestination(
+                          icon: Icon(Icons.rule_folder_outlined),
+                          selectedIcon: Icon(Icons.rule_folder),
+                          label: 'Oversight',
+                        ),
+                      ],
+                    )
+                  : null,
             );
           },
         );
@@ -126,17 +169,21 @@ class _OperationsShellState extends State<OperationsShell> {
     );
   }
 
-  Widget _navList() {
+  Widget _navList({required Iterable<OperationsSection> sections}) {
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       children: [
-        for (final section in OperationsSection.values)
+        for (final section in sections)
           ListTile(
             selected: _section == section,
             leading: Icon(section.icon),
-            title: Text(section.label),
+            title: Text(
+              section == OperationsSection.settings
+                  ? AppLocalizations.of(context)!.settings
+                  : section.label,
+            ),
             onTap: () {
-              setState(() => _section = section);
+              _selectSection(section);
               if (Navigator.of(context).canPop()) Navigator.of(context).pop();
             },
           ),
@@ -148,11 +195,9 @@ class _OperationsShellState extends State<OperationsShell> {
     return switch (_section) {
       OperationsSection.dashboard => OperationsDashboardView(
         repository: widget.repository,
-        onOpenRequests: () =>
-            setState(() => _section = OperationsSection.requests),
-        onOpenJobs: () => setState(() => _section = OperationsSection.jobs),
-        onOpenOversight: () =>
-            setState(() => _section = OperationsSection.oversight),
+        onOpenRequests: () => _selectSection(OperationsSection.requests),
+        onOpenJobs: () => _selectSection(OperationsSection.jobs),
+        onOpenOversight: () => _selectSection(OperationsSection.oversight),
       ),
       OperationsSection.requests => OperationsRequestsView(
         repository: widget.repository,
@@ -175,7 +220,21 @@ class _OperationsShellState extends State<OperationsShell> {
         repository: widget.repository,
       ),
       OperationsSection.reports => ReportsView(repository: widget.repository),
+      OperationsSection.settings => AppSettingsScreen(
+        preferences: widget.preferences,
+        name: widget.repository.mechanizationUserName ?? 'Union staff',
+        role: widget.repository.mechanizationUserRole ?? 'Union staff',
+        email: widget.repository.mechanizationUserEmail,
+      ),
     };
+  }
+
+  void _selectSection(OperationsSection section) {
+    setState(() {
+      _section = section;
+      final primaryIndex = _primarySections.indexOf(section);
+      if (primaryIndex >= 0) _lastPrimaryIndex = primaryIndex;
+    });
   }
 }
 

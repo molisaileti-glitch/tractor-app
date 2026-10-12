@@ -3,7 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../../core/presentation/components/components.dart';
+import '../../../../components/components.dart';
 import '../../../../core/theme/app_theme.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
@@ -47,7 +47,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
         children: [
           const _OtpImageBackground(),
@@ -95,8 +95,8 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         FilteringTextInputFormatter.digitsOnly,
         LengthLimitingTextInputFormatter(1),
       ],
-      style: const TextStyle(
-        color: AppColors.deepGreen,
+      style: TextStyle(
+        color: AppColors.adaptiveText(context),
         fontWeight: FontWeight.w900,
         fontSize: 20,
       ),
@@ -200,7 +200,9 @@ class _OtpPanel extends StatelessWidget {
         filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.58),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppColors.darkSurfaceHigh.withValues(alpha: 0.94)
+                : Colors.white.withValues(alpha: 0.58),
             borderRadius: BorderRadius.circular(28),
             border: Border.all(color: Colors.white.withValues(alpha: 0.54)),
             boxShadow: [
@@ -229,7 +231,7 @@ class _OtpPanel extends StatelessWidget {
                   'Enter the 6-digit code sent to your phone',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w900,
-                    color: AppColors.deepGreen,
+                    color: AppColors.adaptiveText(context),
                     height: 1.10,
                   ),
                 ),
@@ -237,7 +239,7 @@ class _OtpPanel extends StatelessWidget {
                 Text(
                   'We sent a verification code to $phoneNumber.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.black.withValues(alpha: 0.62),
+                    color: AppColors.adaptiveMutedText(context),
                     height: 1.35,
                   ),
                 ),
@@ -365,8 +367,10 @@ class _BackButton extends StatelessWidget {
       tooltip: 'Back',
       onPressed: onPressed,
       icon: const Icon(Icons.arrow_back),
-      color: AppColors.text,
-      style: IconButton.styleFrom(backgroundColor: Colors.white),
+      color: AppColors.adaptiveText(context),
+      style: IconButton.styleFrom(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+      ),
     );
   }
 }

@@ -257,13 +257,17 @@ class _CompactMetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       height: 136,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.09),
+        color: dark
+            ? Color.alphaBlend(color.withValues(alpha: 0.12), scheme.surface)
+            : color.withValues(alpha: 0.09),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.74)),
+        border: Border.all(color: scheme.outlineVariant),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -279,7 +283,7 @@ class _CompactMetricCard extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.82),
+              color: scheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(13),
             ),
             child: Icon(icon, color: color, size: 22),
@@ -289,7 +293,7 @@ class _CompactMetricCard extends StatelessWidget {
             value,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.w800,
-              color: AppColors.text,
+              color: scheme.onSurface,
             ),
           ),
           const SizedBox(height: 2),
@@ -297,7 +301,7 @@ class _CompactMetricCard extends StatelessWidget {
             label,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w700,
-              color: AppColors.text,
+              color: scheme.onSurface,
             ),
           ),
         ],

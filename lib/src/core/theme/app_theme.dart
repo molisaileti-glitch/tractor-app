@@ -18,6 +18,19 @@ class AppColors {
   static const routeBlue = Color(0xFF2563EB);
   static const tractorOrange = Color(0xFFF97316);
   static const purple = Color(0xFF7B4BD2);
+  static const darkBackground = Color(0xFF07111F);
+  static const darkSurface = Color(0xFF14212B);
+  static const darkSurfaceHigh = Color(0xFF1A2A35);
+  static const darkText = Color(0xFFF2F6FA);
+  static const darkMutedText = Color(0xFF66D9CE);
+
+  static Color adaptiveText(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? darkText : text;
+
+  static Color adaptiveMutedText(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+      ? darkMutedText
+      : mutedText;
 }
 
 class AppTheme {
@@ -140,6 +153,185 @@ class AppTheme {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: AppColors.fieldGreen, width: 1.6),
+        ),
+      ),
+    );
+  }
+
+  static ThemeData dark() {
+    const seed = AppColors.fieldGreen;
+    final scheme =
+        ColorScheme.fromSeed(
+          seedColor: seed,
+          brightness: Brightness.dark,
+        ).copyWith(
+          primary: seed,
+          onPrimary: Colors.white,
+          secondary: const Color(0xFF35C7B8),
+          surface: AppColors.darkSurface,
+          onSurface: AppColors.darkText,
+          onSurfaceVariant: AppColors.darkMutedText,
+          outline: const Color(0xFF334552),
+          outlineVariant: const Color(0xFF263743),
+          error: const Color(0xFFFF6B81),
+        );
+    final baseTextTheme = Typography.material2021().white;
+    final textTheme = baseTextTheme
+        .apply(bodyColor: AppColors.darkText, displayColor: AppColors.darkText)
+        .copyWith(
+      headlineLarge: baseTextTheme.headlineLarge?.copyWith(
+        fontWeight: FontWeight.w700,
+      ),
+      headlineMedium: baseTextTheme.headlineMedium?.copyWith(
+        fontWeight: FontWeight.w700,
+      ),
+      headlineSmall: baseTextTheme.headlineSmall?.copyWith(
+        fontWeight: FontWeight.w700,
+      ),
+      titleLarge: baseTextTheme.titleLarge?.copyWith(
+        fontWeight: FontWeight.w700,
+      ),
+      titleMedium: baseTextTheme.titleMedium?.copyWith(
+        fontWeight: FontWeight.w600,
+      ),
+      titleSmall: baseTextTheme.titleSmall?.copyWith(
+        fontWeight: FontWeight.w600,
+      ),
+      bodyLarge: baseTextTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w400),
+      bodyMedium: baseTextTheme.bodyMedium?.copyWith(
+        fontWeight: FontWeight.w400,
+      ),
+      labelLarge: baseTextTheme.labelLarge?.copyWith(
+        color: AppColors.darkText,
+        fontWeight: FontWeight.w600,
+      ),
+      labelMedium: baseTextTheme.labelMedium?.copyWith(
+        color: AppColors.darkText,
+      ),
+      labelSmall: baseTextTheme.labelSmall?.copyWith(
+        color: AppColors.darkMutedText,
+      ),
+    );
+
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      fontFamily: 'Roboto',
+      textTheme: textTheme,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: AppColors.darkBackground,
+      canvasColor: AppColors.darkSurface,
+      dividerColor: scheme.outlineVariant,
+      appBarTheme: const AppBarTheme(
+        centerTitle: false,
+        elevation: 0,
+        backgroundColor: AppColors.darkBackground,
+        foregroundColor: AppColors.darkText,
+        titleTextStyle: TextStyle(
+          color: AppColors.darkText,
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      drawerTheme: const DrawerThemeData(
+        backgroundColor: AppColors.darkSurface,
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: AppColors.darkSurface,
+        indicatorColor: seed.withValues(alpha: 0.22),
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            color: states.contains(WidgetState.selected)
+                ? seed
+                : AppColors.darkMutedText,
+          ),
+        ),
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) => TextStyle(
+            color: states.contains(WidgetState.selected)
+                ? seed
+                : AppColors.darkText,
+            fontWeight: states.contains(WidgetState.selected)
+                ? FontWeight.w600
+                : FontWeight.w400,
+          ),
+        ),
+      ),
+      listTileTheme: const ListTileThemeData(
+        textColor: AppColors.darkText,
+        iconColor: AppColors.darkMutedText,
+        selectedColor: AppColors.fieldGreen,
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: AppColors.darkSurface,
+        modalBackgroundColor: AppColors.darkSurface,
+        surfaceTintColor: Colors.transparent,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: AppColors.darkSurfaceHigh,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      cardTheme: CardThemeData(
+        color: AppColors.darkSurface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: const BorderSide(color: Color(0xFF273A46)),
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppColors.darkSurfaceHigh,
+        contentTextStyle: const TextStyle(color: AppColors.darkText),
+        elevation: 10,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(color: seed.withValues(alpha: 0.28)),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: seed,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: seed.withValues(alpha: 0.28),
+          disabledForegroundColor: Colors.white54,
+          minimumSize: const Size.fromHeight(52),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          textStyle: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: seed,
+          side: const BorderSide(color: Color(0xFF3A5360)),
+          minimumSize: const Size.fromHeight(52),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          textStyle: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: AppColors.darkSurfaceHigh,
+        hintStyle: const TextStyle(color: AppColors.darkMutedText),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFF334A57)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: seed, width: 1.6),
         ),
       ),
     );

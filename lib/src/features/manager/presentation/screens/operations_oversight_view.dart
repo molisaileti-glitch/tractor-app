@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/presentation/components/components.dart';
+import '../../../../components/components.dart';
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/union_operations_repository.dart';
 import '../../domain/entities/operations_models.dart';
@@ -129,7 +129,7 @@ class _OversightTabButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = selected
         ? Theme.of(context).colorScheme.primary
-        : Colors.black.withValues(alpha: 0.58);
+        : Theme.of(context).colorScheme.onSurfaceVariant;
     return Material(
       color: selected
           ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.12)
@@ -200,7 +200,7 @@ class _OversightEmptyState extends StatelessWidget {
               message,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Colors.black.withValues(alpha: 0.62),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -414,7 +414,19 @@ class _ExceptionCard extends StatelessWidget {
                             confirmLabel: 'Acknowledge',
                           );
                           if (confirmed) {
-                            await repository.acknowledgeException(item.id);
+                            final acknowledged = await repository
+                                .acknowledgeException(item.id);
+                            if (!context.mounted) return;
+                            showAppSnackBar(
+                              context,
+                              message: acknowledged
+                                  ? 'Exception acknowledged. It is now marked as being handled.'
+                                  : repository.mechanizationActionError ??
+                                        'The exception could not be acknowledged.',
+                              type: acknowledged
+                                  ? AppSnackType.success
+                                  : AppSnackType.error,
+                            );
                           }
                         }
                       : null,
@@ -529,7 +541,7 @@ class _FactsLine extends StatelessWidget {
     return Text(
       visible.join(' - '),
       style: TextStyle(
-        color: Colors.black.withValues(alpha: 0.58),
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
         fontWeight: FontWeight.w700,
       ),
     );

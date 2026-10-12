@@ -131,7 +131,9 @@ class _AttentionLine extends StatelessWidget {
               Text(issue),
               Text(
                 detail,
-                style: TextStyle(color: Colors.black.withValues(alpha: 0.62)),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/presentation/components/components.dart';
+import '../../../../components/components.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/application/app_preferences_controller.dart';
 import '../../data/repositories/operator_local_repository.dart';
 import 'operator_history_screen.dart';
 import 'operator_jobs_screen.dart';
@@ -12,10 +13,12 @@ class OperatorShell extends StatefulWidget {
   const OperatorShell({
     super.key,
     required this.repository,
+    required this.preferences,
     required this.onLogout,
   });
 
   final OperatorLocalRepository repository;
+  final AppPreferencesController preferences;
   final VoidCallback onLogout;
 
   @override
@@ -34,7 +37,10 @@ class _OperatorShellState extends State<OperatorShell> {
       ),
       OperatorScheduleScreen(repository: widget.repository),
       OperatorHistoryScreen(repository: widget.repository),
-      OperatorProfileScreen(repository: widget.repository),
+      OperatorProfileScreen(
+        repository: widget.repository,
+        preferences: widget.preferences,
+      ),
     ];
 
     return AnimatedBuilder(
@@ -42,7 +48,19 @@ class _OperatorShellState extends State<OperatorShell> {
       builder: (context, _) {
         return Scaffold(
           appBar: AppBar(
-            title: Text(_titleForIndex(_selectedIndex)),
+            title: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'assets/images/logo.png',
+                  width: 30,
+                  height: 30,
+                  semanticLabel: 'Kwanza Track logo',
+                ),
+                const SizedBox(width: 10),
+                Flexible(child: Text(_titleForIndex(_selectedIndex))),
+              ],
+            ),
             actions: [
               IconButton(
                 tooltip: 'Refresh',
@@ -107,10 +125,7 @@ class _OperatorShellState extends State<OperatorShell> {
 }
 
 class _OperatorDrawer extends StatelessWidget {
-  const _OperatorDrawer({
-    required this.repository,
-    required this.onLogout,
-  });
+  const _OperatorDrawer({required this.repository, required this.onLogout});
 
   final OperatorLocalRepository repository;
   final VoidCallback onLogout;
@@ -130,14 +145,14 @@ class _OperatorDrawer extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 25,
-                    backgroundColor: AppColors.fieldGreen.withValues(
-                      alpha: 0.14,
-                    ),
-                    child: const Icon(
-                      Icons.agriculture,
-                      color: AppColors.fieldGreen,
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: Image.asset(
+                      'assets/images/logo.png',
+                      width: 50,
+                      height: 50,
+                      fit: BoxFit.cover,
+                      semanticLabel: 'Kwanza Track logo',
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -151,11 +166,15 @@ class _OperatorDrawer extends StatelessWidget {
                               ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                         Text(
-                          email == null || email.isEmpty ? role : '$role\n$email',
+                          email == null || email.isEmpty
+                              ? role
+                              : '$role\n$email',
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: AppColors.mutedText),
+                              ?.copyWith(
+                                color: AppColors.adaptiveMutedText(context),
+                              ),
                         ),
                         const SizedBox(height: 3),
                         Text(

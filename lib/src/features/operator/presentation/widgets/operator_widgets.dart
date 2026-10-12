@@ -12,8 +12,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/operator_job.dart';
 
-const _googleRoutesAndroidApiKey =
-    'AIzaSyAARTXTKRaYC011X_ruaKhK_R4uzgWtt0U';
+const _googleRoutesAndroidApiKey = 'AIzaSyAARTXTKRaYC011X_ruaKhK_R4uzgWtt0U';
 const _googleRoutesIosApiKey = 'AIzaSyARbOp7_7i56wwdstWxPxy-lVH2ERjHdQ0';
 const _applicationId = 'com.example.tractor';
 const _androidCertSha1 = '40F065D6613192655D59990520E93ED368DC45B7';
@@ -27,11 +26,10 @@ class OperatorCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final card = Card(
-      color: Colors.white,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.black.withValues(alpha: 0.06)),
+        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Padding(padding: const EdgeInsets.all(18), child: child),
     );
@@ -181,9 +179,7 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
               myLocationButtonEnabled: false,
               zoomControlsEnabled: false,
               gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-                Factory<EagerGestureRecognizer>(
-                  () => EagerGestureRecognizer(),
-                ),
+                Factory<EagerGestureRecognizer>(() => EagerGestureRecognizer()),
               },
               onMapCreated: (controller) {
                 _controller = controller;
@@ -213,11 +209,18 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
                 ],
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 7,
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.directions_car, size: 16, color: Colors.white),
+                    const Icon(
+                      Icons.directions_car,
+                      size: 16,
+                      color: Colors.white,
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       _routeSummary!,
@@ -413,12 +416,12 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
       circleRadius,
       Paint()..color = Colors.black.withValues(alpha: 0.22),
     );
-    canvas.drawCircle(circleCenter, circleRadius, Paint()..color = Colors.white);
     canvas.drawCircle(
       circleCenter,
-      circleRadius - 5,
-      Paint()..color = color,
+      circleRadius,
+      Paint()..color = Colors.white,
     );
+    canvas.drawCircle(circleCenter, circleRadius - 5, Paint()..color = color);
 
     final textPainter = TextPainter(
       text: TextSpan(
@@ -440,9 +443,10 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
       ),
     );
 
-    final image = await recorder
-        .endRecording()
-        .toImage(canvasSize.toInt(), canvasSize.toInt());
+    final image = await recorder.endRecording().toImage(
+      canvasSize.toInt(),
+      canvasSize.toInt(),
+    );
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
     final markerBytes = bytes?.buffer.asUint8List() ?? Uint8List(0);
     return BitmapDescriptor.bytes(
@@ -625,7 +629,7 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
         _routeSummary = null;
         _loadingRoute = false;
         _routeError =
-            'Road route unavailable. Check Routes API access for this app.';
+            'Road directions are unavailable right now. Please try again.';
       });
     }
   }
@@ -663,7 +667,8 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
       'polylineEncoding': 'ENCODED_POLYLINE',
     };
 
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 10);
     try {
       final request = await client.postUrl(uri);
       request.headers.contentType = ContentType.json;
@@ -733,9 +738,7 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
       final summaryParts = <String>[];
       if (distanceMeters != null) {
         if (distanceMeters >= 1000) {
-          summaryParts.add(
-            '${(distanceMeters / 1000).toStringAsFixed(1)} km',
-          );
+          summaryParts.add('${(distanceMeters / 1000).toStringAsFixed(1)} km');
         } else {
           summaryParts.add('$distanceMeters m');
         }
@@ -819,10 +822,7 @@ class _NoMapCoordinates extends StatelessWidget {
 }
 
 class _DrivingRouteResult {
-  const _DrivingRouteResult({
-    required this.points,
-    this.summary,
-  });
+  const _DrivingRouteResult({required this.points, this.summary});
 
   final List<LatLng> points;
   final String? summary;

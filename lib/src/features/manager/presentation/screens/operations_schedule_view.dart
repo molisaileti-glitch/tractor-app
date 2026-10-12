@@ -140,7 +140,7 @@ class _WeekStrip extends StatelessWidget {
                       style: TextStyle(
                         color: _sameDate(day, selectedDate)
                             ? Colors.white
-                            : Colors.black54,
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -150,7 +150,7 @@ class _WeekStrip extends StatelessWidget {
                       style: TextStyle(
                         color: _sameDate(day, selectedDate)
                             ? Colors.white
-                            : Colors.black87,
+                            : Theme.of(context).colorScheme.onSurface,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
@@ -195,7 +195,7 @@ class _ScheduleBoard extends StatelessWidget {
                   child: Text(
                     '${hour.toString().padLeft(2, '0')}:00',
                     style: TextStyle(
-                      color: Colors.black.withValues(alpha: 0.50),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -209,7 +209,9 @@ class _ScheduleBoard extends StatelessWidget {
                           decoration: BoxDecoration(
                             border: Border(
                               top: BorderSide(
-                                color: Colors.black.withValues(alpha: 0.06),
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.outlineVariant,
                               ),
                             ),
                           ),
@@ -314,7 +316,9 @@ class _OperationsCalendarBoard extends StatelessWidget {
                           style: TextStyle(
                             color: _sameDate(day, selectedDate)
                                 ? Colors.white
-                                : Colors.black54,
+                                : Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
                             fontSize: 12,
                             fontWeight: FontWeight.w800,
                           ),
@@ -324,7 +328,7 @@ class _OperationsCalendarBoard extends StatelessWidget {
                           style: TextStyle(
                             color: _sameDate(day, selectedDate)
                                 ? Colors.white
-                                : Colors.black87,
+                                : Theme.of(context).colorScheme.onSurface,
                             fontWeight: FontWeight.w900,
                           ),
                         ),
@@ -359,7 +363,9 @@ class _OperationsCalendarBoard extends StatelessWidget {
                         left: _timeColumnWidth + i * columnWidth,
                         child: Container(
                           width: 1,
-                          color: Colors.black.withValues(alpha: 0.05),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.outlineVariant,
                         ),
                       ),
                     for (final job in visibleJobs)
@@ -429,7 +435,7 @@ class _OperationsCalendarHourLine extends StatelessWidget {
             child: Text(
               '${hour.toString().padLeft(2, '0')}:00',
               style: TextStyle(
-                color: Colors.black.withValues(alpha: 0.50),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
@@ -440,7 +446,7 @@ class _OperationsCalendarHourLine extends StatelessWidget {
           child: Container(
             margin: const EdgeInsets.only(top: 8),
             height: 1,
-            color: Colors.black.withValues(alpha: 0.06),
+            color: Theme.of(context).colorScheme.outlineVariant,
           ),
         ),
       ],
@@ -490,8 +496,8 @@ class _PositionedOperationsJobBlock extends StatelessWidget {
           border: Border(left: BorderSide(color: color, width: 4)),
         ),
         child: DefaultTextStyle(
-          style: const TextStyle(
-            color: Colors.black87,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 11,
             height: 1.18,
             fontWeight: FontWeight.w800,

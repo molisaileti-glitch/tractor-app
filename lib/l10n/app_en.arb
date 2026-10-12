@@ -1,0 +1,25 @@
+{
+  "@@locale": "en",
+  "settings": "Settings",
+  "account": "Account",
+  "appearance": "Appearance",
+  "darkMode": "Dark mode",
+  "darkModeDescription": "Use the dark KwanzaTrack theme",
+  "language": "Language",
+  "english": "English",
+  "swahili": "Kiswahili",
+  "profile": "Profile",
+  "assignedJobs": "Assigned jobs",
+  "activeAndCompleted": "{active} active, {completed} completed",
+  "@activeAndCompleted": {
+    "placeholders": {
+      "active": {"type": "int"},
+      "completed": {"type": "int"}
+    }
+  },
+  "dataStatus": "Data status",
+  "updatingInformation": "Updating your information...",
+  "informationUpToDate": "Your information is up to date.",
+  "operator": "Tractor operator",
+  "unionStaff": "Union staff"
+}

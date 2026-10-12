@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/presentation/components/components.dart';
+import '../../../../components/components.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/remote/auth_remote_data_source.dart';
 import '../../data/repositories/auth_local_repository.dart';
@@ -52,7 +52,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(24, 14, 24, bottomInset + 32),
@@ -63,9 +63,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _BackButton(onPressed: widget.onBack),
-                  const SizedBox(height: 88),
+                  const SizedBox(height: 58),
                   const _BrandLockup(),
-                  const SizedBox(height: 42),
+                  const SizedBox(height: 34),
                   _LoginPanel(
                     identifierController: _identifierController,
                     passwordController: _passwordController,
@@ -252,7 +252,7 @@ class _LoginPanel extends StatelessWidget {
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.w700,
-            color: AppColors.text,
+            color: AppColors.adaptiveText(context),
             height: 1.08,
           ),
         ),
@@ -261,7 +261,7 @@ class _LoginPanel extends StatelessWidget {
           'Sign in to continue',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Colors.black.withValues(alpha: 0.62),
+            color: AppColors.adaptiveMutedText(context),
             height: 1.35,
           ),
         ),
@@ -310,7 +310,7 @@ class _LoginPanel extends StatelessWidget {
         AppGlowButton(
           onPressed: onSendOtp,
           loading: isLoading,
-          label: 'Sign In',
+          label: 'Send OTP',
           trailing: Icons.arrow_forward,
         ),
       ],
@@ -323,31 +323,41 @@ class _BrandLockup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: AppColors.fieldGreen.withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(999),
+    return SizedBox(
+      width: double.infinity,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 118,
+            height: 92,
+            child: Image.asset(
+              'assets/images/login_logo.png',
+              fit: BoxFit.contain,
+              semanticLabel: 'Kwanza Track logo',
+            ),
           ),
-          child: const Icon(
-            Icons.agriculture,
-            color: AppColors.fieldGreen,
-            size: 19,
+          const SizedBox(height: 13),
+          Text(
+            'Kwanza Track',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-        ),
-        const SizedBox(width: 10),
-        Text(
-          'Kwanza Track',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            color: AppColors.text,
-            fontWeight: FontWeight.w700,
+          const SizedBox(height: 4),
+          Text(
+            'Mechanization operations',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurfaceVariant.withValues(alpha: 0.82),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -363,8 +373,10 @@ class _BackButton extends StatelessWidget {
       tooltip: 'Back',
       onPressed: onPressed,
       icon: const Icon(Icons.arrow_back),
-      color: AppColors.text,
-      style: IconButton.styleFrom(backgroundColor: Colors.white),
+      color: AppColors.adaptiveText(context),
+      style: IconButton.styleFrom(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+      ),
     );
   }
 }
