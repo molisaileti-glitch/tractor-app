@@ -8,10 +8,9 @@ import '../../../farmer/domain/entities/service_request.dart';
 import '../../domain/entities/operator_job.dart';
 
 class OperatorLocalRepository extends ChangeNotifier {
-  OperatorLocalRepository.seeded({
-    KwanzaTrackMobileApiClient? mobileApiClient,
-  }) : mobileApiClient = mobileApiClient ?? const KwanzaTrackMobileApiClient(),
-       _jobs = [];
+  OperatorLocalRepository.seeded({KwanzaTrackMobileApiClient? mobileApiClient})
+    : mobileApiClient = mobileApiClient ?? const KwanzaTrackMobileApiClient(),
+      _jobs = [];
 
   final KwanzaTrackMobileApiClient mobileApiClient;
   final List<OperatorJob> _jobs;
@@ -46,15 +45,17 @@ class OperatorLocalRepository extends ChangeNotifier {
   List<OperatorJob> get pastAssignments {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final items = _jobs.where((job) {
-      if (job.isComplete) return true;
-      final stillUnderway =
-          job.status == OperatorJobStatus.enRoute ||
-          job.status == OperatorJobStatus.arrived ||
-          job.status == OperatorJobStatus.inProgress;
-      return job.scheduledAt.isBefore(today) && !stillUnderway;
-    }).toList()
-      ..sort((first, second) => second.scheduledAt.compareTo(first.scheduledAt));
+    final items =
+        _jobs.where((job) {
+          if (job.isComplete) return true;
+          final stillUnderway =
+              job.status == OperatorJobStatus.enRoute ||
+              job.status == OperatorJobStatus.arrived ||
+              job.status == OperatorJobStatus.inProgress;
+          return job.scheduledAt.isBefore(today) && !stillUnderway;
+        }).toList()..sort(
+          (first, second) => second.scheduledAt.compareTo(first.scheduledAt),
+        );
     return List.unmodifiable(items);
   }
 
@@ -90,12 +91,7 @@ class OperatorLocalRepository extends ChangeNotifier {
       final to = _dateOnly(today.add(const Duration(days: 7)));
       final responses = await Future.wait<Map<String, Object?>>([
         mobileApiClient.me(token: token),
-        mobileApiClient.calendar(
-          token: token,
-          from: from,
-          to: to,
-          mine: true,
-        ),
+        mobileApiClient.calendar(token: token, from: from, to: to, mine: true),
         mobileApiClient.jobs(
           token: token,
           from: from,
@@ -525,7 +521,8 @@ class OperatorLocalRepository extends ChangeNotifier {
                   acceptedByOperator: existing.acceptedByOperator,
                   trackPoints: existing.trackPoints,
                 );
-        }).toList();
+        })
+        .toList();
     _jobs
       ..clear()
       ..addAll(remoteJobs);
@@ -534,7 +531,10 @@ class OperatorLocalRepository extends ChangeNotifier {
   Future<void> _refreshJobPaths(String token) async {
     for (final job in List<OperatorJob>.from(_jobs)) {
       try {
-        final response = await mobileApiClient.jobPath(token: token, jobId: job.id);
+        final response = await mobileApiClient.jobPath(
+          token: token,
+          jobId: job.id,
+        );
         final points = _pathPointsFromResponse(response);
         if (points.isEmpty) continue;
         _replace(job.id, job.copyWith(trackPoints: points), notify: false);
@@ -658,23 +658,55 @@ class OperatorLocalRepository extends ChangeNotifier {
   }
 
   FarmPlot _plotFromJson(Map<String, Object?> plot, String jobId) {
-    final centroid = _map(plot['centroid']);
-    final lat = _asDouble(centroid['latitude']);
-    final lng = _asDouble(centroid['longitude']);
-    final areaHa = _asDouble(plot['area_ha']) ??
+    final boundaryPoints = _plotBoundaryPoints(plot);
+    final areaHa =
+        _asDouble(plot['area_ha']) ??
         ((_asDouble(plot['area_acres']) ?? 0) * 0.404686);
     return FarmPlot(
       id: _text(plot, const ['id', 'external_ref']) ?? 'plot-$jobId',
       name: _text(plot, const ['name']) ?? 'Farm plot',
       areaHectares: areaHa,
       location: _text(plot, const ['village', 'ward', 'district']) ?? '',
-      boundaryRegistered: plot['mapped'] == true,
-      boundaryPoints: lat == null || lng == null
-          ? const []
-          : [
-              BoundaryPoint(label: 'Plot', latitude: lat, longitude: lng),
-            ],
+      boundaryRegistered: boundaryPoints.length >= 3 || plot['mapped'] == true,
+      boundaryPoints: boundaryPoints,
     );
+  }
+
+  List<BoundaryPoint> _plotBoundaryPoints(Map<String, Object?> plot) {
+    final boundary = plot['boundary'];
+    if (boundary is List) {
+      final points = boundary.indexed
+          .map((entry) {
+            final point = _map(entry.$2);
+            final latitude = _asDouble(point['latitude'] ?? point['lat']);
+            final longitude = _asDouble(
+              point['longitude'] ?? point['lng'] ?? point['lon'],
+            );
+            if (latitude == null || longitude == null) return null;
+            return BoundaryPoint(
+              label: 'Boundary ${entry.$1 + 1}',
+              latitude: latitude,
+              longitude: longitude,
+            );
+          })
+          .whereType<BoundaryPoint>()
+          .toList(growable: false);
+      if (points.length >= 3) return points;
+    }
+
+    final centroid = _map(plot['centroid']);
+    final latitude = _asDouble(centroid['latitude'] ?? centroid['lat']);
+    final longitude = _asDouble(
+      centroid['longitude'] ?? centroid['lng'] ?? centroid['lon'],
+    );
+    if (latitude == null || longitude == null) return const [];
+    return [
+      BoundaryPoint(
+        label: 'Plot center',
+        latitude: latitude,
+        longitude: longitude,
+      ),
+    ];
   }
 
   Future<bool> _runJobAction({
@@ -742,25 +774,28 @@ class OperatorLocalRepository extends ChangeNotifier {
     final points = data is List
         ? data
         : data is Map
-        ? (_stringKeyedMap(data)['points'] as Object?)
+        ? _stringKeyedMap(data)['points']
         : null;
     if (points is! List) return const [];
 
-    return points.whereType<Map>().map((item) {
-      final map = _stringKeyedMap(item);
-      final latitude = _asDouble(
-        map['latitude'] ?? map['lat'] ?? map['y'],
-      );
-      final longitude = _asDouble(
-        map['longitude'] ?? map['lng'] ?? map['lon'] ?? map['x'],
-      );
-      if (latitude == null || longitude == null) return null;
-      return BoundaryPoint(
-        label: _text(map, const ['recorded_at', 'time', 'timestamp']) ?? 'Fix',
-        latitude: latitude,
-        longitude: longitude,
-      );
-    }).whereType<BoundaryPoint>().toList(growable: false);
+    return points
+        .whereType<Map>()
+        .map((item) {
+          final map = _stringKeyedMap(item);
+          final latitude = _asDouble(map['latitude'] ?? map['lat'] ?? map['y']);
+          final longitude = _asDouble(
+            map['longitude'] ?? map['lng'] ?? map['lon'] ?? map['x'],
+          );
+          if (latitude == null || longitude == null) return null;
+          return BoundaryPoint(
+            label:
+                _text(map, const ['recorded_at', 'time', 'timestamp']) ?? 'Fix',
+            latitude: latitude,
+            longitude: longitude,
+          );
+        })
+        .whereType<BoundaryPoint>()
+        .toList(growable: false);
   }
 
   OperatorStartCheckResult _startCheckFromJson(Map<String, Object?> json) {
@@ -861,8 +896,10 @@ class OperatorLocalRepository extends ChangeNotifier {
       'accepted' => OperatorJobStatus.assigned,
       'arrived' => OperatorJobStatus.arrived,
       'in_progress' || 'started' || 'working' => OperatorJobStatus.inProgress,
-      'completed' || 'awaiting_verification' || 'verified' || 'closed' =>
-        OperatorJobStatus.completedPendingConfirmation,
+      'completed' ||
+      'awaiting_verification' ||
+      'verified' ||
+      'closed' => OperatorJobStatus.completedPendingConfirmation,
       _ => OperatorJobStatus.scheduled,
     };
   }

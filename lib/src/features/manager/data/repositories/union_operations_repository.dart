@@ -122,6 +122,7 @@ class UnionOperationsRepository extends ChangeNotifier {
           _metaCount(responses[4]) ?? _dataList(responses[4]).length;
       _applyRequestsResponse(responses[5], replace: true);
       await _refreshAllRequestBuckets(token);
+      await _enrichRequestBoundaries(token);
       _applyTractorsResponse(responses[7]);
       _applyTractorsResponse(responses[6]);
       _applyOverridesResponse(responses[8]);
@@ -290,6 +291,7 @@ class UnionOperationsRepository extends ChangeNotifier {
         );
         _applyRequestsResponse(response, replace: true);
       }
+      await _enrichRequestBoundaries(token);
       notifyListeners();
     } on KwanzaTrackApiException catch (error) {
       _mechanizationActionError = error.message;
@@ -307,7 +309,10 @@ class UnionOperationsRepository extends ChangeNotifier {
         requestId: id,
       );
       final request = _requestFromJson(_dataMap(response));
-      if (request != null) _upsertRequest(request);
+      if (request != null) {
+        _upsertRequest(request);
+        await _enrichRequestBoundaries(token, requestIds: {request.id});
+      }
       notifyListeners();
     } on KwanzaTrackApiException catch (error) {
       _mechanizationActionError = error.message;
@@ -1158,7 +1163,13 @@ class UnionOperationsRepository extends ChangeNotifier {
     final farmerJson = _map(json['farmer']);
     final plotJson = _map(json['plot']);
     final serviceTypeJson = _map(json['service_type']);
-    final centroid = _map(plotJson['centroid']);
+    final boundaryPoints = _plotBoundaryPoints(plotJson);
+    _logReceivedPlotBoundary(
+      requestId: id,
+      requestReference: _text(json, const ['reference', 'external_ref']),
+      plot: plotJson,
+      parsedPoints: boundaryPoints,
+    );
     final areaHa = _number(plotJson, const ['area_ha']);
     final areaAcres = _number(plotJson, const ['area_acres']);
     final preferredDate =
@@ -1173,6 +1184,8 @@ class UnionOperationsRepository extends ChangeNotifier {
           _text(json, const ['farmer_name']) ??
           'Farmer',
       farmerPhone: _text(farmerJson, const ['phone']),
+      farmerId: _text(farmerJson, const ['id']),
+      plotExternalRef: _text(plotJson, const ['external_ref']),
       serviceType: _serviceType(
         _text(serviceTypeJson, const ['code', 'name']) ??
             _text(json, const ['service_type']),
@@ -1189,18 +1202,10 @@ class UnionOperationsRepository extends ChangeNotifier {
           _text(farmerJson, const ['district']),
           _text(farmerJson, const ['region']),
         ].whereType<String>().join(', '),
-        boundaryRegistered: _asBool(plotJson['mapped']) ?? false,
-        boundaryPoints:
-            _number(centroid, const ['latitude']) == null ||
-                _number(centroid, const ['longitude']) == null
-            ? const []
-            : [
-                BoundaryPoint(
-                  label: 'Centroid',
-                  latitude: _number(centroid, const ['latitude'])!.toDouble(),
-                  longitude: _number(centroid, const ['longitude'])!.toDouble(),
-                ),
-              ],
+        boundaryRegistered:
+            boundaryPoints.length >= 3 ||
+            (_asBool(plotJson['mapped']) ?? false),
+        boundaryPoints: boundaryPoints,
       ),
       preferredDate: preferredDate,
       status: _requestStatus(json['status']?.toString()),
@@ -1243,7 +1248,7 @@ class UnionOperationsRepository extends ChangeNotifier {
     final estimatedHours = windowEnd == null
         ? 1
         : windowEnd.difference(scheduledAt).inMinutes ~/ 60;
-    final centroid = _map(plotJson['centroid']);
+    final boundaryPoints = _plotBoundaryPoints(plotJson);
     final areaHa = _number(plotJson, const ['area_ha']);
     final areaAcres = _number(plotJson, const ['area_acres']);
 
@@ -1276,18 +1281,10 @@ class UnionOperationsRepository extends ChangeNotifier {
           _text(plotJson, const ['district']),
           _text(plotJson, const ['region']),
         ].whereType<String>().join(', '),
-        boundaryRegistered: _asBool(plotJson['mapped']) ?? false,
-        boundaryPoints:
-            _number(centroid, const ['latitude']) == null ||
-                _number(centroid, const ['longitude']) == null
-            ? const []
-            : [
-                BoundaryPoint(
-                  label: 'Centroid',
-                  latitude: _number(centroid, const ['latitude'])!.toDouble(),
-                  longitude: _number(centroid, const ['longitude'])!.toDouble(),
-                ),
-              ],
+        boundaryRegistered:
+            boundaryPoints.length >= 3 ||
+            (_asBool(plotJson['mapped']) ?? false),
+        boundaryPoints: boundaryPoints,
       ),
       tractor: TractorAsset(
         id: tractorId,
@@ -1533,6 +1530,151 @@ class UnionOperationsRepository extends ChangeNotifier {
   Map<String, Object?> _map(Object? value) {
     if (value is Map) return _stringKeyedMap(value);
     return const {};
+  }
+
+  List<BoundaryPoint> _plotBoundaryPoints(Map<String, Object?> plot) {
+    final boundary = plot['boundary'];
+    if (boundary is List) {
+      final points = boundary.indexed
+          .map((entry) {
+            final point = _map(entry.$2);
+            final latitude = _number(point, const ['latitude', 'lat']);
+            final longitude = _number(point, const ['longitude', 'lng', 'lon']);
+            if (latitude == null || longitude == null) return null;
+            return BoundaryPoint(
+              label: 'Boundary ${entry.$1 + 1}',
+              latitude: latitude.toDouble(),
+              longitude: longitude.toDouble(),
+            );
+          })
+          .whereType<BoundaryPoint>()
+          .toList(growable: false);
+      if (points.length >= 3) return points;
+    }
+
+    final centroid = _map(plot['centroid']);
+    final latitude = _number(centroid, const ['latitude', 'lat']);
+    final longitude = _number(centroid, const ['longitude', 'lng', 'lon']);
+    if (latitude == null || longitude == null) return const [];
+    return [
+      BoundaryPoint(
+        label: 'Plot center',
+        latitude: latitude.toDouble(),
+        longitude: longitude.toDouble(),
+      ),
+    ];
+  }
+
+  Future<void> _enrichRequestBoundaries(
+    String token, {
+    Set<String>? requestIds,
+  }) async {
+    final candidates = _requests.where(
+      (request) =>
+          request.plot.boundaryPoints.length < 3 &&
+          request.farmerId != null &&
+          (requestIds == null || requestIds.contains(request.id)),
+    );
+    final farmerIds = candidates
+        .map((request) => request.farmerId!)
+        .toSet()
+        .toList(growable: false);
+
+    for (final farmerId in farmerIds) {
+      try {
+        final response = await mobileApiClient.farmer(
+          token: token,
+          farmerId: farmerId,
+        );
+        final plots = _dataMap(response)['plots'];
+        if (plots is! List) continue;
+
+        final registryPlots = plots
+            .whereType<Map>()
+            .map(_stringKeyedMap)
+            .toList(growable: false);
+        for (var index = 0; index < _requests.length; index++) {
+          final request = _requests[index];
+          if (request.farmerId != farmerId ||
+              request.plot.boundaryPoints.length >= 3 ||
+              (requestIds != null && !requestIds.contains(request.id))) {
+            continue;
+          }
+
+          final matchingPlot = registryPlots.cast<Map<String, Object?>?>().firstWhere(
+            (plot) =>
+                _text(plot!, const ['id']) == request.plot.id ||
+                (_text(plot, const ['external_ref']) != null &&
+                    _text(plot, const ['external_ref']) ==
+                        request.plotExternalRef),
+            orElse: () => null,
+          );
+          if (matchingPlot == null) continue;
+
+          final boundary = _plotBoundaryPoints(matchingPlot);
+          if (boundary.length < 3) continue;
+          _requests[index] = request.copyWith(
+            plot: FarmPlot(
+              id: request.plot.id,
+              name: request.plot.name,
+              areaHectares: request.plot.areaHectares,
+              location: request.plot.location,
+              boundaryRegistered: true,
+              boundaryPoints: boundary,
+            ),
+          );
+          if (kDebugMode) {
+            debugPrint(
+              '[Mechanization Request] Enriched ${request.id} from farmer registry: '
+              '${boundary.length} boundary points.',
+            );
+          }
+        }
+      } on KwanzaTrackApiException catch (error) {
+        if (kDebugMode) {
+          debugPrint(
+            '[Mechanization Request] Could not load farmer $farmerId plots: '
+            '${error.message}',
+          );
+        }
+      }
+    }
+  }
+
+  void _logReceivedPlotBoundary({
+    required String requestId,
+    required String? requestReference,
+    required Map<String, Object?> plot,
+    required List<BoundaryPoint> parsedPoints,
+  }) {
+    if (!kDebugMode) return;
+
+    final rawBoundary = plot['boundary'];
+    final rawPointCount = rawBoundary is List ? rawBoundary.length : 0;
+    final centroid = _map(plot['centroid']);
+    debugPrint(
+      '[Mechanization Request] Received '
+      '${requestReference ?? requestId}: plot=${plot['name'] ?? plot['id'] ?? 'unknown'}, '
+      'mapped=${plot['mapped']}, boundary_field=${rawBoundary == null ? 'missing' : rawBoundary.runtimeType}, '
+      'raw_boundary_points=$rawPointCount, parsed_points=${parsedPoints.length}, '
+      'centroid=${centroid.isEmpty ? 'missing' : centroid}',
+    );
+
+    if (rawPointCount < 3) {
+      debugPrint(
+        '[Mechanization Request] WARNING ${requestReference ?? requestId}: '
+        'KwanzaTrack did not return a drawable plot boundary (minimum 3 points).',
+      );
+      return;
+    }
+
+    for (var index = 0; index < parsedPoints.length; index++) {
+      final point = parsedPoints[index];
+      debugPrint(
+        '[Mechanization Request] Boundary ${index + 1}: '
+        'latitude=${point.latitude}, longitude=${point.longitude}',
+      );
+    }
   }
 
   Map<String, Object?> _stringKeyedMap(Map<dynamic, dynamic> value) {

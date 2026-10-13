@@ -581,10 +581,7 @@ class OperationsRequestDetailScreen extends StatelessWidget {
                                   value: requestNotes.season!,
                                 ),
                               if (requestNotes.crop != null)
-                                _Fact(
-                                  label: 'Crop',
-                                  value: requestNotes.crop!,
-                                ),
+                                _Fact(label: 'Crop', value: requestNotes.crop!),
                               const Divider(height: 26),
                               if (requestNotes.other.isNotEmpty) ...[
                                 Text(
@@ -1277,6 +1274,12 @@ class _RequestPlotMap extends StatelessWidget {
         target: center,
         zoom: points.length >= 3 ? 17 : 18.5,
       ),
+      onMapCreated: (controller) {
+        if (points.length < 2) return;
+        controller.moveCamera(
+          CameraUpdate.newLatLngBounds(_boundsFor(points), 48),
+        );
+      },
       mapType: MapType.hybrid,
       markers: {
         Marker(
@@ -1319,6 +1322,23 @@ class _RequestPlotMap extends StatelessWidget {
         points.fold<double>(0, (sum, point) => sum + point.longitude) /
         points.length;
     return LatLng(latitude, longitude);
+  }
+
+  LatLngBounds _boundsFor(List<LatLng> points) {
+    var south = points.first.latitude;
+    var north = points.first.latitude;
+    var west = points.first.longitude;
+    var east = points.first.longitude;
+    for (final point in points.skip(1)) {
+      if (point.latitude < south) south = point.latitude;
+      if (point.latitude > north) north = point.latitude;
+      if (point.longitude < west) west = point.longitude;
+      if (point.longitude > east) east = point.longitude;
+    }
+    return LatLngBounds(
+      southwest: LatLng(south, west),
+      northeast: LatLng(north, east),
+    );
   }
 }
 

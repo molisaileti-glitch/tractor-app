@@ -129,6 +129,8 @@ class OperationsServiceRequest {
     required this.preferredDate,
     required this.status,
     this.farmerPhone,
+    this.farmerId,
+    this.plotExternalRef,
     this.notes,
     this.rejectionReason,
     this.rejectionNotes,
@@ -141,12 +143,15 @@ class OperationsServiceRequest {
   final DateTime preferredDate;
   final OperationsRequestStatus status;
   final String? farmerPhone;
+  final String? farmerId;
+  final String? plotExternalRef;
   final String? notes;
   final String? rejectionReason;
   final String? rejectionNotes;
 
   OperationsServiceRequest copyWith({
     OperationsRequestStatus? status,
+    FarmPlot? plot,
     String? rejectionReason,
     String? rejectionNotes,
   }) {
@@ -154,10 +159,12 @@ class OperationsServiceRequest {
       id: id,
       farmerName: farmerName,
       serviceType: serviceType,
-      plot: plot,
+      plot: plot ?? this.plot,
       preferredDate: preferredDate,
       status: status ?? this.status,
       farmerPhone: farmerPhone,
+      farmerId: farmerId,
+      plotExternalRef: plotExternalRef,
       notes: notes,
       rejectionReason: rejectionReason ?? this.rejectionReason,
       rejectionNotes: rejectionNotes ?? this.rejectionNotes,
