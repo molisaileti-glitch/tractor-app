@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../../core/network/kwanza_track_endpoints.dart';
 import '../models/auth_challenge_model.dart';
 import '../models/auth_verified_session_model.dart';
 
@@ -27,7 +28,7 @@ class AuthRemoteException implements Exception {
 }
 
 class AuthRemoteDataSource {
-  const AuthRemoteDataSource({this.baseUrl = 'http://161.35.65.228'});
+  const AuthRemoteDataSource({this.baseUrl = KwanzaTrackEndpoints.baseUrl});
 
   final String baseUrl;
 

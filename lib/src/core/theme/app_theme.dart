@@ -96,6 +96,10 @@ class AppTheme {
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
+      timePickerTheme: _timePickerTheme(
+        scheme.copyWith(primary: seed),
+        Colors.white,
+      ),
       cardTheme: CardThemeData(
         color: Colors.white,
         elevation: 0,
@@ -272,6 +276,7 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
+      timePickerTheme: _timePickerTheme(scheme, AppColors.darkSurfaceHigh),
       cardTheme: CardThemeData(
         color: AppColors.darkSurface,
         surfaceTintColor: Colors.transparent,
@@ -334,6 +339,27 @@ class AppTheme {
           borderSide: const BorderSide(color: seed, width: 1.6),
         ),
       ),
+    );
+  }
+
+  static TimePickerThemeData _timePickerTheme(
+    ColorScheme scheme,
+    Color backgroundColor,
+  ) {
+    return TimePickerThemeData(
+      backgroundColor: backgroundColor,
+      dialHandColor: AppColors.fieldGreen,
+      dayPeriodColor: WidgetStateColor.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? AppColors.fieldGreen
+            : scheme.surfaceContainerHighest,
+      ),
+      dayPeriodTextColor: WidgetStateColor.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? Colors.white
+            : scheme.onSurface,
+      ),
+      dayPeriodBorderSide: const BorderSide(color: AppColors.fieldGreen),
     );
   }
 }

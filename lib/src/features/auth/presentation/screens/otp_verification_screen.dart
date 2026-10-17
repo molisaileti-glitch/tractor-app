@@ -85,6 +85,9 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   }
 
   Widget _otpBox({required int index}) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return TextField(
       key: ValueKey('otp-digit-$index'),
       controller: _controllers[index],
@@ -96,18 +99,25 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         LengthLimitingTextInputFormatter(1),
       ],
       style: TextStyle(
-        color: AppColors.adaptiveText(context),
+        color: isDark ? AppColors.darkText : AppColors.text,
         fontWeight: FontWeight.w900,
         fontSize: 20,
       ),
+      cursorColor: AppColors.fieldGreen,
       decoration: InputDecoration(
         counterText: '',
         contentPadding: const EdgeInsets.symmetric(vertical: 13),
         filled: true,
-        fillColor: const Color(0xFFF4F5F3),
+        fillColor: isDark
+            ? AppColors.darkSurface
+            : const Color(0xFFF4F5F3),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide.none,
+          borderSide: BorderSide(
+            color: isDark
+                ? theme.colorScheme.outline
+                : Colors.transparent,
+          ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),

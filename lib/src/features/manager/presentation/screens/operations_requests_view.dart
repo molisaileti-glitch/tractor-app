@@ -354,7 +354,7 @@ class _RequestPreviewCard extends StatelessWidget {
           const SizedBox(height: 16),
           _MiniFact(
             icon: Icons.calendar_today_outlined,
-            text: formatDate(request.preferredDate),
+            text: 'Farmer preferred: ${formatDate(request.preferredDate)}',
           ),
           const SizedBox(height: 8),
           _MiniFact(
@@ -708,17 +708,27 @@ class OperationsRequestDetailScreen extends StatelessWidget {
       builder: (_) => AlertDialog(
         title: const Text('Request Approved'),
         content: const Text('Next step: schedule service.'),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Later'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _openSchedule(context, id);
-            },
-            child: const Text('Schedule Service'),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Later'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _openSchedule(context, id);
+                  },
+                  child: const Text('Schedule'),
+                ),
+              ),
+            ],
           ),
         ],
       ),

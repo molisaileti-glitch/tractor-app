@@ -110,6 +110,7 @@ class UnionOperationsRepository extends ChangeNotifier {
         mobileApiClient.requests(token: token, status: 'queue'),
         mobileApiClient.tractors(token: token, mine: true, live: true),
         mobileApiClient.tractors(token: token, mine: false),
+        mobileApiClient.operators(token: token),
         mobileApiClient.overrides(token: token),
         mobileApiClient.exceptions(token: token),
       ]);
@@ -117,7 +118,6 @@ class UnionOperationsRepository extends ChangeNotifier {
 
       _applyMeResponse(responses[0]);
       _dashboardData = _dataMap(responses[1]);
-      _applyCalendarResponse(responses[3]);
       _remoteBacklogCount =
           _metaCount(responses[4]) ?? _dataList(responses[4]).length;
       _applyRequestsResponse(responses[5], replace: true);
@@ -125,8 +125,10 @@ class UnionOperationsRepository extends ChangeNotifier {
       await _enrichRequestBoundaries(token);
       _applyTractorsResponse(responses[7]);
       _applyTractorsResponse(responses[6]);
-      _applyOverridesResponse(responses[8]);
-      _applyExceptionsResponse(responses[9]);
+      _applyOperatorsResponse(responses[8]);
+      _applyCalendarResponse(responses[3]);
+      _applyOverridesResponse(responses[9]);
+      _applyExceptionsResponse(responses[10]);
       _mechanizationSyncError = null;
     } on KwanzaTrackApiException catch (error) {
       if (generation == _syncGeneration) {
@@ -992,6 +994,18 @@ class UnionOperationsRepository extends ChangeNotifier {
     }
   }
 
+  void _applyOperatorsResponse(Map<String, Object?> response) {
+    final operators = _dataList(response)
+        .whereType<Map>()
+        .map((item) => _operatorFromJson(_stringKeyedMap(item)))
+        .whereType<OperatorProfile>()
+        .toList();
+
+    _operators
+      ..clear()
+      ..addAll(operators);
+  }
+
   void _applyOverridesResponse(Map<String, Object?> response) {
     final overrides = _dataList(response)
         .whereType<Map>()
@@ -1410,6 +1424,48 @@ class UnionOperationsRepository extends ChangeNotifier {
     );
   }
 
+  OperatorProfile? _operatorFromJson(Map<String, Object?> json) {
+    final user = _map(json['user']);
+    final id =
+        _text(json, const ['id', 'operator_id', 'user_id']) ??
+        _text(user, const ['id']);
+    final name =
+        _text(json, const ['name', 'operator_name', 'full_name']) ??
+        _text(user, const ['name', 'full_name']);
+    if (id == null || name == null) return null;
+
+    final status = _text(json, const [
+      'availability_status',
+      'status',
+      'operator_status',
+    ]);
+    final isActive =
+        _asBool(json['is_active']) ??
+        _asBool(json['active']) ??
+        _asBool(user['is_active']) ??
+        _asBool(user['active']);
+    final phone =
+        _text(json, const ['phone', 'phone_number']) ??
+        _text(user, const ['phone', 'phone_number']);
+    final licence = _text(json, const [
+      'license_number',
+      'licence_number',
+      'license_no',
+      'licence_no',
+    ]);
+    final noteParts = [
+      phone,
+      if (licence != null) 'Licence $licence',
+    ].whereType<String>().toList();
+
+    return OperatorProfile(
+      id: id,
+      name: name,
+      status: _operatorRegistryStatus(status, isActive: isActive),
+      note: noteParts.isEmpty ? null : noteParts.join(' - '),
+    );
+  }
+
   void _upsertTractor(TractorAsset tractor) {
     final index = _tractors.indexWhere((item) => item.id == tractor.id);
     if (index == -1) {
@@ -1820,6 +1876,24 @@ class UnionOperationsRepository extends ChangeNotifier {
     return switch (status) {
       JobStatus.cancelled || JobStatus.closed => OperatorStatus.available,
       _ => OperatorStatus.assigned,
+    };
+  }
+
+  OperatorStatus _operatorRegistryStatus(
+    String? value, {
+    required bool? isActive,
+  }) {
+    if (isActive == false) return OperatorStatus.unavailable;
+    final normalized = value?.toLowerCase().replaceAll('-', '_') ?? '';
+    return switch (normalized) {
+      'assigned' || 'busy' || 'on_job' || 'in_use' =>
+        OperatorStatus.assigned,
+      'inactive' ||
+      'unavailable' ||
+      'suspended' ||
+      'expired' ||
+      'disabled' => OperatorStatus.unavailable,
+      _ => OperatorStatus.available,
     };
   }
 

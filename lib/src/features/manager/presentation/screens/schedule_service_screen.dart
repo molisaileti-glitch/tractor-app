@@ -21,6 +21,7 @@ class ScheduleServiceScreen extends StatefulWidget {
 }
 
 class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
+  int _currentStep = 0;
   String? _tractorId;
   String? _operatorId;
   DateTime _date = DateTime.now();
@@ -31,21 +32,14 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
   RequestAvailabilityResult? _availability;
 
   @override
-  void initState() {
-    super.initState();
-    _tractorId = widget.repository.tractors
-        .where((tractor) => tractor.status.canSchedule)
-        .firstOrNull
-        ?.id;
-    _operatorId = widget.repository.operators
-        .where((operator) => operator.status.canSchedule)
-        .firstOrNull
-        ?.id;
-  }
-
-  @override
   Widget build(BuildContext context) {
     final request = widget.repository.requestById(widget.requestId);
+    final availableTractors = widget.repository.tractors
+        .where((tractor) => tractor.status.canSchedule)
+        .toList();
+    final availableOperators = widget.repository.operators
+        .where((operator) => operator.status.canSchedule)
+        .toList();
     return Scaffold(
       appBar: AppBar(title: const Text('Schedule Service')),
       body: SingleChildScrollView(
@@ -55,154 +49,302 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 820),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 OperationsCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        '${request.serviceType.label} for ${request.farmerName}',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '${request.serviceType.label} - ${request.plot.name} - ${request.plot.areaHectares.toStringAsFixed(1)} ha',
-                      ),
-                    ],
-                  ),
-                ),
-                const OperationsSectionTitle('1. SELECT TRACTOR'),
-                for (final tractor in widget.repository.tractors) ...[
-                  _TractorOption(
-                    tractor: tractor,
-                    selected: _tractorId == tractor.id,
-                    onTap: tractor.status.canSchedule
-                        ? () => setState(() {
-                            _tractorId = tractor.id;
-                            _availability = null;
-                          })
-                        : null,
-                  ),
-                  const SizedBox(height: 10),
-                ],
-                const OperationsSectionTitle('2. SELECT OPERATOR'),
-                for (final operator in widget.repository.operators) ...[
-                  _OperatorOption(
-                    operator: operator,
-                    selected: _operatorId == operator.id,
-                    onTap: operator.status.canSchedule
-                        ? () => setState(() {
-                            _operatorId = operator.id;
-                            _availability = null;
-                          })
-                        : null,
-                  ),
-                  const SizedBox(height: 10),
-                ],
-                const OperationsSectionTitle('3. SCHEDULE'),
-                OperationsCard(
-                  child: Column(
-                    children: [
-                      _ScheduleTile(
-                        label: 'Date',
-                        value: formatDate(_date),
-                        icon: Icons.calendar_month_outlined,
-                        onTap: _pickDate,
-                      ),
-                      const Divider(height: 24),
-                      _ScheduleTile(
-                        label: 'Time',
-                        value: _time.format(context),
-                        icon: Icons.schedule,
-                        onTap: _pickTime,
-                      ),
-                      const Divider(height: 24),
                       Row(
                         children: [
-                          const Expanded(child: Text('Estimated duration')),
-                          DropdownButton<int>(
-                            value: _duration,
-                            items: [2, 3, 4, 5, 6]
-                                .map(
-                                  (hours) => DropdownMenuItem(
-                                    value: hours,
-                                    child: Text('$hours hours'),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (value) =>
-                                setState(() => _duration = value ?? _duration),
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.primary.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              Icons.agriculture_outlined,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${request.serviceType.label} service',
+                                  style: Theme.of(context).textTheme.titleLarge,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Review the request before assigning resources',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
+                      const SizedBox(height: 18),
+                      const Divider(height: 1),
+                      const SizedBox(height: 14),
+                      _RequestSummaryRow(
+                        icon: Icons.person_outline,
+                        label: 'Farmer',
+                        value: request.farmerName,
+                      ),
+                      const SizedBox(height: 12),
+                      _RequestSummaryRow(
+                        icon: Icons.landscape_outlined,
+                        label: 'Plot',
+                        value: request.plot.name,
+                      ),
+                      const SizedBox(height: 12),
+                      _RequestSummaryRow(
+                        icon: Icons.straighten_outlined,
+                        label: 'Plot area',
+                        value:
+                            '${request.plot.areaHectares.toStringAsFixed(1)} ha',
+                      ),
+                      const SizedBox(height: 12),
+                      _RequestSummaryRow(
+                        icon: Icons.event_outlined,
+                        label: 'Preferred date',
+                        value: formatDate(request.preferredDate),
+                      ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 18),
-                OutlinedButton.icon(
-                  onPressed:
-                      _tractorId == null ||
-                          _operatorId == null ||
-                          _checkingAvailability
+                const SizedBox(height: 12),
+                AppHorizontalStepper(
+                  currentStep: _currentStep,
+                  canContinue: _currentStep == 0
+                      ? _tractorId != null
+                      : _operatorId != null,
+                  onStepTapped: (step) {
+                    final canOpen =
+                        step == 0 ||
+                        (step == 1 && _tractorId != null) ||
+                        (step == 2 &&
+                            _tractorId != null &&
+                            _operatorId != null);
+                    if (canOpen) setState(() => _currentStep = step);
+                  },
+                  onStepContinue: () {
+                    if (_currentStep == 0 && _tractorId != null) {
+                      setState(() => _currentStep = 1);
+                    } else if (_currentStep == 1 && _operatorId != null) {
+                      setState(() => _currentStep = 2);
+                    }
+                  },
+                  onStepBack: _currentStep == 0
                       ? null
-                      : _checkAvailability,
-                  icon: _checkingAvailability
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.event_available_outlined),
-                  label: Text(
-                    _checkingAvailability
-                        ? 'Checking availability...'
-                        : 'Check Availability',
-                  ),
-                ),
-                if (_availability != null) ...[
-                  const SizedBox(height: 10),
-                  OperationsCard(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          _availability!.isAvailable
-                              ? Icons.check_circle_outline
-                              : Icons.warning_amber_outlined,
-                          color: _availability!.isAvailable
-                              ? Theme.of(context).colorScheme.primary
-                              : Theme.of(context).colorScheme.error,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            _availability!.summary,
-                            style: const TextStyle(fontWeight: FontWeight.w800),
-                          ),
-                        ),
-                      ],
+                      : () => setState(() => _currentStep--),
+                  steps: [
+                    Step(
+                      title: const Text('Select tractor'),
+                      subtitle: Text(
+                        _tractorId == null
+                            ? 'Choose an available tractor'
+                            : 'Tractor selected',
+                      ),
+                      isActive: _currentStep >= 0,
+                      state: _tractorId == null
+                          ? StepState.indexed
+                          : StepState.complete,
+                      content: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (availableTractors.isEmpty)
+                            const AppEmptyState(
+                              icon: Icons.agriculture_outlined,
+                              title: 'No tractors available',
+                              message:
+                                  'Available tractors will appear here when they are ready for scheduling.',
+                            ),
+                          for (final tractor in availableTractors) ...[
+                            _SelectableResourceCard(
+                              selected: _tractorId == tractor.id,
+                              title:
+                                  tractor.assetNo ??
+                                  tractor.label ??
+                                  tractor.model,
+                              subtitle: tractor.model,
+                              supportingText: tractor.note,
+                              trailing: OperationsStatusChip.tractor(
+                                tractorStatus: tractor.status,
+                              ),
+                              onTap: () => setState(() {
+                                _tractorId = _tractorId == tractor.id
+                                    ? null
+                                    : tractor.id;
+                                _availability = null;
+                              }),
+                            ),
+                            const SizedBox(height: 10),
+                          ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-                const SizedBox(height: 18),
-                FilledButton.icon(
-                  onPressed:
-                      _tractorId == null || _operatorId == null || _submitting
-                      ? null
-                      : _confirmSchedule,
-                  icon: _submitting
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.check),
-                  label: Text(
-                    _submitting ? 'Scheduling...' : 'Confirm Schedule',
-                  ),
+                    Step(
+                      title: const Text('Select operator'),
+                      subtitle: Text(
+                        _operatorId == null
+                            ? 'Choose an available operator'
+                            : 'Operator selected',
+                      ),
+                      isActive: _currentStep >= 1,
+                      state: _operatorId == null
+                          ? StepState.indexed
+                          : StepState.complete,
+                      content: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (availableOperators.isEmpty)
+                            const AppEmptyState(
+                              icon: Icons.engineering_outlined,
+                              title: 'No operators available',
+                              message:
+                                  'Registered operators will appear here when they are available for scheduling.',
+                            ),
+                          for (final operator in availableOperators) ...[
+                            _SelectableResourceCard(
+                              selected: _operatorId == operator.id,
+                              title: operator.name,
+                              supportingText: operator.note,
+                              trailing: OperationsStatusChip.operator(
+                                operatorStatus: operator.status,
+                              ),
+                              onTap: () => setState(() {
+                                _operatorId = _operatorId == operator.id
+                                    ? null
+                                    : operator.id;
+                                _availability = null;
+                              }),
+                            ),
+                            const SizedBox(height: 10),
+                          ],
+                        ],
+                      ),
+                    ),
+                    Step(
+                      title: const Text('Schedule'),
+                      subtitle: const Text('Choose the service date and time'),
+                      isActive: _currentStep >= 2,
+                      content: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          OperationsCard(
+                            child: Column(
+                              children: [
+                                _ScheduleTile(
+                                  label: 'Date',
+                                  value: formatDate(_date),
+                                  icon: Icons.calendar_month_outlined,
+                                  onTap: _pickDate,
+                                ),
+                                const Divider(height: 24),
+                                _ScheduleTile(
+                                  label: 'Time',
+                                  value: _time.format(context),
+                                  icon: Icons.schedule,
+                                  onTap: _pickTime,
+                                ),
+                                const Divider(height: 24),
+                                Row(
+                                  children: [
+                                    const Expanded(
+                                      child: Text('Estimated duration'),
+                                    ),
+                                    DropdownButton<int>(
+                                      value: _duration,
+                                      items: [2, 3, 4, 5, 6]
+                                          .map(
+                                            (hours) => DropdownMenuItem(
+                                              value: hours,
+                                              child: Text('$hours hours'),
+                                            ),
+                                          )
+                                          .toList(),
+                                      onChanged: (value) => setState(() {
+                                        _duration = value ?? _duration;
+                                        _availability = null;
+                                      }),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          OutlinedButton.icon(
+                            onPressed: _checkingAvailability
+                                ? null
+                                : _checkAvailability,
+                            icon: _checkingAvailability
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.event_available_outlined),
+                            label: Text(
+                              _checkingAvailability
+                                  ? 'Checking availability...'
+                                  : 'Check Availability',
+                            ),
+                          ),
+                          if (_availability != null) ...[
+                            const SizedBox(height: 10),
+                            OperationsCard(
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(
+                                    _availability!.isAvailable
+                                        ? Icons.check_circle_outline
+                                        : Icons.warning_amber_outlined,
+                                    color: _availability!.isAvailable
+                                        ? Theme.of(context).colorScheme.primary
+                                        : Theme.of(context).colorScheme.error,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(_availability!.summary),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 14),
+                          FilledButton.icon(
+                            onPressed: _submitting ? null : _confirmSchedule,
+                            icon: _submitting
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.check),
+                            label: Text(
+                              _submitting
+                                  ? 'Scheduling...'
+                                  : 'Confirm Schedule',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -259,7 +401,8 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
   Future<void> _confirmSchedule() async {
     final availability = _availability ?? await _checkAvailability();
     if (!mounted) return;
-    if (availability != null && !availability.isAvailable) {
+    if (availability == null) return;
+    if (!availability.isAvailable) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(availability.summary)));
@@ -313,103 +456,118 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
   }
 }
 
-class _TractorOption extends StatelessWidget {
-  const _TractorOption({
-    required this.tractor,
-    required this.selected,
-    required this.onTap,
+class _RequestSummaryRow extends StatelessWidget {
+  const _RequestSummaryRow({
+    required this.icon,
+    required this.label,
+    required this.value,
   });
 
-  final TractorAsset tractor;
-  final bool selected;
-  final VoidCallback? onTap;
+  final IconData icon;
+  final String label;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
-    final disabled = onTap == null;
-    return Opacity(
-      opacity: disabled ? 0.58 : 1,
-      child: OperationsCard(
-        onTap: onTap,
-        child: Row(
-          children: [
-            Icon(
-              selected
-                  ? Icons.radio_button_checked
-                  : Icons.radio_button_unchecked,
-              color: selected
-                  ? Theme.of(context).colorScheme.primary
-                  : Colors.black45,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    tractor.assetNo ?? tractor.label ?? tractor.model,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  Text(tractor.model),
-                  if (tractor.note != null) Text(tractor.note!),
-                ],
-              ),
-            ),
-            OperationsStatusChip.tractor(tractorStatus: tractor.status),
-          ],
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: theme.colorScheme.onSurfaceVariant),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 112,
+          child: Text(label, style: theme.textTheme.bodyMedium),
         ),
-      ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
 
-class _OperatorOption extends StatelessWidget {
-  const _OperatorOption({
-    required this.operator,
+class _SelectableResourceCard extends StatelessWidget {
+  const _SelectableResourceCard({
     required this.selected,
+    required this.title,
     required this.onTap,
+    this.subtitle,
+    this.supportingText,
+    this.trailing,
   });
 
-  final OperatorProfile operator;
   final bool selected;
-  final VoidCallback? onTap;
+  final String title;
+  final VoidCallback onTap;
+  final String? subtitle;
+  final String? supportingText;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
-    final disabled = onTap == null;
-    return Opacity(
-      opacity: disabled ? 0.58 : 1,
-      child: OperationsCard(
+    final theme = Theme.of(context);
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(
+          color: selected
+              ? theme.colorScheme.primary
+              : theme.colorScheme.outlineVariant,
+          width: selected ? 1.6 : 1,
+        ),
+      ),
+      child: InkWell(
         onTap: onTap,
-        child: Row(
-          children: [
-            Icon(
-              selected
-                  ? Icons.radio_button_checked
-                  : Icons.radio_button_unchecked,
-              color: selected
-                  ? Theme.of(context).colorScheme.primary
-                  : Colors.black45,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    operator.name,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  if (operator.note != null) Text(operator.note!),
-                ],
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Icon(
+                selected
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_unchecked,
+                color: selected
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurfaceVariant,
               ),
-            ),
-            OperationsStatusChip.operator(operatorStatus: operator.status),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: theme.textTheme.titleMedium),
+                    if (subtitle?.trim().isNotEmpty == true) ...[
+                      const SizedBox(height: 2),
+                      Text(subtitle!, style: theme.textTheme.bodyMedium),
+                    ],
+                    if (supportingText?.trim().isNotEmpty == true) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        supportingText!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (trailing != null) ...[
+                const SizedBox(width: 10),
+                trailing!,
+              ],
+            ],
+          ),
         ),
       ),
     );

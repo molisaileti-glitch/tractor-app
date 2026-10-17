@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'kwanza_track_endpoints.dart';
+
 class KwanzaTrackApiException implements Exception {
   const KwanzaTrackApiException(this.message, {this.code, this.statusCode});
 
@@ -23,7 +25,7 @@ class KwanzaTrackApiException implements Exception {
 
 class KwanzaTrackMobileApiClient {
   const KwanzaTrackMobileApiClient({
-    this.baseUrl = 'http://161.35.65.228',
+    this.baseUrl = KwanzaTrackEndpoints.baseUrl,
     this.apiPrefix = '/api/v1/mech',
   });
 
