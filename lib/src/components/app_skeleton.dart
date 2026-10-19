@@ -24,6 +24,19 @@ class _AppSkeletonState extends State<AppSkeleton>
   )..repeat(reverse: true);
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (reduceMotion) {
+      _controller.stop();
+      _controller.value = 0.65;
+    } else if (!_controller.isAnimating) {
+      _controller.repeat(reverse: true);
+    }
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
@@ -32,9 +45,10 @@ class _AppSkeletonState extends State<AppSkeleton>
   @override
   Widget build(BuildContext context) {
     return FadeTransition(
-      opacity: Tween<double>(begin: 0.42, end: 0.9).animate(
-        CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-      ),
+      opacity: Tween<double>(
+        begin: 0.42,
+        end: 0.9,
+      ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut)),
       child: Container(
         width: widget.width,
         height: widget.height,
@@ -63,9 +77,7 @@ class AppCardSkeleton extends StatelessWidget {
             const AppSkeleton(height: 20, width: 150),
             const SizedBox(height: 16),
             for (var index = 0; index < rows; index++) ...[
-              AppSkeleton(
-                width: index == rows - 1 ? 190 : double.infinity,
-              ),
+              AppSkeleton(width: index == rows - 1 ? 190 : double.infinity),
               if (index < rows - 1) const SizedBox(height: 10),
             ],
           ],

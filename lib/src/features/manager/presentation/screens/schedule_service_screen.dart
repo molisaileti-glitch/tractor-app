@@ -21,6 +21,7 @@ class ScheduleServiceScreen extends StatefulWidget {
 }
 
 class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
+  final _implementController = TextEditingController();
   int _currentStep = 0;
   String? _tractorId;
   String? _operatorId;
@@ -30,6 +31,24 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
   bool _checkingAvailability = false;
   bool _submitting = false;
   RequestAvailabilityResult? _availability;
+
+  @override
+  void initState() {
+    super.initState();
+    final preferred = widget.repository
+        .requestById(widget.requestId)
+        .preferredDate;
+    final today = DateTime.now();
+    _date = preferred.isBefore(DateTime(today.year, today.month, today.day))
+        ? today
+        : preferred;
+  }
+
+  @override
+  void dispose() {
+    _implementController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -107,9 +126,10 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
                       const SizedBox(height: 12),
                       _RequestSummaryRow(
                         icon: Icons.straighten_outlined,
-                        label: 'Plot area',
-                        value:
-                            '${request.plot.areaHectares.toStringAsFixed(1)} ha',
+                        label: 'Requested work',
+                        value: request.requestedAcres == null
+                            ? 'Not provided'
+                            : '${request.requestedAcres!.toStringAsFixed(1)} acres',
                       ),
                       const SizedBox(height: 12),
                       _RequestSummaryRow(
@@ -117,6 +137,14 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
                         label: 'Preferred date',
                         value: formatDate(request.preferredDate),
                       ),
+                      if (request.preferredWindow != null) ...[
+                        const SizedBox(height: 12),
+                        _RequestSummaryRow(
+                          icon: Icons.schedule_outlined,
+                          label: 'Preferred time',
+                          value: request.preferredWindow!,
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -282,6 +310,19 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
                             ),
                           ),
                           const SizedBox(height: 14),
+                          TextField(
+                            controller: _implementController,
+                            textInputAction: TextInputAction.done,
+                            decoration: const InputDecoration(
+                              labelText: 'Implement',
+                              hintText: 'For example, disc plough 3-furrow',
+                              prefixIcon: Icon(Icons.handyman_outlined),
+                            ),
+                            onChanged: (_) => setState(() {
+                              _availability = null;
+                            }),
+                          ),
+                          const SizedBox(height: 14),
                           OutlinedButton.icon(
                             onPressed: _checkingAvailability
                                 ? null
@@ -316,9 +357,7 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
                                         : Theme.of(context).colorScheme.error,
                                   ),
                                   const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(_availability!.summary),
-                                  ),
+                                  Expanded(child: Text(_availability!.summary)),
                                 ],
                               ),
                             ),
@@ -391,8 +430,10 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
       _checkingAvailability = false;
     });
     if (result == null && widget.repository.mechanizationActionError != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(widget.repository.mechanizationActionError!)),
+      showAppSnackBar(
+        context,
+        message: widget.repository.mechanizationActionError!,
+        type: AppSnackType.error,
       );
     }
     return result;
@@ -403,9 +444,20 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
     if (!mounted) return;
     if (availability == null) return;
     if (!availability.isAvailable) {
-      ScaffoldMessenger.of(
+      showAppSnackBar(
         context,
-      ).showSnackBar(SnackBar(content: Text(availability.summary)));
+        message: availability.summary,
+        type: AppSnackType.warning,
+      );
+      return;
+    }
+    final implement = _implementController.text.trim();
+    if (implement.isEmpty) {
+      await showAppErrorDialog(
+        context,
+        title: 'Implement required',
+        message: 'Enter the implement that will be used for this service.',
+      );
       return;
     }
     final scheduledAt = DateTime(
@@ -430,29 +482,25 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
       operatorId: _operatorId!,
       scheduledAt: scheduledAt,
       estimatedHours: _duration,
+      implement: implement,
     );
     if (!mounted) return;
     setState(() => _submitting = false);
     if (widget.repository.mechanizationActionError != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(widget.repository.mechanizationActionError!)),
+      showAppSnackBar(
+        context,
+        message: widget.repository.mechanizationActionError!,
+        type: AppSnackType.error,
       );
       return;
     }
-    showDialog<void>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Service Scheduled'),
-        content: Text('Job $jobId is ready for dispatch on service day.'),
-        actions: [
-          FilledButton(
-            onPressed: () =>
-                Navigator.of(context).popUntil((route) => route.isFirst),
-            child: const Text('Done'),
-          ),
-        ],
-      ),
+    await showAppSuccessDialog(
+      context,
+      title: 'Service scheduled',
+      message: 'Job $jobId is ready for the assigned operator.',
     );
+    if (!mounted) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 }
 
@@ -562,10 +610,7 @@ class _SelectableResourceCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (trailing != null) ...[
-                const SizedBox(width: 10),
-                trailing!,
-              ],
+              if (trailing != null) ...[const SizedBox(width: 10), trailing!],
             ],
           ),
         ),

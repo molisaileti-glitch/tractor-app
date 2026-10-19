@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'kwanza_track_endpoints.dart';
+import '../constants/kwanza_track_endpoints.dart';
 
 class KwanzaTrackApiException implements Exception {
   const KwanzaTrackApiException(this.message, {this.code, this.statusCode});

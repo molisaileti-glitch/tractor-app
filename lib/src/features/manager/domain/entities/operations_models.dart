@@ -131,6 +131,8 @@ class OperationsServiceRequest {
     this.farmerPhone,
     this.farmerId,
     this.plotExternalRef,
+    this.requestedAcres,
+    this.preferredWindow,
     this.notes,
     this.rejectionReason,
     this.rejectionNotes,
@@ -145,6 +147,8 @@ class OperationsServiceRequest {
   final String? farmerPhone;
   final String? farmerId;
   final String? plotExternalRef;
+  final double? requestedAcres;
+  final String? preferredWindow;
   final String? notes;
   final String? rejectionReason;
   final String? rejectionNotes;
@@ -165,6 +169,8 @@ class OperationsServiceRequest {
       farmerPhone: farmerPhone,
       farmerId: farmerId,
       plotExternalRef: plotExternalRef,
+      requestedAcres: requestedAcres,
+      preferredWindow: preferredWindow,
       notes: notes,
       rejectionReason: rejectionReason ?? this.rejectionReason,
       rejectionNotes: rejectionNotes ?? this.rejectionNotes,
@@ -280,6 +286,26 @@ class OperatorProfile {
   final String name;
   final OperatorStatus status;
   final String? note;
+}
+
+class RegistryFarmer {
+  const RegistryFarmer({
+    required this.id,
+    required this.name,
+    this.externalRef,
+    this.phone,
+    this.location,
+    this.status,
+    this.plotCount = 0,
+  });
+
+  final String id;
+  final String name;
+  final String? externalRef;
+  final String? phone;
+  final String? location;
+  final String? status;
+  final int plotCount;
 }
 
 class OperationsJob {
@@ -427,6 +453,8 @@ class RequestAvailabilityResult {
       if (operatorConflicts.isNotEmpty)
         'operator: ${operatorConflicts.join(', ')}',
     ];
-    return issues.isEmpty ? 'Not available.' : 'Conflict on ${issues.join('; ')}';
+    return issues.isEmpty
+        ? 'Not available.'
+        : 'Conflict on ${issues.join('; ')}';
   }
 }

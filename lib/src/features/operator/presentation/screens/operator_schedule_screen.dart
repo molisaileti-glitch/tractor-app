@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../components/components.dart';
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/operator_local_repository.dart';
 import '../../domain/entities/operator_job.dart';
@@ -27,7 +28,9 @@ class _OperatorScheduleScreenState extends State<OperatorScheduleScreen> {
   @override
   Widget build(BuildContext context) {
     final jobs = widget.repository.jobs.toList()
-      ..sort((first, second) => first.scheduledAt.compareTo(second.scheduledAt));
+      ..sort(
+        (first, second) => first.scheduledAt.compareTo(second.scheduledAt),
+      );
     final selectedCount = jobs
         .where((job) => _sameDate(job.scheduledAt, _selectedDate))
         .length;
@@ -40,60 +43,60 @@ class _OperatorScheduleScreenState extends State<OperatorScheduleScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-                Row(
-                  children: [
-                    Text(
-                      formatDate(_selectedDate),
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.w900),
+              Row(
+                children: [
+                  Text(
+                    formatDate(_selectedDate),
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
                     ),
-                    IconButton(
-                      tooltip: 'Choose date',
-                      onPressed: _pickDate,
-                      icon: const Icon(Icons.keyboard_arrow_down),
+                  ),
+                  IconButton(
+                    tooltip: 'Choose date',
+                    onPressed: _pickDate,
+                    icon: const Icon(Icons.keyboard_arrow_down),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _OperatorWeekStrip(
+                selectedDate: _selectedDate,
+                onDateSelected: (date) => setState(() => _selectedDate = date),
+              ),
+              const SizedBox(height: 12),
+              OperatorCard(
+                child: Row(
+                  children: [
+                    const Icon(Icons.event_note_outlined),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        selectedCount == 0
+                            ? 'No assignments on ${formatShortDate(_selectedDate)}.'
+                            : '$selectedCount assignment${selectedCount == 1 ? '' : 's'} on ${formatShortDate(_selectedDate)}.',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                _OperatorWeekStrip(
-                  selectedDate: _selectedDate,
-                  onDateSelected: (date) =>
-                      setState(() => _selectedDate = date),
-                ),
-                const SizedBox(height: 12),
-                OperatorCard(
-                  child: Row(
-                    children: [
-                      const Icon(Icons.event_note_outlined),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          selectedCount == 0
-                              ? 'No assignments on ${formatShortDate(_selectedDate)}.'
-                              : '$selectedCount assignment${selectedCount == 1 ? '' : 's'} on ${formatShortDate(_selectedDate)}.',
-                          style: const TextStyle(fontWeight: FontWeight.w800),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _OperatorCalendarBoard(
-                  selectedDate: _selectedDate,
-                  jobs: jobs,
-                  onOpen: (job) => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => OperatorJobDetailScreen(
-                        repository: widget.repository,
-                        jobId: job.id,
-                      ),
+              ),
+              const SizedBox(height: 12),
+              _OperatorCalendarBoard(
+                selectedDate: _selectedDate,
+                jobs: jobs,
+                onOpen: (job) => Navigator.of(context).push(
+                  appPageRoute(
+                    builder: (_) => OperatorJobDetailScreen(
+                      repository: widget.repository,
+                      jobId: job.id,
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
+      ),
     );
   }
 
@@ -227,38 +230,38 @@ class _OperatorCalendarBoard extends StatelessWidget {
               for (final day in days)
                 Expanded(
                   child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                        color: _sameDate(day, selectedDate)
-                            ? Theme.of(context).colorScheme.primary
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            _weekday(day.weekday).toUpperCase(),
-                            style: TextStyle(
-                              color: _sameDate(day, selectedDate)
-                                  ? Colors.white
-                                  : Theme.of(
-                                      context,
-                                    ).colorScheme.onSurfaceVariant,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 12,
-                            ),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      color: _sameDate(day, selectedDate)
+                          ? Theme.of(context).colorScheme.primary
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          _weekday(day.weekday).toUpperCase(),
+                          style: TextStyle(
+                            color: _sameDate(day, selectedDate)
+                                ? Colors.white
+                                : Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
                           ),
-                          Text(
-                            '${day.day}',
-                            style: TextStyle(
-                              color: _sameDate(day, selectedDate)
-                                  ? Colors.white
-                                  : Theme.of(context).colorScheme.onSurface,
-                              fontWeight: FontWeight.w900,
-                            ),
+                        ),
+                        Text(
+                          '${day.day}',
+                          style: TextStyle(
+                            color: _sameDate(day, selectedDate)
+                                ? Colors.white
+                                : Theme.of(context).colorScheme.onSurface,
+                            fontWeight: FontWeight.w900,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
             ],
@@ -288,9 +291,7 @@ class _OperatorCalendarBoard extends StatelessWidget {
                         left: _timeColumnWidth + i * columnWidth,
                         child: Container(
                           width: 1,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.outlineVariant,
+                          color: Theme.of(context).colorScheme.outlineVariant,
                         ),
                       ),
                     for (final job in visibleJobs)
@@ -326,10 +327,14 @@ class _OperatorCalendarBoard extends StatelessWidget {
 
   int _maxHour(List<OperatorJob> visibleJobs) {
     if (visibleJobs.isEmpty) return 19;
-    final latest = visibleJobs.map((job) {
-      final end = job.scheduledEndAt ?? job.scheduledAt.add(const Duration(hours: 1));
-      return end.minute == 0 ? end.hour : end.hour + 1;
-    }).reduce((first, second) => first > second ? first : second);
+    final latest = visibleJobs
+        .map((job) {
+          final end =
+              job.scheduledEndAt ??
+              job.scheduledAt.add(const Duration(hours: 1));
+          return end.minute == 0 ? end.hour : end.hour + 1;
+        })
+        .reduce((first, second) => first > second ? first : second);
     return latest > 19 ? latest : 19;
   }
 
@@ -400,12 +405,14 @@ class _PositionedJobBlock extends StatelessWidget {
     final dayIndex = days.indexWhere((day) => _sameDate(day, job.scheduledAt));
     if (dayIndex == -1) return const SizedBox.shrink();
 
-    final end = job.scheduledEndAt ?? job.scheduledAt.add(const Duration(hours: 1));
+    final end =
+        job.scheduledEndAt ?? job.scheduledAt.add(const Duration(hours: 1));
     final startMinutes =
         (job.scheduledAt.hour - minHour) * 60 + job.scheduledAt.minute;
     final durationMinutes = end.difference(job.scheduledAt).inMinutes;
     final top = startMinutes / 60 * _OperatorCalendarBoard._rowHeight;
-    final height = (durationMinutes <= 0 ? 60 : durationMinutes) /
+    final height =
+        (durationMinutes <= 0 ? 60 : durationMinutes) /
         60 *
         _OperatorCalendarBoard._rowHeight;
     final left =
@@ -473,8 +480,8 @@ class _PositionedJobBlock extends StatelessWidget {
 
   Color _statusColor(BuildContext context, OperatorJobStatus status) {
     return switch (status) {
-      OperatorJobStatus.dispatched || OperatorJobStatus.assigned =>
-        const Color(0xFFF59E0B),
+      OperatorJobStatus.dispatched ||
+      OperatorJobStatus.assigned => const Color(0xFFF59E0B),
       OperatorJobStatus.enRoute => const Color(0xFFF97316),
       OperatorJobStatus.arrived => const Color(0xFF0EA5E9),
       OperatorJobStatus.inProgress => Theme.of(context).colorScheme.primary,
@@ -527,10 +534,7 @@ class _CurrentTimeLine extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: Container(
-              height: 1.5,
-              color: const Color(0xFFE11D48),
-            ),
+            child: Container(height: 1.5, color: const Color(0xFFE11D48)),
           ),
         ],
       ),

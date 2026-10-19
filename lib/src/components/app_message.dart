@@ -24,7 +24,10 @@ class AppMessage extends StatelessWidget {
         AppColors.successGreen,
         Icons.check_circle_outline,
       ),
-      AppMessageType.warning => (AppColors.warning, Icons.warning_amber_rounded),
+      AppMessageType.warning => (
+        AppColors.warning,
+        Icons.warning_amber_rounded,
+      ),
       AppMessageType.error => (AppColors.danger, Icons.error_outline),
     };
     return DecoratedBox(

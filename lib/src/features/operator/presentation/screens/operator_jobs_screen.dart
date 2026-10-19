@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../components/components.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/operator_local_repository.dart';
@@ -12,10 +13,12 @@ class OperatorJobsScreen extends StatelessWidget {
     super.key,
     required this.repository,
     required this.onOpenSchedule,
+    required this.onRefresh,
   });
 
   final OperatorLocalRepository repository;
   final VoidCallback onOpenSchedule;
+  final Future<void> Function() onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -34,97 +37,101 @@ class OperatorJobsScreen extends StatelessWidget {
         .where((job) => _sameDate(job.scheduledAt, DateTime.now()))
         .length;
     final activeCount = repository.jobs.where((job) => !job.isComplete).length;
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 620),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Good morning, $displayName',
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.w700),
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 620),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Good morning, $displayName',
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
                     ),
+                  ],
+                ),
+                if (repository.mechanizationSyncError != null) ...[
+                  const SizedBox(height: 12),
+                  _SyncNotice(
+                    message: repository.mechanizationSyncError!,
+                    onRetry: repository.refreshMechanizationData,
                   ),
                 ],
-              ),
-              if (repository.mechanizationSyncError != null) ...[
-                const SizedBox(height: 12),
-                _SyncNotice(
-                  message: repository.mechanizationSyncError!,
-                  onRetry: repository.refreshMechanizationData,
+                const SizedBox(height: 18),
+                _DashboardToolGrid(
+                  children: [
+                    _DashboardToolCard(
+                      value: '${repository.jobs.length}',
+                      label: 'Assigned jobs',
+                      detail: 'All assignments',
+                      icon: Icons.assignment_outlined,
+                      tint: const Color(0xFFEAF2FF),
+                      iconColor: const Color(0xFF2563EB),
+                    ),
+                    _DashboardToolCard(
+                      value: '$totalTodayJobs',
+                      label: 'Today',
+                      detail: 'Scheduled for this date',
+                      icon: Icons.today_outlined,
+                      tint: AppColors.mint,
+                      iconColor: AppColors.fieldGreen,
+                    ),
+                    _DashboardToolCard(
+                      value: '$activeCount',
+                      label: 'Active',
+                      detail: 'Not yet closed',
+                      icon: Icons.route_outlined,
+                      tint: const Color(0xFFFFF4E6),
+                      iconColor: AppColors.tractorOrange,
+                    ),
+                    _DashboardToolCard(
+                      value: '${repository.history.length}',
+                      label: 'Completed',
+                      detail: 'Finished jobs',
+                      icon: Icons.task_alt_outlined,
+                      tint: const Color(0xFFF0ECFF),
+                      iconColor: AppColors.purple,
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 22),
+                Row(
+                  children: [
+                    Text(
+                      'FOCUS JOB',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const Spacer(),
+                    TextButton.icon(
+                      onPressed: onOpenSchedule,
+                      icon: const Icon(Icons.calendar_month_outlined),
+                      label: const Text('View Schedule'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                if (focusJob == null)
+                  const _NoAssignedJobsCard()
+                else
+                  _OperatorJobCard(
+                    job: focusJob,
+                    emphasis: true,
+                    onView: () => _openJob(context, focusJob),
+                  ),
               ],
-              const SizedBox(height: 18),
-              _DashboardToolGrid(
-                children: [
-                  _DashboardToolCard(
-                    value: '${repository.jobs.length}',
-                    label: 'Assigned jobs',
-                    detail: 'All assignments',
-                    icon: Icons.assignment_outlined,
-                    tint: const Color(0xFFEAF2FF),
-                    iconColor: const Color(0xFF2563EB),
-                  ),
-                  _DashboardToolCard(
-                    value: '$totalTodayJobs',
-                    label: 'Today',
-                    detail: 'Scheduled for this date',
-                    icon: Icons.today_outlined,
-                    tint: AppColors.mint,
-                    iconColor: AppColors.fieldGreen,
-                  ),
-                  _DashboardToolCard(
-                    value: '$activeCount',
-                    label: 'Active',
-                    detail: 'Not yet closed',
-                    icon: Icons.route_outlined,
-                    tint: const Color(0xFFFFF4E6),
-                    iconColor: AppColors.tractorOrange,
-                  ),
-                  _DashboardToolCard(
-                    value: '${repository.history.length}',
-                    label: 'Completed',
-                    detail: 'Finished jobs',
-                    icon: Icons.task_alt_outlined,
-                    tint: const Color(0xFFF0ECFF),
-                    iconColor: AppColors.purple,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 22),
-              Row(
-                children: [
-                  Text(
-                    'FOCUS JOB',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const Spacer(),
-                  TextButton.icon(
-                    onPressed: onOpenSchedule,
-                    icon: const Icon(Icons.calendar_month_outlined),
-                    label: const Text('View Schedule'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              if (focusJob == null)
-                const _NoAssignedJobsCard()
-              else
-                _OperatorJobCard(
-                  job: focusJob,
-                  emphasis: true,
-                  onView: () => _openJob(context, focusJob),
-                ),
-            ],
+            ),
           ),
         ),
       ),
@@ -160,7 +167,7 @@ class OperatorJobsScreen extends StatelessWidget {
 
   void _openJob(BuildContext context, OperatorJob job) {
     Navigator.of(context).push(
-      MaterialPageRoute(
+      appPageRoute(
         builder: (_) =>
             OperatorJobDetailScreen(repository: repository, jobId: job.id),
       ),
@@ -225,9 +232,7 @@ class _NoAssignedJobsCard extends StatelessWidget {
             Text(
               'Your active job will appear here when it is ready.',
               textAlign: TextAlign.center,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: AppColors.adaptiveMutedText(context),
               ),
             ),

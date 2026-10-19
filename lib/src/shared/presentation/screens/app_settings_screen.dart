@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../components/components.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../application/app_preferences_controller.dart';
 
@@ -11,6 +13,7 @@ class AppSettingsScreen extends StatelessWidget {
     required this.role,
     this.email,
     this.showTitle = true,
+    this.onThemeChanged,
   });
 
   final AppPreferencesController preferences;
@@ -18,6 +21,8 @@ class AppSettingsScreen extends StatelessWidget {
   final String role;
   final String? email;
   final bool showTitle;
+  final Future<void> Function(BuildContext origin, bool enabled)?
+  onThemeChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +55,7 @@ class AppSettingsScreen extends StatelessWidget {
                 subtitle: Text(
                   [role, email]
                       .where(
-                        (value) => value != null && value!.trim().isNotEmpty,
+                        (value) => value != null && value.trim().isNotEmpty,
                       )
                       .join('\n'),
                 ),
@@ -61,13 +66,30 @@ class AppSettingsScreen extends StatelessWidget {
               title: strings.appearance,
               child: Column(
                 children: [
-                  SwitchListTile(
+                  ListTile(
                     contentPadding: EdgeInsets.zero,
-                    secondary: const Icon(Icons.dark_mode_outlined),
+                    leading: const Icon(Icons.dark_mode_outlined),
                     title: Text(strings.darkMode),
                     subtitle: Text(strings.darkModeDescription),
-                    value: Theme.of(context).brightness == Brightness.dark,
-                    onChanged: preferences.setDarkMode,
+                    trailing: Builder(
+                      builder: (switchContext) => Switch(
+                        value: Theme.of(context).brightness == Brightness.dark,
+                        onChanged: (enabled) async {
+                          final callback = onThemeChanged;
+                          if (callback != null) {
+                            await callback(switchContext, enabled);
+                            return;
+                          }
+                          await showAppThemeReveal(
+                            switchContext,
+                            color: enabled
+                                ? AppColors.darkBackground
+                                : AppColors.pageBackground,
+                            onCovered: () => preferences.setDarkMode(enabled),
+                          );
+                        },
+                      ),
+                    ),
                   ),
                   const Divider(height: 1),
                   SwitchListTile(

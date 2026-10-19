@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:animations/animations.dart';
 
 import '../../../../components/components.dart';
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
@@ -75,36 +76,49 @@ class _OperationsOversightViewState extends State<OperationsOversightView> {
           ],
         ),
         const SizedBox(height: 16),
-        switch (_tab) {
-          _OversightTab.overrides =>
-            repository.overrides.isEmpty
-                ? const _OversightEmptyState(
-                    icon: Icons.rule_folder_outlined,
-                    message: 'No overrides found.',
-                  )
-                : Column(
-                    children: [
-                      for (final item in repository.overrides) ...[
-                        _OverrideCard(repository: repository, item: item),
-                        const SizedBox(height: 12),
-                      ],
-                    ],
-                  ),
-          _OversightTab.exceptions =>
-            repository.exceptions.isEmpty
-                ? const _OversightEmptyState(
-                    icon: Icons.report_problem_outlined,
-                    message: 'No exceptions found.',
-                  )
-                : Column(
-                    children: [
-                      for (final item in repository.exceptions) ...[
-                        _ExceptionCard(repository: repository, item: item),
-                        const SizedBox(height: 12),
-                      ],
-                    ],
-                  ),
-        },
+        PageTransitionSwitcher(
+          duration: AppMotion.duration(context, AppMotion.standard),
+          transitionBuilder: (child, primaryAnimation, secondaryAnimation) =>
+              FadeThroughTransition(
+                animation: primaryAnimation,
+                secondaryAnimation: secondaryAnimation,
+                fillColor: Colors.transparent,
+                child: child,
+              ),
+          child: KeyedSubtree(
+            key: ValueKey(_tab),
+            child: switch (_tab) {
+              _OversightTab.overrides =>
+                repository.overrides.isEmpty
+                    ? const _OversightEmptyState(
+                        icon: Icons.rule_folder_outlined,
+                        message: 'No overrides found.',
+                      )
+                    : Column(
+                        children: [
+                          for (final item in repository.overrides) ...[
+                            _OverrideCard(repository: repository, item: item),
+                            const SizedBox(height: 12),
+                          ],
+                        ],
+                      ),
+              _OversightTab.exceptions =>
+                repository.exceptions.isEmpty
+                    ? const _OversightEmptyState(
+                        icon: Icons.report_problem_outlined,
+                        message: 'No exceptions found.',
+                      )
+                    : Column(
+                        children: [
+                          for (final item in repository.exceptions) ...[
+                            _ExceptionCard(repository: repository, item: item),
+                            const SizedBox(height: 12),
+                          ],
+                        ],
+                      ),
+            },
+          ),
+        ),
       ],
     );
   }

@@ -4,7 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
-import '../../../../core/network/kwanza_track_endpoints.dart';
+import '../../../../core/constants/kwanza_track_endpoints.dart';
 import '../models/auth_challenge_model.dart';
 import '../models/auth_verified_session_model.dart';
 

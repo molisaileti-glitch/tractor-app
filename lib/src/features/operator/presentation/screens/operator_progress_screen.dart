@@ -98,7 +98,7 @@ class OperatorProgressScreen extends StatelessWidget {
                 const SizedBox(height: 10),
                 FilledButton.icon(
                   onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(
+                    appPageRoute(
                       builder: (_) => OperatorCompleteJobScreen(
                         repository: repository,
                         jobId: job.id,

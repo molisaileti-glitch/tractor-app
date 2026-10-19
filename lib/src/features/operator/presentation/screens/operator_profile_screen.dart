@@ -11,10 +11,13 @@ class OperatorProfileScreen extends StatelessWidget {
     super.key,
     required this.repository,
     required this.preferences,
+    this.onThemeChanged,
   });
 
   final OperatorLocalRepository repository;
   final AppPreferencesController preferences;
+  final Future<void> Function(BuildContext origin, bool enabled)?
+  onThemeChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -44,6 +47,7 @@ class OperatorProfileScreen extends StatelessWidget {
                 role: role,
                 email: repository.operatorEmail,
                 showTitle: false,
+                onThemeChanged: onThemeChanged,
               ),
               const SizedBox(height: 16),
               OperatorCard(

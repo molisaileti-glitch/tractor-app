@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:animations/animations.dart';
 
 import '../../../../components/components.dart';
 import '../../../../l10n/generated/app_localizations.dart';
@@ -36,11 +37,14 @@ class OperationsShell extends StatefulWidget {
     required this.repository,
     required this.preferences,
     required this.onLogout,
+    this.onThemeChanged,
   });
 
   final UnionOperationsRepository repository;
   final AppPreferencesController preferences;
   final VoidCallback onLogout;
+  final Future<void> Function(BuildContext origin, bool enabled)?
+  onThemeChanged;
 
   @override
   State<OperationsShell> createState() => _OperationsShellState();
@@ -76,14 +80,30 @@ class _OperationsShellState extends State<OperationsShell> {
           builder: (context, constraints) {
             final compact = constraints.maxWidth < 880;
             return Scaffold(
-              appBar: AppBar(title: const Text('Union Operations')),
+              appBar: AppBar(
+                title: const Text('Union Operations'),
+                actions: [
+                  IconButton(
+                    tooltip: 'Refresh ${_section.label.toLowerCase()}',
+                    onPressed: _isRefreshingCurrentSection
+                        ? null
+                        : _refreshCurrentSection,
+                    icon: _isRefreshingCurrentSection
+                        ? const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh_rounded),
+                  ),
+                ],
+              ),
               drawer: compact
                   ? _OperationsDrawer(
                       subtitle:
                           widget.repository.mechanizationUserName ??
                           'Union staff',
-                      child: _navList(sections: _secondarySections),
                       onLogout: widget.onLogout,
+                      child: _navList(sections: _secondarySections),
                     )
                   : null,
               body: Row(
@@ -110,20 +130,46 @@ class _OperationsShellState extends State<OperationsShell> {
                       ),
                     ),
                   Expanded(
-                    child: widget.repository.isSyncingMechanization
-                        ? const AppScreenSkeleton()
-                        : SingleChildScrollView(
-                            padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-                            child: Align(
-                              alignment: Alignment.topCenter,
-                              child: ConstrainedBox(
-                                constraints: const BoxConstraints(
-                                  maxWidth: 1180,
+                    child: PageTransitionSwitcher(
+                      duration: AppMotion.duration(
+                        context,
+                        const Duration(milliseconds: 600),
+                      ),
+                      transitionBuilder:
+                          (child, primaryAnimation, secondaryAnimation) =>
+                              FadeThroughTransition(
+                                animation: primaryAnimation,
+                                secondaryAnimation: secondaryAnimation,
+                                fillColor: Theme.of(
+                                  context,
+                                ).scaffoldBackgroundColor,
+                                child: child,
+                              ),
+                      child: widget.repository.isSyncingMechanization
+                          ? const AppScreenSkeleton(key: ValueKey('loading'))
+                          : RefreshIndicator(
+                              key: ValueKey(_section),
+                              onRefresh: _refreshCurrentSection,
+                              child: SingleChildScrollView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                padding: const EdgeInsets.fromLTRB(
+                                  20,
+                                  16,
+                                  20,
+                                  28,
                                 ),
-                                child: _currentView(),
+                                child: Align(
+                                  alignment: Alignment.topCenter,
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      maxWidth: 1180,
+                                    ),
+                                    child: _currentView(),
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
+                    ),
                   ),
                 ],
               ),
@@ -225,6 +271,7 @@ class _OperationsShellState extends State<OperationsShell> {
         name: widget.repository.mechanizationUserName ?? 'Union staff',
         role: widget.repository.mechanizationUserRole ?? 'Union staff',
         email: widget.repository.mechanizationUserEmail,
+        onThemeChanged: widget.onThemeChanged,
       ),
     };
   }
@@ -235,6 +282,42 @@ class _OperationsShellState extends State<OperationsShell> {
       final primaryIndex = _primarySections.indexOf(section);
       if (primaryIndex >= 0) _lastPrimaryIndex = primaryIndex;
     });
+  }
+
+  bool get _isRefreshingCurrentSection {
+    if (widget.repository.isSyncingMechanization) return true;
+    return switch (_section) {
+      OperationsSection.tractors => widget.repository.isRefreshingTractors,
+      OperationsSection.operators => widget.repository.isRefreshingOperators,
+      OperationsSection.farmers => widget.repository.isRefreshingFarmers,
+      _ => widget.repository.isSyncingMechanization,
+    };
+  }
+
+  Future<void> _refreshCurrentSection() async {
+    final label = _section.label.toLowerCase();
+    switch (_section) {
+      case OperationsSection.tractors:
+        await widget.repository.refreshTractors();
+      case OperationsSection.operators:
+        await widget.repository.refreshOperators();
+      case OperationsSection.farmers:
+        await widget.repository.refreshFarmers();
+      default:
+        await widget.repository.refreshMechanizationData();
+    }
+    if (!mounted) return;
+    final error = widget.repository.mechanizationSyncError;
+    showAppSnackBar(
+      context,
+      message: error ?? '${_capitalize(label)} refreshed successfully.',
+      type: error == null ? AppSnackType.success : AppSnackType.error,
+    );
+  }
+
+  String _capitalize(String value) {
+    if (value.isEmpty) return value;
+    return '${value[0].toUpperCase()}${value.substring(1)}';
   }
 }
 

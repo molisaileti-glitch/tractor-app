@@ -177,10 +177,7 @@ class FarmersView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final farmers = <String, List<OperationsServiceRequest>>{};
-    for (final request in repository.requests) {
-      farmers.putIfAbsent(request.farmerName, () => []).add(request);
-    }
+    final farmers = repository.farmers;
 
     return _DirectoryPage(
       title: 'Farmers',
@@ -189,13 +186,18 @@ class FarmersView extends StatelessWidget {
           const _DirectoryEmptyState(
             icon: Icons.groups_outlined,
             title: 'No farmers available',
-            message: 'Farmers connected to service requests will appear here.',
+            message: 'Registered farmers will appear here after refreshing.',
           )
         else
           _PrettyGrid(
             children: [
-              for (final entry in farmers.entries)
-                _FarmerDirectoryCard(name: entry.key, requests: entry.value),
+              for (final farmer in farmers)
+                _FarmerDirectoryCard(
+                  farmer: farmer,
+                  requests: repository.requests
+                      .where((request) => request.farmerId == farmer.id)
+                      .toList(),
+                ),
             ],
           ),
       ],
@@ -295,24 +297,21 @@ class _OperatorDirectoryCard extends StatelessWidget {
 }
 
 class _FarmerDirectoryCard extends StatelessWidget {
-  const _FarmerDirectoryCard({required this.name, required this.requests});
+  const _FarmerDirectoryCard({required this.farmer, required this.requests});
 
-  final String name;
+  final RegistryFarmer farmer;
   final List<OperationsServiceRequest> requests;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final latest = requests.first;
-    final phone = requests
-        .map((item) => item.farmerPhone)
-        .whereType<String>()
-        .firstOrNull;
-    final plots = requests.map((item) => item.plot.name).toSet();
-    final location = requests
-        .map((item) => item.plot.location.trim())
-        .where((item) => item.isNotEmpty)
-        .firstOrNull;
+    final requestPlotCount = requests
+        .map((item) => item.plot.id)
+        .toSet()
+        .length;
+    final plotCount = farmer.plotCount > 0
+        ? farmer.plotCount
+        : requestPlotCount;
     return OperationsCard(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
@@ -337,19 +336,19 @@ class _FarmerDirectoryCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        name,
+                        farmer.name,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      if (phone != null) ...[
+                      if (farmer.phone != null) ...[
                         const SizedBox(height: 4),
-                        Text(phone, style: theme.textTheme.bodyMedium),
+                        Text(farmer.phone!, style: theme.textTheme.bodyMedium),
                       ],
                     ],
                   ),
                 ),
-                OperationsStatusChip.request(requestStatus: latest.status),
+                if (farmer.status != null) Chip(label: Text(farmer.status!)),
               ],
             ),
             const SizedBox(height: 16),
@@ -360,8 +359,7 @@ class _FarmerDirectoryCard extends StatelessWidget {
             const SizedBox(height: 14),
             _DirectoryFact(
               icon: Icons.landscape_outlined,
-              text:
-                  '${plots.length} registered plot${plots.length == 1 ? '' : 's'}',
+              text: '$plotCount registered plot${plotCount == 1 ? '' : 's'}',
             ),
             const SizedBox(height: 9),
             _DirectoryFact(
@@ -372,7 +370,7 @@ class _FarmerDirectoryCard extends StatelessWidget {
             const SizedBox(height: 9),
             _DirectoryFact(
               icon: Icons.location_on_outlined,
-              text: location ?? latest.plot.name,
+              text: farmer.location ?? 'Location not provided',
             ),
           ],
         ),

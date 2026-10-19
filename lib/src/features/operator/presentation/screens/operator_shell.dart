@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:animations/animations.dart';
 
 import '../../../../components/components.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -15,11 +16,14 @@ class OperatorShell extends StatefulWidget {
     required this.repository,
     required this.preferences,
     required this.onLogout,
+    this.onThemeChanged,
   });
 
   final OperatorLocalRepository repository;
   final AppPreferencesController preferences;
   final VoidCallback onLogout;
+  final Future<void> Function(BuildContext origin, bool enabled)?
+  onThemeChanged;
 
   @override
   State<OperatorShell> createState() => _OperatorShellState();
@@ -34,12 +38,14 @@ class _OperatorShellState extends State<OperatorShell> {
       OperatorJobsScreen(
         repository: widget.repository,
         onOpenSchedule: () => setState(() => _selectedIndex = 1),
+        onRefresh: _refreshData,
       ),
       OperatorScheduleScreen(repository: widget.repository),
       OperatorHistoryScreen(repository: widget.repository),
       OperatorProfileScreen(
         repository: widget.repository,
         preferences: widget.preferences,
+        onThemeChanged: widget.onThemeChanged,
       ),
     ];
 
@@ -66,8 +72,13 @@ class _OperatorShellState extends State<OperatorShell> {
                 tooltip: 'Refresh',
                 onPressed: widget.repository.isSyncingMechanization
                     ? null
-                    : widget.repository.refreshMechanizationData,
-                icon: const Icon(Icons.sync),
+                    : _refreshData,
+                icon: widget.repository.isSyncingMechanization
+                    ? const SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh_rounded),
               ),
             ],
           ),
@@ -77,9 +88,26 @@ class _OperatorShellState extends State<OperatorShell> {
           ),
           body: SafeArea(
             top: false,
-            child: widget.repository.isSyncingMechanization
-                ? const AppScreenSkeleton()
-                : screens[_selectedIndex],
+            child: PageTransitionSwitcher(
+              duration: AppMotion.duration(
+                context,
+                const Duration(milliseconds: 600),
+              ),
+              transitionBuilder:
+                  (child, primaryAnimation, secondaryAnimation) =>
+                      FadeThroughTransition(
+                        animation: primaryAnimation,
+                        secondaryAnimation: secondaryAnimation,
+                        fillColor: Theme.of(context).scaffoldBackgroundColor,
+                        child: child,
+                      ),
+              child: widget.repository.isSyncingMechanization
+                  ? const AppScreenSkeleton(key: ValueKey('loading'))
+                  : KeyedSubtree(
+                      key: ValueKey(_selectedIndex),
+                      child: screens[_selectedIndex],
+                    ),
+            ),
           ),
           bottomNavigationBar: NavigationBar(
             selectedIndex: _selectedIndex,
@@ -121,6 +149,17 @@ class _OperatorShellState extends State<OperatorShell> {
       2 => 'Job History',
       _ => 'Profile',
     };
+  }
+
+  Future<void> _refreshData() async {
+    await widget.repository.refreshMechanizationData();
+    if (!mounted) return;
+    final error = widget.repository.mechanizationSyncError;
+    showAppSnackBar(
+      context,
+      message: error ?? 'Assignments refreshed successfully.',
+      type: error == null ? AppSnackType.success : AppSnackType.error,
+    );
   }
 }
 

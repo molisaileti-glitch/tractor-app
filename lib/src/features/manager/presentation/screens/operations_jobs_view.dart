@@ -267,7 +267,7 @@ class _JobCard extends StatelessWidget {
                 onTap: () {
                   Navigator.of(context).pop();
                   Navigator.of(context).push(
-                    MaterialPageRoute(
+                    appPageRoute(
                       builder: (_) => RescheduleJobScreen(
                         repository: repository,
                         jobId: job.id,

@@ -50,6 +50,7 @@ class _TractorAppState extends State<TractorApp> {
   final AppPreferencesController preferences = AppPreferencesController();
   _Workspace _workspace = _Workspace.welcome;
   bool _restoringSession = true;
+  bool _sessionExpiryInProgress = false;
 
   @override
   void initState() {
@@ -83,50 +84,70 @@ class _TractorAppState extends State<TractorApp> {
         locale: preferences.locale,
         supportedLocales: AppLocalizations.supportedLocales,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
-        home: _restoringSession
-            ? const Scaffold(body: SafeArea(child: AppScreenSkeleton()))
-            : switch (_workspace) {
-                _Workspace.welcome => AppWelcomeScreen(
-                  onContinue: () =>
-                      setState(() => _workspace = _Workspace.login),
+        themeAnimationDuration: const Duration(milliseconds: 1000),
+        themeAnimationCurve: Curves.easeInOutCubic,
+        builder: (context, child) => MediaQuery.withClampedTextScaling(
+          minScaleFactor: 0.9,
+          maxScaleFactor: 1.3,
+          child: child ?? const SizedBox.shrink(),
+        ),
+        home: AppFadeThroughSwitcher(
+          child: _restoringSession
+              ? const Scaffold(
+                  key: ValueKey('restoring-session'),
+                  body: SafeArea(child: AppScreenSkeleton()),
+                )
+              : KeyedSubtree(
+                  key: ValueKey(_workspace),
+                  child: switch (_workspace) {
+                    _Workspace.welcome => AppWelcomeScreen(
+                      onContinue: () =>
+                          setState(() => _workspace = _Workspace.login),
+                    ),
+                    _Workspace.login => LoginScreen(
+                      repository: authRepository,
+                      onBack: () =>
+                          setState(() => _workspace = _Workspace.welcome),
+                      onOpenFarmer: () =>
+                          setState(() => _workspace = _Workspace.farmer),
+                      onOpenOperations: _openOperations,
+                      onOpenOperator: _openOperator,
+                      onOpenTechnician: _openTechnician,
+                      onCreateFarmerAccount: () => setState(
+                        () => _workspace = _Workspace.registerFarmer,
+                      ),
+                    ),
+                    _Workspace.registerFarmer => FarmerRegistrationScreen(
+                      repository: authRepository,
+                      onBack: () =>
+                          setState(() => _workspace = _Workspace.login),
+                      onRegistered: () =>
+                          setState(() => _workspace = _Workspace.farmer),
+                    ),
+                    _Workspace.farmer => FarmerShell(
+                      repository: farmerRepository,
+                      onLogout: _confirmLogout,
+                    ),
+                    _Workspace.operations => OperationsShell(
+                      repository: operationsRepository,
+                      preferences: preferences,
+                      onLogout: _confirmLogout,
+                      onThemeChanged: _changeThemeWithReveal,
+                    ),
+                    _Workspace.operator => OperatorShell(
+                      repository: operatorRepository,
+                      preferences: preferences,
+                      onLogout: _confirmLogout,
+                      onThemeChanged: _changeThemeWithReveal,
+                    ),
+                    _Workspace.technician => TechnicianShell(
+                      operationsRepository: operationsRepository,
+                      technicianRepository: technicianRepository,
+                      onLogout: _confirmLogout,
+                    ),
+                  },
                 ),
-                _Workspace.login => LoginScreen(
-                  repository: authRepository,
-                  onBack: () => setState(() => _workspace = _Workspace.welcome),
-                  onOpenFarmer: () =>
-                      setState(() => _workspace = _Workspace.farmer),
-                  onOpenOperations: _openOperations,
-                  onOpenOperator: _openOperator,
-                  onOpenTechnician: _openTechnician,
-                  onCreateFarmerAccount: () =>
-                      setState(() => _workspace = _Workspace.registerFarmer),
-                ),
-                _Workspace.registerFarmer => FarmerRegistrationScreen(
-                  repository: authRepository,
-                  onBack: () => setState(() => _workspace = _Workspace.login),
-                  onRegistered: () =>
-                      setState(() => _workspace = _Workspace.farmer),
-                ),
-                _Workspace.farmer => FarmerShell(
-                  repository: farmerRepository,
-                  onLogout: _confirmLogout,
-                ),
-                _Workspace.operations => OperationsShell(
-                  repository: operationsRepository,
-                  preferences: preferences,
-                  onLogout: _confirmLogout,
-                ),
-                _Workspace.operator => OperatorShell(
-                  repository: operatorRepository,
-                  preferences: preferences,
-                  onLogout: _confirmLogout,
-                ),
-                _Workspace.technician => TechnicianShell(
-                  operationsRepository: operationsRepository,
-                  technicianRepository: technicianRepository,
-                  onLogout: _confirmLogout,
-                ),
-              },
+        ),
       ),
     );
   }
@@ -134,15 +155,15 @@ class _TractorAppState extends State<TractorApp> {
   Future<void> _confirmLogout() async {
     final dialogContext = _navigatorKey.currentContext;
     if (dialogContext == null) return;
-    final confirmed = await showAppConfirmationDialog(
+    await showAppAsyncConfirmationDialog(
       dialogContext,
       title: 'Log out?',
       message: 'You will need to sign in again to continue using the app.',
       confirmLabel: 'Log out',
+      workingLabel: 'Logging out...',
       danger: true,
+      onConfirm: _logout,
     );
-    if (!confirmed) return;
-    await _logout();
   }
 
   Future<void> _logout() async {
@@ -153,13 +174,23 @@ class _TractorAppState extends State<TractorApp> {
     setState(() => _workspace = _Workspace.login);
   }
 
+  Future<void> _changeThemeWithReveal(BuildContext origin, bool enabled) async {
+    await showAppThemeReveal(
+      origin,
+      color: enabled ? AppColors.darkBackground : AppColors.pageBackground,
+      onCovered: () => preferences.setDarkMode(enabled),
+    );
+  }
+
   Future<void> _handleSessionExpired() async {
-    if (!mounted) return;
+    if (!mounted || _sessionExpiryInProgress) return;
+    _sessionExpiryInProgress = true;
     operationsRepository.setMechanizationAccessToken(null);
     operatorRepository.setMechanizationAccessToken(null);
     await authRepository.signOut();
     if (!mounted) return;
     setState(() => _workspace = _Workspace.login);
+    _sessionExpiryInProgress = false;
     _messengerKey.currentState
       ?..clearSnackBars()
       ..showSnackBar(

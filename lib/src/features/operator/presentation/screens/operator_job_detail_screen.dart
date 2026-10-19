@@ -91,7 +91,7 @@ class OperatorJobDetailScreen extends StatelessWidget {
     }
     if (job.status == OperatorJobStatus.inProgress) {
       Navigator.of(context).push(
-        MaterialPageRoute(
+        appPageRoute(
           builder: (_) =>
               OperatorProgressScreen(repository: repository, jobId: job.id),
         ),
@@ -101,7 +101,7 @@ class OperatorJobDetailScreen extends StatelessWidget {
     if (job.status == OperatorJobStatus.enRoute ||
         job.status == OperatorJobStatus.arrived) {
       Navigator.of(context).push(
-        MaterialPageRoute(
+        appPageRoute(
           builder: (_) =>
               OperatorArrivalScreen(repository: repository, jobId: job.id),
         ),
@@ -154,7 +154,7 @@ class OperatorJobDetailScreen extends StatelessWidget {
       return;
     }
     navigator.pushReplacement(
-      MaterialPageRoute(
+      appPageRoute(
         builder: (_) =>
             OperatorArrivalScreen(repository: repository, jobId: job.id),
       ),

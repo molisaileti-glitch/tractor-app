@@ -24,11 +24,15 @@ class UnionOperationsRepository extends ChangeNotifier {
   final List<OperationsServiceRequest> _requests;
   final List<TractorAsset> _tractors;
   final List<OperatorProfile> _operators;
+  final List<RegistryFarmer> _farmers = [];
   final List<OperationsJob> _jobs;
   final List<MechanizationOverride> _overrides = [];
   final List<MechanizationException> _exceptions = [];
   String? _accessToken;
   bool _isSyncingMechanization = false;
+  bool _isRefreshingTractors = false;
+  bool _isRefreshingOperators = false;
+  bool _isRefreshingFarmers = false;
   String? _mechanizationSyncError;
   String? _mechanizationActionError;
   String? _mechanizationUserName;
@@ -41,10 +45,14 @@ class UnionOperationsRepository extends ChangeNotifier {
   List<OperationsServiceRequest> get requests => List.unmodifiable(_requests);
   List<TractorAsset> get tractors => List.unmodifiable(_tractors);
   List<OperatorProfile> get operators => List.unmodifiable(_operators);
+  List<RegistryFarmer> get farmers => List.unmodifiable(_farmers);
   List<OperationsJob> get jobs => List.unmodifiable(_jobs);
   List<MechanizationOverride> get overrides => List.unmodifiable(_overrides);
   List<MechanizationException> get exceptions => List.unmodifiable(_exceptions);
   bool get isSyncingMechanization => _isSyncingMechanization;
+  bool get isRefreshingTractors => _isRefreshingTractors;
+  bool get isRefreshingOperators => _isRefreshingOperators;
+  bool get isRefreshingFarmers => _isRefreshingFarmers;
   String? get mechanizationSyncError => _mechanizationSyncError;
   String? get mechanizationActionError => _mechanizationActionError;
   String? get mechanizationUserName => _mechanizationUserName;
@@ -65,6 +73,7 @@ class UnionOperationsRepository extends ChangeNotifier {
     _requests.clear();
     _tractors.clear();
     _operators.clear();
+    _farmers.clear();
     _jobs.clear();
     _overrides.clear();
     _exceptions.clear();
@@ -113,6 +122,7 @@ class UnionOperationsRepository extends ChangeNotifier {
         mobileApiClient.operators(token: token),
         mobileApiClient.overrides(token: token),
         mobileApiClient.exceptions(token: token),
+        mobileApiClient.farmers(token: token),
       ]);
       if (generation != _syncGeneration) return;
 
@@ -123,12 +133,13 @@ class UnionOperationsRepository extends ChangeNotifier {
       _applyRequestsResponse(responses[5], replace: true);
       await _refreshAllRequestBuckets(token);
       await _enrichRequestBoundaries(token);
-      _applyTractorsResponse(responses[7]);
+      _applyTractorsResponse(responses[7], replace: true, source: 'all');
       _applyTractorsResponse(responses[6]);
       _applyOperatorsResponse(responses[8]);
       _applyCalendarResponse(responses[3]);
       _applyOverridesResponse(responses[9]);
       _applyExceptionsResponse(responses[10]);
+      _applyFarmersResponse(responses[11]);
       _mechanizationSyncError = null;
     } on KwanzaTrackApiException catch (error) {
       if (generation == _syncGeneration) {
@@ -144,6 +155,82 @@ class UnionOperationsRepository extends ChangeNotifier {
         _isSyncingMechanization = false;
         notifyListeners();
       }
+    }
+  }
+
+  Future<void> refreshTractors() async {
+    final token = _accessToken;
+    if (token == null ||
+        token.isEmpty ||
+        _isSyncingMechanization ||
+        _isRefreshingTractors) {
+      return;
+    }
+    _isRefreshingTractors = true;
+    _mechanizationSyncError = null;
+    notifyListeners();
+    try {
+      final responses = await Future.wait<Map<String, Object?>>([
+        mobileApiClient.tractors(token: token, mine: false),
+        mobileApiClient.tractors(token: token, mine: true, live: true),
+      ]);
+      _applyTractorsResponse(responses[0], replace: true, source: 'all');
+      _applyTractorsResponse(responses[1]);
+    } on KwanzaTrackApiException catch (error) {
+      _mechanizationSyncError = error.message;
+    } catch (error) {
+      _mechanizationSyncError = 'Could not refresh tractors: $error';
+    } finally {
+      _isRefreshingTractors = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> refreshOperators() async {
+    final token = _accessToken;
+    if (token == null ||
+        token.isEmpty ||
+        _isSyncingMechanization ||
+        _isRefreshingOperators) {
+      return;
+    }
+    _isRefreshingOperators = true;
+    _mechanizationSyncError = null;
+    notifyListeners();
+    try {
+      final response = await mobileApiClient.operators(token: token);
+      _applyOperatorsResponse(response);
+    } on KwanzaTrackApiException catch (error) {
+      _mechanizationSyncError = error.message;
+    } catch (error) {
+      _mechanizationSyncError = 'Could not refresh operators: $error';
+    } finally {
+      _isRefreshingOperators = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> refreshFarmers() async {
+    final token = _accessToken;
+    if (token == null ||
+        token.isEmpty ||
+        _isSyncingMechanization ||
+        _isRefreshingFarmers) {
+      return;
+    }
+    _isRefreshingFarmers = true;
+    _mechanizationSyncError = null;
+    notifyListeners();
+    try {
+      final response = await mobileApiClient.farmers(token: token);
+      _applyFarmersResponse(response);
+    } on KwanzaTrackApiException catch (error) {
+      _mechanizationSyncError = error.message;
+    } catch (error) {
+      _mechanizationSyncError = 'Could not refresh farmers: $error';
+    } finally {
+      _isRefreshingFarmers = false;
+      notifyListeners();
     }
   }
 
@@ -455,6 +542,7 @@ class UnionOperationsRepository extends ChangeNotifier {
     required String operatorId,
     required DateTime scheduledAt,
     required int estimatedHours,
+    required String implement,
   }) async {
     final request = requestById(requestId);
     if (await _tryRemoteRequestSchedule(
@@ -464,6 +552,7 @@ class UnionOperationsRepository extends ChangeNotifier {
       scheduledAt: scheduledAt,
       estimatedHours: estimatedHours,
       request: request,
+      implement: implement,
     )) {
       return requestId;
     }
@@ -849,7 +938,12 @@ class UnionOperationsRepository extends ChangeNotifier {
 
   Future<bool> acknowledgeException(String exceptionId) async {
     final token = _accessToken;
-    if (token == null || token.isEmpty) return false;
+    if (token == null || token.isEmpty) {
+      _mechanizationActionError =
+          'Your session has expired. Please sign in again.';
+      notifyListeners();
+      return false;
+    }
     try {
       _mechanizationActionError = null;
       await mobileApiClient.acknowledgeException(
@@ -980,12 +1074,27 @@ class UnionOperationsRepository extends ChangeNotifier {
     }
   }
 
-  void _applyTractorsResponse(Map<String, Object?> response) {
+  void _applyTractorsResponse(
+    Map<String, Object?> response, {
+    bool replace = false,
+    String source = 'mine/live',
+  }) {
     final tractors = _dataList(response)
         .whereType<Map>()
         .map((item) => _tractorFromJson(_stringKeyedMap(item)))
         .whereType<TractorAsset>()
         .toList();
+    if (kDebugMode) {
+      final labels = tractors
+          .map((tractor) => tractor.assetNo ?? tractor.label ?? tractor.id)
+          .join(', ');
+      debugPrint(
+        '[Mechanization Registry] $source tractors: '
+        '${tractors.length}${labels.isEmpty ? '' : ' [$labels]'}',
+      );
+    }
+
+    if (replace) _tractors.clear();
     if (tractors.isEmpty) return;
 
     for (final tractor in tractors) {
@@ -1004,6 +1113,54 @@ class UnionOperationsRepository extends ChangeNotifier {
     _operators
       ..clear()
       ..addAll(operators);
+  }
+
+  void _applyFarmersResponse(Map<String, Object?> response) {
+    final parsed = _dataList(response)
+        .whereType<Map>()
+        .map((item) => _registryFarmerFromJson(_stringKeyedMap(item)))
+        .whereType<RegistryFarmer>()
+        .toList();
+    final unique = <String, RegistryFarmer>{};
+    for (final farmer in parsed) {
+      final key = farmer.externalRef?.trim().toLowerCase().isNotEmpty == true
+          ? 'external:${farmer.externalRef!.trim().toLowerCase()}'
+          : farmer.phone?.trim().isNotEmpty == true
+          ? 'phone:${farmer.phone!.trim()}'
+          : 'id:${farmer.id}';
+      unique[key] = farmer;
+    }
+    final farmers = unique.values.toList();
+    _farmers
+      ..clear()
+      ..addAll(farmers);
+    if (kDebugMode) {
+      debugPrint('[Mechanization Registry] farmers: ${farmers.length}');
+    }
+  }
+
+  RegistryFarmer? _registryFarmerFromJson(Map<String, Object?> json) {
+    final id = _text(json, const ['id']);
+    final name = _text(json, const ['name', 'full_name']);
+    if (id == null || name == null) return null;
+    final plots = json['plots'];
+    final location = [
+      _text(json, const ['village']),
+      _text(json, const ['ward']),
+      _text(json, const ['district']),
+      _text(json, const ['region']),
+    ].whereType<String>().where((value) => value.isNotEmpty).join(', ');
+    return RegistryFarmer(
+      id: id,
+      name: name,
+      externalRef: _text(json, const ['external_ref']),
+      phone: _text(json, const ['phone']),
+      location: location.isEmpty ? null : location,
+      status: _text(json, const ['status']),
+      plotCount: plots is List
+          ? plots.length
+          : (_asInt(json['plots_count']) ?? _asInt(json['plot_count']) ?? 0),
+    );
   }
 
   void _applyOverridesResponse(Map<String, Object?> response) {
@@ -1032,7 +1189,12 @@ class UnionOperationsRepository extends ChangeNotifier {
     Future<Map<String, Object?>> Function() request,
   ) async {
     final token = _accessToken;
-    if (token == null || token.isEmpty) return false;
+    if (token == null || token.isEmpty) {
+      _mechanizationActionError =
+          'Your session has expired. Please sign in again.';
+      notifyListeners();
+      return true;
+    }
     try {
       _mechanizationActionError = null;
       final response = await request();
@@ -1051,7 +1213,12 @@ class UnionOperationsRepository extends ChangeNotifier {
     Future<Map<String, Object?>> Function() request,
   ) async {
     final token = _accessToken;
-    if (token == null || token.isEmpty) return false;
+    if (token == null || token.isEmpty) {
+      _mechanizationActionError =
+          'Your session has expired. Please sign in again.';
+      notifyListeners();
+      return true;
+    }
     try {
       _mechanizationActionError = null;
       final response = await request();
@@ -1073,9 +1240,15 @@ class UnionOperationsRepository extends ChangeNotifier {
     required DateTime scheduledAt,
     required int estimatedHours,
     required OperationsServiceRequest request,
+    required String implement,
   }) async {
     final token = _accessToken;
-    if (token == null || token.isEmpty) return false;
+    if (token == null || token.isEmpty) {
+      _mechanizationActionError =
+          'Your session has expired. Please sign in again.';
+      notifyListeners();
+      return true;
+    }
     try {
       _mechanizationActionError = null;
       final response = await mobileApiClient.scheduleRequest(
@@ -1086,8 +1259,8 @@ class UnionOperationsRepository extends ChangeNotifier {
         windowEnd: _timeOnly(scheduledAt.add(Duration(hours: estimatedHours))),
         tractorId: tractorId,
         operatorId: operatorId,
-        plannedAcres: request.plot.areaHectares / 0.404686,
-        implement: 'Disc plough 3-furrow',
+        plannedAcres: request.requestedAcres,
+        implement: implement,
       );
       final job = _jobFromJson(_dataMap(response));
       if (job != null) _upsertJob(job);
@@ -1200,6 +1373,8 @@ class UnionOperationsRepository extends ChangeNotifier {
       farmerPhone: _text(farmerJson, const ['phone']),
       farmerId: _text(farmerJson, const ['id']),
       plotExternalRef: _text(plotJson, const ['external_ref']),
+      requestedAcres: _number(json, const ['requested_acres'])?.toDouble(),
+      preferredWindow: _text(json, const ['preferred_window']),
       serviceType: _serviceType(
         _text(serviceTypeJson, const ['code', 'name']) ??
             _text(json, const ['service_type']),
@@ -1657,14 +1832,16 @@ class UnionOperationsRepository extends ChangeNotifier {
             continue;
           }
 
-          final matchingPlot = registryPlots.cast<Map<String, Object?>?>().firstWhere(
-            (plot) =>
-                _text(plot!, const ['id']) == request.plot.id ||
-                (_text(plot, const ['external_ref']) != null &&
-                    _text(plot, const ['external_ref']) ==
-                        request.plotExternalRef),
-            orElse: () => null,
-          );
+          final matchingPlot = registryPlots
+              .cast<Map<String, Object?>?>()
+              .firstWhere(
+                (plot) =>
+                    _text(plot!, const ['id']) == request.plot.id ||
+                    (_text(plot, const ['external_ref']) != null &&
+                        _text(plot, const ['external_ref']) ==
+                            request.plotExternalRef),
+                orElse: () => null,
+              );
           if (matchingPlot == null) continue;
 
           final boundary = _plotBoundaryPoints(matchingPlot);
@@ -1886,8 +2063,7 @@ class UnionOperationsRepository extends ChangeNotifier {
     if (isActive == false) return OperatorStatus.unavailable;
     final normalized = value?.toLowerCase().replaceAll('-', '_') ?? '';
     return switch (normalized) {
-      'assigned' || 'busy' || 'on_job' || 'in_use' =>
-        OperatorStatus.assigned,
+      'assigned' || 'busy' || 'on_job' || 'in_use' => OperatorStatus.assigned,
       'inactive' ||
       'unavailable' ||
       'suspended' ||

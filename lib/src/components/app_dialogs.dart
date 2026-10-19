@@ -87,6 +87,118 @@ Future<bool> showAppConfirmationDialog(
   return result ?? false;
 }
 
+Future<bool> showAppAsyncConfirmationDialog(
+  BuildContext context, {
+  required String title,
+  required String message,
+  required Future<void> Function() onConfirm,
+  String confirmLabel = 'Continue',
+  String workingLabel = 'Please wait...',
+  String cancelLabel = 'Cancel',
+  bool danger = false,
+}) async {
+  final result = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) => _AsyncConfirmationDialog(
+      title: title,
+      message: message,
+      onConfirm: onConfirm,
+      confirmLabel: confirmLabel,
+      workingLabel: workingLabel,
+      cancelLabel: cancelLabel,
+      danger: danger,
+    ),
+  );
+  return result ?? false;
+}
+
+class _AsyncConfirmationDialog extends StatefulWidget {
+  const _AsyncConfirmationDialog({
+    required this.title,
+    required this.message,
+    required this.onConfirm,
+    required this.confirmLabel,
+    required this.workingLabel,
+    required this.cancelLabel,
+    required this.danger,
+  });
+
+  final String title;
+  final String message;
+  final Future<void> Function() onConfirm;
+  final String confirmLabel;
+  final String workingLabel;
+  final String cancelLabel;
+  final bool danger;
+
+  @override
+  State<_AsyncConfirmationDialog> createState() =>
+      _AsyncConfirmationDialogState();
+}
+
+class _AsyncConfirmationDialogState extends State<_AsyncConfirmationDialog> {
+  bool _loading = false;
+  String? _error;
+
+  Future<void> _submit() async {
+    if (_loading) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await widget.onConfirm();
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'The action could not be completed. Please try again.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: !_loading,
+      child: AlertDialog(
+        title: Text(widget.title),
+        content: AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(widget.message),
+              if (_error != null) ...[
+                const SizedBox(height: 14),
+                Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+        actions: [
+          AppDialogActions(
+            onCancel: () => Navigator.of(context).pop(false),
+            onConfirm: _submit,
+            cancelLabel: widget.cancelLabel,
+            confirmLabel: _loading ? widget.workingLabel : widget.confirmLabel,
+            danger: widget.danger,
+            loading: _loading,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 Future<void> showAppSuccessDialog(
   BuildContext context, {
   required String title,

@@ -137,8 +137,9 @@ class OperatorLocalRepository extends ChangeNotifier {
   Future<bool> acceptAssignment(String jobId, {DeviceLocation? phone}) async {
     final token = _accessToken;
     if (token == null || token.isEmpty) {
-      _replace(jobId, jobById(jobId).copyWith(acceptedByOperator: true));
-      return true;
+      _lastActionError = 'Your session has expired. Please sign in again.';
+      notifyListeners();
+      return false;
     }
 
     try {
@@ -160,46 +161,27 @@ class OperatorLocalRepository extends ChangeNotifier {
   }
 
   Future<bool> startJourney(String jobId, {DeviceLocation? phone}) async {
-    final token = _accessToken;
-    if (token != null && token.isNotEmpty) {
-      final ok = await _runJobAction(
-        offline: () => jobById(jobId),
-        remote: (token) => mobileApiClient.markEnRoute(
-          token: token,
-          jobId: jobId,
-          clientEventId: _eventId(),
-          phone: _phonePayload(phone),
-        ),
-      );
-      return ok;
-    }
-
-    _replace(
-      jobId,
-      jobById(jobId).copyWith(
-        status: OperatorJobStatus.enRoute,
-        journeyStartedAt: DateTime.now(),
+    return _runJobAction(
+      offline: () => jobById(jobId),
+      remote: (token) => mobileApiClient.markEnRoute(
+        token: token,
+        jobId: jobId,
+        clientEventId: _eventId(),
+        phone: _phonePayload(phone),
       ),
     );
-    return true;
   }
 
   Future<bool> arriveJob(String jobId, {DeviceLocation? phone}) async {
-    final token = _accessToken;
-    if (token != null && token.isNotEmpty) {
-      return _runJobAction(
-        offline: () => jobById(jobId),
-        remote: (token) => mobileApiClient.arriveJob(
-          token: token,
-          jobId: jobId,
-          clientEventId: _eventId(),
-          phone: _phonePayload(phone),
-        ),
-      );
-    }
-
-    _replace(jobId, jobById(jobId).copyWith(status: OperatorJobStatus.arrived));
-    return true;
+    return _runJobAction(
+      offline: () => jobById(jobId),
+      remote: (token) => mobileApiClient.arriveJob(
+        token: token,
+        jobId: jobId,
+        clientEventId: _eventId(),
+        phone: _phonePayload(phone),
+      ),
+    );
   }
 
   Future<bool> recordInspection({
@@ -213,7 +195,11 @@ class OperatorLocalRepository extends ChangeNotifier {
     DeviceLocation? phone,
   }) async {
     final token = _accessToken;
-    if (token == null || token.isEmpty) return true;
+    if (token == null || token.isEmpty) {
+      _lastActionError = 'Your session has expired. Please sign in again.';
+      notifyListeners();
+      return false;
+    }
 
     try {
       _lastActionError = null;
@@ -245,49 +231,43 @@ class OperatorLocalRepository extends ChangeNotifier {
     String? overrideId,
   }) async {
     final token = _accessToken;
-    if (token != null && token.isNotEmpty) {
-      try {
-        _lastActionError = null;
-        final check = await mobileApiClient.startCheck(
-          token: token,
-          jobId: jobId,
-          phone: _phonePayload(phone),
-        );
-        final checkData = _map(check['data']);
-        if (checkData['can_start'] == false) {
-          _lastActionError =
-              check['message']?.toString() ?? 'The start check did not pass.';
-          notifyListeners();
-          return false;
-        }
-        final response = await mobileApiClient.startJob(
-          token: token,
-          jobId: jobId,
-          clientEventId: _eventId(),
-          hourMeter: hourMeter,
-          implement: implement,
-          overrideId: overrideId,
-          phone: _phonePayload(phone),
-        );
-        _applyJobResponse(response);
-        _lastActionError = null;
-        notifyListeners();
-        return true;
-      } on KwanzaTrackApiException catch (error) {
-        _lastActionError = error.message;
+    if (token == null || token.isEmpty) {
+      _lastActionError = 'Your session has expired. Please sign in again.';
+      notifyListeners();
+      return false;
+    }
+    try {
+      _lastActionError = null;
+      final check = await mobileApiClient.startCheck(
+        token: token,
+        jobId: jobId,
+        phone: _phonePayload(phone),
+      );
+      final checkData = _map(check['data']);
+      if (checkData['can_start'] == false) {
+        _lastActionError =
+            check['message']?.toString() ?? 'The start check did not pass.';
         notifyListeners();
         return false;
       }
+      final response = await mobileApiClient.startJob(
+        token: token,
+        jobId: jobId,
+        clientEventId: _eventId(),
+        hourMeter: hourMeter,
+        implement: implement,
+        overrideId: overrideId,
+        phone: _phonePayload(phone),
+      );
+      _applyJobResponse(response);
+      _lastActionError = null;
+      notifyListeners();
+      return true;
+    } on KwanzaTrackApiException catch (error) {
+      _lastActionError = error.message;
+      notifyListeners();
+      return false;
     }
-
-    _replace(
-      jobId,
-      jobById(jobId).copyWith(
-        status: OperatorJobStatus.inProgress,
-        startedAt: DateTime.now(),
-      ),
-    );
-    return true;
   }
 
   Future<OperatorStartCheckResult?> runStartCheck({
@@ -334,7 +314,11 @@ class OperatorLocalRepository extends ChangeNotifier {
     DeviceLocation? phone,
   }) async {
     final token = _accessToken;
-    if (token == null || token.isEmpty) return true;
+    if (token == null || token.isEmpty) {
+      _lastActionError = 'Your session has expired. Please sign in again.';
+      notifyListeners();
+      return false;
+    }
 
     try {
       _lastActionError = null;
@@ -384,39 +368,25 @@ class OperatorLocalRepository extends ChangeNotifier {
 
   Future<bool> completeJob({
     required String jobId,
-    required double areaServicedHectares,
+    required double reportedAcres,
     required String notes,
     num? endHourMeter,
     num? fuelUsedLitres,
     DeviceLocation? phone,
   }) async {
-    final token = _accessToken;
-    if (token != null && token.isNotEmpty) {
-      return _runJobAction(
-        offline: () => jobById(jobId),
-        remote: (token) => mobileApiClient.completeJob(
-          token: token,
-          jobId: jobId,
-          reportedAcres: areaServicedHectares,
-          clientEventId: _eventId(),
-          endHourMeter: endHourMeter,
-          fuelUsedLitres: fuelUsedLitres,
-          notes: notes,
-          phone: _phonePayload(phone),
-        ),
-      );
-    }
-
-    _replace(
-      jobId,
-      jobById(jobId).copyWith(
-        status: OperatorJobStatus.completedPendingConfirmation,
-        finishedAt: DateTime.now(),
-        areaServicedHectares: areaServicedHectares,
-        completionNotes: notes,
+    return _runJobAction(
+      offline: () => jobById(jobId),
+      remote: (token) => mobileApiClient.completeJob(
+        token: token,
+        jobId: jobId,
+        reportedAcres: reportedAcres,
+        clientEventId: _eventId(),
+        endHourMeter: endHourMeter,
+        fuelUsedLitres: fuelUsedLitres,
+        notes: notes,
+        phone: _phonePayload(phone),
       ),
     );
-    return true;
   }
 
   Future<bool> reportProblem({
@@ -425,65 +395,14 @@ class OperatorLocalRepository extends ChangeNotifier {
     required String notes,
     DeviceLocation? phone,
   }) async {
-    final token = _accessToken;
-    if (token != null && token.isNotEmpty) {
-      return _runPlainAction(
-        (token) => mobileApiClient.reportIssue(
-          token: token,
-          jobId: jobId,
-          text: notes.isEmpty ? reason.label : notes,
-          severity: 'warning',
-          openTicket: true,
-          phone: _phonePayload(phone),
-        ),
-      );
-    }
-
-    final job = jobById(jobId);
-    _replace(
-      jobId,
-      job.copyWith(
-        problemReports: [
-          ...job.problemReports,
-          OperatorProblemReport(
-            id: const Uuid().v4(),
-            reason: reason,
-            notes: notes,
-            reportedAt: DateTime.now(),
-          ),
-        ],
-      ),
-    );
-    return true;
-  }
-
-  Future<bool> requestFarmerOtp(String jobId) async {
     return _runPlainAction(
-      (token) => mobileApiClient.farmerOtp(token: token, jobId: jobId),
-    );
-  }
-
-  Future<bool> confirmFarmer({
-    required String jobId,
-    required String method,
-    String? code,
-    String? pin,
-    int? rating,
-    String? note,
-    bool? dispute,
-  }) async {
-    return _runPlainAction(
-      (token) => mobileApiClient.farmerConfirm(
+      (token) => mobileApiClient.reportIssue(
         token: token,
         jobId: jobId,
-        body: {
-          'method': method,
-          'code': code,
-          'pin': pin,
-          'rating': rating,
-          'note': note,
-          'dispute': dispute,
-        },
+        text: notes.isEmpty ? reason.label : notes,
+        severity: 'warning',
+        openTicket: true,
+        phone: _phonePayload(phone),
       ),
     );
   }

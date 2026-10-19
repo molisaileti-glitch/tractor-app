@@ -59,8 +59,7 @@ class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
                             ? 'Pending'
                             : formatTime(job.startedAt!),
                       ),
-                      const _Fact(label: 'Finished', value: '12:36 PM'),
-                      const _Fact(label: 'Duration', value: '3h 32m'),
+                      _Fact(label: 'Status', value: job.status.label),
                     ],
                   ),
                 ),
@@ -98,12 +97,6 @@ class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
                   minLines: 4,
                   maxLines: 6,
                   decoration: const InputDecoration(labelText: 'Add Notes'),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.add_a_photo_outlined),
-                  label: const Text('Add Photo'),
                 ),
                 const SizedBox(height: 16),
                 AppGlowButton(
@@ -144,7 +137,7 @@ class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
     setState(() => _submitting = true);
     final ok = await widget.repository.completeJob(
       jobId: widget.jobId,
-      areaServicedHectares: area,
+      reportedAcres: area,
       notes: _notesController.text.trim(),
       endHourMeter: endHourMeter,
       fuelUsedLitres: fuelUsed,
@@ -164,259 +157,8 @@ class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
     await showAppSuccessDialog(
       context,
       title: 'Work submitted',
-      message: 'Completed work was sent successfully.',
-    );
-    if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => OperatorFarmerConfirmationScreen(
-          repository: widget.repository,
-          jobId: widget.jobId,
-        ),
-      ),
-    );
-  }
-}
-
-class OperatorFarmerConfirmationScreen extends StatefulWidget {
-  const OperatorFarmerConfirmationScreen({
-    super.key,
-    required this.repository,
-    required this.jobId,
-  });
-
-  final OperatorLocalRepository repository;
-  final String jobId;
-
-  @override
-  State<OperatorFarmerConfirmationScreen> createState() =>
-      _OperatorFarmerConfirmationScreenState();
-}
-
-class _OperatorFarmerConfirmationScreenState
-    extends State<OperatorFarmerConfirmationScreen> {
-  final _codeController = TextEditingController();
-  final _pinController = TextEditingController();
-  final _noteController = TextEditingController();
-  String _method = 'pin';
-  int _rating = 5;
-  bool _dispute = false;
-  bool _sendingOtp = false;
-  bool _submitting = false;
-
-  @override
-  void dispose() {
-    _codeController.dispose();
-    _pinController.dispose();
-    _noteController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final job = widget.repository.jobById(widget.jobId);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Farmer Confirmation')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 620),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                OperatorCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        job.reference ?? job.id,
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w900),
-                      ),
-                      const SizedBox(height: 4),
-                      Text('${job.farmerName} - ${job.plot.name}'),
-                      if (job.farmerPhone != null) Text(job.farmerPhone!),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                DropdownButtonFormField<String>(
-                  value: _method,
-                  decoration: const InputDecoration(
-                    labelText: 'Confirmation method',
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'pin', child: Text('Farmer PIN')),
-                    DropdownMenuItem(value: 'otp', child: Text('SMS OTP')),
-                  ],
-                  onChanged: (value) =>
-                      setState(() => _method = value ?? _method),
-                ),
-                const SizedBox(height: 12),
-                if (_method == 'otp') ...[
-                  OutlinedButton.icon(
-                    onPressed: _sendingOtp ? null : _requestOtp,
-                    icon: const Icon(Icons.sms_outlined),
-                    label: Text(_sendingOtp ? 'Sending OTP...' : 'Send OTP'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _codeController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'OTP code'),
-                  ),
-                ] else
-                  TextField(
-                    controller: _pinController,
-                    keyboardType: TextInputType.number,
-                    obscureText: true,
-                    decoration: const InputDecoration(labelText: 'Farmer PIN'),
-                  ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<int>(
-                  value: _rating,
-                  decoration: const InputDecoration(labelText: 'Rating'),
-                  items: [1, 2, 3, 4, 5]
-                      .map(
-                        (value) => DropdownMenuItem(
-                          value: value,
-                          child: Text('$value'),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) =>
-                      setState(() => _rating = value ?? _rating),
-                ),
-                const SizedBox(height: 12),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: _dispute,
-                  title: const Text('Farmer disputes the work'),
-                  onChanged: (value) => setState(() => _dispute = value),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _noteController,
-                  minLines: 3,
-                  maxLines: 5,
-                  decoration: InputDecoration(
-                    labelText: _dispute ? 'Dispute note' : 'Confirmation note',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                AppPrimaryButton(
-                  onPressed: _submitting ? null : _submit,
-                  loading: _submitting,
-                  icon: Icons.verified_outlined,
-                  label: _submitting ? 'Submitting...' : 'Submit Confirmation',
-                ),
-                const SizedBox(height: 10),
-                TextButton(
-                  onPressed: _submitting
-                      ? null
-                      : () => Navigator.of(
-                          context,
-                        ).popUntil((route) => route.isFirst),
-                  child: const Text('Skip for now'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _requestOtp() async {
-    setState(() => _sendingOtp = true);
-    final ok = await widget.repository.requestFarmerOtp(widget.jobId);
-    if (!mounted) return;
-    setState(() => _sendingOtp = false);
-    if (ok) {
-      await showAppSuccessDialog(
-        context,
-        title: 'OTP requested',
-        message: 'The farmer confirmation OTP request was sent.',
-      );
-      return;
-    }
-    await showAppErrorDialog(
-      context,
-      title: 'Could not send OTP',
-      message: widget.repository.lastActionError ?? 'Could not send OTP.',
-    );
-  }
-
-  Future<void> _submit() async {
-    final pin = _pinController.text.trim();
-    final code = _codeController.text.trim();
-    final note = _noteController.text.trim();
-    if (_method == 'pin' && pin.isEmpty) {
-      await showAppErrorDialog(
-        context,
-        title: 'PIN required',
-        message: 'Enter the farmer PIN before submitting confirmation.',
-      );
-      return;
-    }
-    if (_method == 'otp' && code.isEmpty) {
-      await showAppErrorDialog(
-        context,
-        title: 'OTP required',
-        message: 'Enter the OTP code before submitting confirmation.',
-      );
-      return;
-    }
-    if (_dispute && note.isEmpty) {
-      await showAppErrorDialog(
-        context,
-        title: 'Dispute note required',
-        message: 'Enter a dispute note so the union understands the issue.',
-      );
-      return;
-    }
-
-    final confirmed = await showAppConfirmationDialog(
-      context,
-      title: _dispute
-          ? 'Submit farmer dispute?'
-          : 'Submit farmer confirmation?',
-      message: _dispute
-          ? 'This will record the farmer dispute against this completed job.'
-          : 'This will record the farmer confirmation for this completed job.',
-      confirmLabel: 'Submit',
-    );
-    if (!confirmed || !mounted) return;
-
-    setState(() => _submitting = true);
-    final ok = await widget.repository.confirmFarmer(
-      jobId: widget.jobId,
-      method: _method,
-      code: _method == 'otp' ? code : null,
-      pin: _method == 'pin' ? pin : null,
-      rating: _dispute ? null : _rating,
-      note: note.isEmpty ? null : note,
-      dispute: _dispute,
-    );
-    if (!mounted) return;
-    setState(() => _submitting = false);
-    if (!ok) {
-      await showAppErrorDialog(
-        context,
-        title: 'Confirmation failed',
-        message:
-            widget.repository.lastActionError ?? 'Farmer confirmation failed.',
-      );
-      return;
-    }
-    await showAppSuccessDialog(
-      context,
-      title: _dispute ? 'Dispute recorded' : 'Farmer confirmed',
-      message: _dispute
-          ? 'The farmer dispute was recorded successfully.'
-          : 'The farmer confirmation was recorded successfully.',
+      message:
+          'Completed work was sent to the union. The farmer can review and confirm it in Shamba Bora.',
     );
     if (!mounted) return;
     Navigator.of(context).popUntil((route) => route.isFirst);

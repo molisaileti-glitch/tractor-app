@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:animations/animations.dart';
 
-class AppHorizontalStepper extends StatelessWidget {
+import 'app_motion.dart';
+
+class AppHorizontalStepper extends StatefulWidget {
   const AppHorizontalStepper({
     super.key,
     required this.currentStep,
@@ -21,19 +24,35 @@ class AppHorizontalStepper extends StatelessWidget {
   final bool hideControlsOnLastStep;
 
   @override
+  State<AppHorizontalStepper> createState() => _AppHorizontalStepperState();
+}
+
+class _AppHorizontalStepperState extends State<AppHorizontalStepper> {
+  int _previousStep = 0;
+
+  @override
+  void didUpdateWidget(covariant AppHorizontalStepper oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentStep != widget.currentStep) {
+      _previousStep = oldWidget.currentStep;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (steps.isEmpty) return const SizedBox.shrink();
+    if (widget.steps.isEmpty) return const SizedBox.shrink();
 
     final colorScheme = Theme.of(context).colorScheme;
-    final safeStep = currentStep.clamp(0, steps.length - 1);
-    final isLastStep = safeStep == steps.length - 1;
+    final safeStep = widget.currentStep.clamp(0, widget.steps.length - 1);
+    final isLastStep = safeStep == widget.steps.length - 1;
+    final movingBack = safeStep < _previousStep;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           children: [
-            for (var index = 0; index < steps.length; index++) ...[
+            for (var index = 0; index < widget.steps.length; index++) ...[
               if (index > 0)
                 Expanded(
                   child: Container(
@@ -47,10 +66,11 @@ class AppHorizontalStepper extends StatelessWidget {
                 index: index,
                 selected: index == safeStep,
                 complete:
-                    index < safeStep || steps[index].state == StepState.complete,
-                onTap: onStepTapped == null
+                    index < safeStep ||
+                    widget.steps[index].state == StepState.complete,
+                onTap: widget.onStepTapped == null
                     ? null
-                    : () => onStepTapped!(index),
+                    : () => widget.onStepTapped!(index),
               ),
             ],
           ],
@@ -59,12 +79,12 @@ class AppHorizontalStepper extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            for (var index = 0; index < steps.length; index++)
+            for (var index = 0; index < widget.steps.length; index++)
               Expanded(
                 child: InkWell(
-                  onTap: onStepTapped == null
+                  onTap: widget.onStepTapped == null
                       ? null
-                      : () => onStepTapped!(index),
+                      : () => widget.onStepTapped!(index),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: DefaultTextStyle.merge(
@@ -76,14 +96,14 @@ class AppHorizontalStepper extends StatelessWidget {
                             ? colorScheme.onSurface
                             : colorScheme.onSurfaceVariant,
                       ),
-                      child: steps[index].title,
+                      child: widget.steps[index].title,
                     ),
                   ),
                 ),
               ),
           ],
         ),
-        if (steps[safeStep].subtitle case final subtitle?) ...[
+        if (widget.steps[safeStep].subtitle case final subtitle?) ...[
           const SizedBox(height: 10),
           DefaultTextStyle.merge(
             textAlign: TextAlign.center,
@@ -94,11 +114,23 @@ class AppHorizontalStepper extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 20),
-        KeyedSubtree(
-          key: ValueKey(safeStep),
-          child: steps[safeStep].content,
+        PageTransitionSwitcher(
+          duration: AppMotion.duration(context, AppMotion.emphasized),
+          reverse: movingBack,
+          transitionBuilder: (child, primaryAnimation, secondaryAnimation) =>
+              SharedAxisTransition(
+                animation: primaryAnimation,
+                secondaryAnimation: secondaryAnimation,
+                transitionType: SharedAxisTransitionType.horizontal,
+                fillColor: Colors.transparent,
+                child: child,
+              ),
+          child: KeyedSubtree(
+            key: ValueKey(safeStep),
+            child: widget.steps[safeStep].content,
+          ),
         ),
-        if (!(hideControlsOnLastStep && isLastStep))
+        if (!(widget.hideControlsOnLastStep && isLastStep))
           Padding(
             padding: const EdgeInsets.only(top: 18),
             child: Row(
@@ -106,7 +138,7 @@ class AppHorizontalStepper extends StatelessWidget {
                 if (safeStep > 0) ...[
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: onStepBack,
+                      onPressed: widget.onStepBack,
                       child: const Text('Back'),
                     ),
                   ),
@@ -114,7 +146,9 @@ class AppHorizontalStepper extends StatelessWidget {
                 ],
                 Expanded(
                   child: FilledButton(
-                    onPressed: canContinue ? onStepContinue : null,
+                    onPressed: widget.canContinue
+                        ? widget.onStepContinue
+                        : null,
                     child: const Text('Next'),
                   ),
                 ),

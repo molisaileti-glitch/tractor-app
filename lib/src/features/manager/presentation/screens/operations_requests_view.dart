@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:animations/animations.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../../components/components.dart';
@@ -119,13 +120,26 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
           ),
         ),
         const SizedBox(height: 14),
-        if (requests.isEmpty)
-          const _RequestsEmptyState(message: 'No requests found.')
-        else
-          _RequestCardGrid(
-            requests: requests,
-            onOpen: (id) => _openRequest(context, id),
-          ),
+        PageTransitionSwitcher(
+          duration: AppMotion.duration(context, AppMotion.standard),
+          transitionBuilder: (child, primaryAnimation, secondaryAnimation) =>
+              FadeThroughTransition(
+                animation: primaryAnimation,
+                secondaryAnimation: secondaryAnimation,
+                fillColor: Colors.transparent,
+                child: child,
+              ),
+          child: requests.isEmpty
+              ? _RequestsEmptyState(
+                  key: ValueKey('empty-$_status'),
+                  message: 'No requests found.',
+                )
+              : _RequestCardGrid(
+                  key: ValueKey('requests-$_status'),
+                  requests: requests,
+                  onOpen: (id) => _openRequest(context, id),
+                ),
+        ),
       ],
     );
   }
@@ -133,7 +147,7 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
   void _openRequest(BuildContext context, String id) {
     unawaited(widget.repository.refreshRequestDetail(id));
     Navigator.of(context).push(
-      MaterialPageRoute(
+      appPageRoute(
         builder: (_) => OperationsRequestDetailScreen(
           repository: widget.repository,
           requestId: id,
@@ -154,7 +168,7 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
 }
 
 class _RequestsEmptyState extends StatelessWidget {
-  const _RequestsEmptyState({required this.message});
+  const _RequestsEmptyState({super.key, required this.message});
 
   final String message;
 
@@ -275,7 +289,11 @@ class _FilterChip extends StatelessWidget {
 }
 
 class _RequestCardGrid extends StatelessWidget {
-  const _RequestCardGrid({required this.requests, required this.onOpen});
+  const _RequestCardGrid({
+    super.key,
+    required this.requests,
+    required this.onOpen,
+  });
 
   final List<OperationsServiceRequest> requests;
   final ValueChanged<String> onOpen;
@@ -820,7 +838,7 @@ class OperationsRequestDetailScreen extends StatelessWidget {
 
   void _openSchedule(BuildContext context, String id) {
     Navigator.of(context).push(
-      MaterialPageRoute(
+      appPageRoute(
         builder: (_) =>
             ScheduleServiceScreen(repository: repository, requestId: id),
       ),

@@ -419,7 +419,7 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
       return;
     }
     navigator.pushReplacement(
-      MaterialPageRoute(
+      appPageRoute(
         builder: (_) => OperatorProgressScreen(
           repository: widget.repository,
           jobId: widget.jobId,
