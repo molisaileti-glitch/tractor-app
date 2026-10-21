@@ -26,7 +26,9 @@ class _OperationsScheduleViewState extends State<OperationsScheduleView> {
   @override
   Widget build(BuildContext context) {
     final jobs = widget.repository.jobs.toList()
-      ..sort((first, second) => first.scheduledAt.compareTo(second.scheduledAt));
+      ..sort(
+        (first, second) => first.scheduledAt.compareTo(second.scheduledAt),
+      );
     final selectedCount = jobs
         .where((job) => _sameDate(job.scheduledAt, _selectedDate))
         .length;
@@ -100,10 +102,7 @@ class _OperationsScheduleViewState extends State<OperationsScheduleView> {
 }
 
 class _WeekStrip extends StatelessWidget {
-  const _WeekStrip({
-    required this.selectedDate,
-    required this.onDateSelected,
-  });
+  const _WeekStrip({required this.selectedDate, required this.onDateSelected});
 
   final DateTime selectedDate;
   final ValueChanged<DateTime> onDateSelected;
@@ -171,98 +170,6 @@ class _WeekStrip extends StatelessWidget {
 
   String _weekday(int weekday) {
     return const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][weekday - 1];
-  }
-}
-
-class _ScheduleBoard extends StatelessWidget {
-  const _ScheduleBoard({required this.jobs});
-
-  final List<OperationsJob> jobs;
-
-  @override
-  Widget build(BuildContext context) {
-    final rows = List.generate(14, (index) => index + 6);
-    return Column(
-      children: [
-        for (final hour in rows)
-          SizedBox(
-            height: 74,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: 54,
-                  child: Text(
-                    '${hour.toString().padLeft(2, '0')}:00',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Stack(
-                    children: [
-                      Positioned.fill(
-                        top: 10,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            border: Border(
-                              top: BorderSide(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.outlineVariant,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      for (final job in jobs.where(
-                        (item) => item.scheduledAt.hour == hour,
-                      ))
-                        _JobBlock(job: job),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _JobBlock extends StatelessWidget {
-  const _JobBlock({required this.job});
-
-  final OperationsJob job;
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.topLeft,
-      child: FractionallySizedBox(
-        widthFactor: 0.72,
-        child: Container(
-          margin: const EdgeInsets.only(top: 4),
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.14),
-            borderRadius: BorderRadius.circular(8),
-            border: Border(
-              left: BorderSide(
-                color: Theme.of(context).colorScheme.primary,
-                width: 4,
-              ),
-            ),
-          ),
-          child: Text(
-            '${formatTime(job.scheduledAt)}\n${job.farmerName}\n${job.serviceType.label}',
-            style: const TextStyle(fontWeight: FontWeight.w800, height: 1.2),
-          ),
-        ),
-      ),
-    );
   }
 }
 
@@ -345,6 +252,7 @@ class _OperationsCalendarBoard extends StatelessWidget {
               builder: (context, constraints) {
                 final columnWidth =
                     (constraints.maxWidth - _timeColumnWidth) / days.length;
+                final placements = _placeOverlappingJobs(visibleJobs);
                 return Stack(
                   clipBehavior: Clip.none,
                   children: [
@@ -363,17 +271,17 @@ class _OperationsCalendarBoard extends StatelessWidget {
                         left: _timeColumnWidth + i * columnWidth,
                         child: Container(
                           width: 1,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.outlineVariant,
+                          color: Theme.of(context).colorScheme.outlineVariant,
                         ),
                       ),
-                    for (final job in visibleJobs)
+                    for (final placement in placements)
                       _PositionedOperationsJobBlock(
-                        job: job,
+                        job: placement.job,
                         days: days,
                         minHour: minHour,
                         columnWidth: columnWidth,
+                        lane: placement.lane,
+                        laneCount: placement.laneCount,
                       ),
                     _OperationsCurrentTimeLine(
                       days: days,
@@ -400,12 +308,76 @@ class _OperationsCalendarBoard extends StatelessWidget {
 
   int _maxHour(List<OperationsJob> visibleJobs) {
     if (visibleJobs.isEmpty) return 19;
-    final latest = visibleJobs.map((job) {
-      final end = job.scheduledAt.add(Duration(hours: job.estimatedHours));
-      return end.minute == 0 ? end.hour : end.hour + 1;
-    }).reduce((first, second) => first > second ? first : second);
+    final latest = visibleJobs
+        .map((job) {
+          final end = job.scheduledAt.add(Duration(hours: job.estimatedHours));
+          return end.minute == 0 ? end.hour : end.hour + 1;
+        })
+        .reduce((first, second) => first > second ? first : second);
     return latest > 19 ? latest : 19;
   }
+
+  List<_CalendarJobPlacement> _placeOverlappingJobs(List<OperationsJob> jobs) {
+    final placements = <_CalendarJobPlacement>[];
+    final jobsByDay = <DateTime, List<OperationsJob>>{};
+    for (final job in jobs) {
+      final day = DateTime(
+        job.scheduledAt.year,
+        job.scheduledAt.month,
+        job.scheduledAt.day,
+      );
+      jobsByDay.putIfAbsent(day, () => []).add(job);
+    }
+
+    for (final dayJobs in jobsByDay.values) {
+      dayJobs.sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+      var index = 0;
+      while (index < dayJobs.length) {
+        final group = <OperationsJob>[dayJobs[index]];
+        var groupEnd = _jobEnd(dayJobs[index]);
+        var cursor = index + 1;
+        while (cursor < dayJobs.length &&
+            dayJobs[cursor].scheduledAt.isBefore(groupEnd)) {
+          final job = dayJobs[cursor];
+          group.add(job);
+          final end = _jobEnd(job);
+          if (end.isAfter(groupEnd)) groupEnd = end;
+          cursor++;
+        }
+
+        final laneEnds = <DateTime>[];
+        final assignedLanes = <OperationsJob, int>{};
+        for (final job in group) {
+          var lane = laneEnds.indexWhere(
+            (end) => !end.isAfter(job.scheduledAt),
+          );
+          if (lane == -1) {
+            lane = laneEnds.length;
+            laneEnds.add(_jobEnd(job));
+          } else {
+            laneEnds[lane] = _jobEnd(job);
+          }
+          assignedLanes[job] = lane;
+        }
+
+        final laneCount = laneEnds.length;
+        for (final job in group) {
+          placements.add(
+            _CalendarJobPlacement(
+              job: job,
+              lane: assignedLanes[job]!,
+              laneCount: laneCount,
+            ),
+          );
+        }
+        index = cursor;
+      }
+    }
+    return placements;
+  }
+
+  DateTime _jobEnd(OperationsJob job) =>
+      job.scheduledAt.add(Duration(hours: job.estimatedHours.clamp(1, 24)));
 
   bool _sameDate(DateTime first, DateTime second) {
     return first.year == second.year &&
@@ -460,12 +432,16 @@ class _PositionedOperationsJobBlock extends StatelessWidget {
     required this.days,
     required this.minHour,
     required this.columnWidth,
+    required this.lane,
+    required this.laneCount,
   });
 
   final OperationsJob job;
   final List<DateTime> days;
   final int minHour;
   final double columnWidth;
+  final int lane;
+  final int laneCount;
 
   @override
   Widget build(BuildContext context) {
@@ -476,17 +452,25 @@ class _PositionedOperationsJobBlock extends StatelessWidget {
         (job.scheduledAt.hour - minHour) * 60 + job.scheduledAt.minute;
     final durationMinutes = end.difference(job.scheduledAt).inMinutes;
     final top = startMinutes / 60 * _OperationsCalendarBoard._rowHeight;
-    final height = (durationMinutes <= 0 ? 60 : durationMinutes) /
+    final height =
+        (durationMinutes <= 0 ? 60 : durationMinutes) /
         60 *
         _OperationsCalendarBoard._rowHeight;
+    const horizontalGap = 3.0;
+    final availableWidth = columnWidth - 8;
+    final laneWidth =
+        (availableWidth - horizontalGap * (laneCount - 1)) / laneCount;
     final left =
-        _OperationsCalendarBoard._timeColumnWidth + dayIndex * columnWidth + 4;
+        _OperationsCalendarBoard._timeColumnWidth +
+        dayIndex * columnWidth +
+        4 +
+        lane * (laneWidth + horizontalGap);
     final color = _statusColor(context, job.status);
 
     return Positioned(
       top: top + 4,
       left: left,
-      width: columnWidth - 8,
+      width: laneWidth,
       height: height.clamp(54, 280).toDouble(),
       child: Container(
         padding: const EdgeInsets.all(8),
@@ -557,6 +541,18 @@ class _PositionedOperationsJobBlock extends StatelessWidget {
   }
 }
 
+class _CalendarJobPlacement {
+  const _CalendarJobPlacement({
+    required this.job,
+    required this.lane,
+    required this.laneCount,
+  });
+
+  final OperationsJob job;
+  final int lane;
+  final int laneCount;
+}
+
 class _OperationsCurrentTimeLine extends StatelessWidget {
   const _OperationsCurrentTimeLine({
     required this.days,
@@ -594,10 +590,7 @@ class _OperationsCurrentTimeLine extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: Container(
-              height: 1.5,
-              color: const Color(0xFFE11D48),
-            ),
+            child: Container(height: 1.5, color: const Color(0xFFE11D48)),
           ),
         ],
       ),

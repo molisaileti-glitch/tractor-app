@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../components/components.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/generated/app_localizations.dart';
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/operator_local_repository.dart';
 import '../../domain/entities/operator_job.dart';
@@ -22,6 +23,7 @@ class OperatorJobsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context)!;
     final displayName = repository.operatorName?.split(' ').first ?? 'Operator';
     final now = DateTime.now();
     final currentJobs = repository.jobs.where((job) {
@@ -30,7 +32,8 @@ class OperatorJobsScreen extends StatelessWidget {
           job.status == OperatorJobStatus.enRoute ||
           job.status == OperatorJobStatus.arrived ||
           job.status == OperatorJobStatus.inProgress;
-      return activelyUnderway || _sameDate(job.scheduledAt, now);
+      final today = DateTime(now.year, now.month, now.day);
+      return activelyUnderway || !job.scheduledAt.isBefore(today);
     }).toList()..sort(_sortJobs);
     final focusJob = currentJobs.firstOrNull;
     final totalTodayJobs = repository.jobs
@@ -53,7 +56,7 @@ class OperatorJobsScreen extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        'Good morning, $displayName',
+                        strings.goodMorning(displayName),
                         style: Theme.of(context).textTheme.headlineSmall
                             ?.copyWith(fontWeight: FontWeight.w700),
                       ),
@@ -72,32 +75,32 @@ class OperatorJobsScreen extends StatelessWidget {
                   children: [
                     _DashboardToolCard(
                       value: '${repository.jobs.length}',
-                      label: 'Assigned jobs',
-                      detail: 'All assignments',
+                      label: strings.assignedJobs,
+                      detail: strings.allAssignments,
                       icon: Icons.assignment_outlined,
                       tint: const Color(0xFFEAF2FF),
                       iconColor: const Color(0xFF2563EB),
                     ),
                     _DashboardToolCard(
                       value: '$totalTodayJobs',
-                      label: 'Today',
-                      detail: 'Scheduled for this date',
+                      label: strings.today,
+                      detail: strings.scheduledForDate,
                       icon: Icons.today_outlined,
                       tint: AppColors.mint,
                       iconColor: AppColors.fieldGreen,
                     ),
                     _DashboardToolCard(
                       value: '$activeCount',
-                      label: 'Active',
-                      detail: 'Not yet closed',
+                      label: strings.active,
+                      detail: strings.notYetClosed,
                       icon: Icons.route_outlined,
                       tint: const Color(0xFFFFF4E6),
                       iconColor: AppColors.tractorOrange,
                     ),
                     _DashboardToolCard(
                       value: '${repository.history.length}',
-                      label: 'Completed',
-                      detail: 'Finished jobs',
+                      label: strings.completed,
+                      detail: strings.finishedJobs,
                       icon: Icons.task_alt_outlined,
                       tint: const Color(0xFFF0ECFF),
                       iconColor: AppColors.purple,
@@ -108,7 +111,7 @@ class OperatorJobsScreen extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      'FOCUS JOB',
+                      strings.focusJob.toUpperCase(),
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
@@ -117,7 +120,7 @@ class OperatorJobsScreen extends StatelessWidget {
                     TextButton.icon(
                       onPressed: onOpenSchedule,
                       icon: const Icon(Icons.calendar_month_outlined),
-                      label: const Text('View Schedule'),
+                      label: Text(strings.viewSchedule),
                     ),
                   ],
                 ),
@@ -198,7 +201,7 @@ class _SyncNotice extends StatelessWidget {
             ),
           ),
           IconButton(
-            tooltip: 'Retry',
+            tooltip: AppLocalizations.of(context)!.retry,
             onPressed: onRetry,
             icon: const Icon(Icons.refresh),
           ),
@@ -225,12 +228,12 @@ class _NoAssignedJobsCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(
-              'No current assignment',
+              AppLocalizations.of(context)!.noCurrentAssignment,
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 4),
             Text(
-              'Your active job will appear here when it is ready.',
+              AppLocalizations.of(context)!.activeJobAppearsHere,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: AppColors.adaptiveMutedText(context),
@@ -361,6 +364,7 @@ class _OperatorJobCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final strings = AppLocalizations.of(context)!;
     return Container(
       padding: EdgeInsets.all(emphasis ? 20 : 18),
       decoration: BoxDecoration(
@@ -432,7 +436,9 @@ class _OperatorJobCard extends StatelessWidget {
               if (job.plannedAcres != null)
                 _MiniChip(
                   icon: Icons.straighten,
-                  label: '${job.plannedAcres!.toStringAsFixed(1)} acres',
+                  label: strings.acresValue(
+                    job.plannedAcres!.toStringAsFixed(1),
+                  ),
                 ),
               _MiniChip(
                 icon: Icons.agriculture,
@@ -441,11 +447,11 @@ class _OperatorJobCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          _Line(label: 'Farmer', value: _farmerText(job)),
-          _Line(label: 'Plot', value: job.plot.name),
+          _Line(label: strings.farmer, value: _farmerText(job)),
+          _Line(label: strings.plot, value: job.plot.name),
           if (job.amount != null)
             _Line(
-              label: 'Amount',
+              label: strings.amount,
               value:
                   '${job.currency ?? ''} ${job.amount!.toStringAsFixed(job.amount! % 1 == 0 ? 0 : 2)}'
                       .trim(),
@@ -457,7 +463,7 @@ class _OperatorJobCard extends StatelessWidget {
                 child: FilledButton.icon(
                   onPressed: onView,
                   icon: const Icon(Icons.open_in_new),
-                  label: Text(_actionLabel(job.status)),
+                  label: Text(_actionLabel(job.status, strings)),
                 ),
               ),
             ],
@@ -481,15 +487,15 @@ class _OperatorJobCard extends StatelessWidget {
     return '${job.farmerName} - $phone';
   }
 
-  String _actionLabel(OperatorJobStatus status) {
+  String _actionLabel(OperatorJobStatus status, AppLocalizations strings) {
     return switch (status) {
-      OperatorJobStatus.arrived => 'Open Arrival',
-      OperatorJobStatus.inProgress => 'Continue Work',
-      OperatorJobStatus.enRoute => 'Navigate',
+      OperatorJobStatus.arrived => strings.openArrival,
+      OperatorJobStatus.inProgress => strings.continueWork,
+      OperatorJobStatus.enRoute => strings.navigate,
       OperatorJobStatus.dispatched ||
       OperatorJobStatus.assigned ||
-      OperatorJobStatus.scheduled => 'Open Job',
-      OperatorJobStatus.completedPendingConfirmation => 'View',
+      OperatorJobStatus.scheduled => strings.openJob,
+      OperatorJobStatus.completedPendingConfirmation => strings.view,
     };
   }
 }

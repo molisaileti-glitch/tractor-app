@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../components/components.dart';
+import '../../../../l10n/generated/app_localizations.dart';
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/operator_local_repository.dart';
 import '../../domain/entities/operator_job.dart';
@@ -22,11 +23,21 @@ class _OperatorScheduleScreenState extends State<OperatorScheduleScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedDate = DateTime.now();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final upcoming =
+        widget.repository.jobs
+            .where((job) => !job.isComplete && !job.scheduledAt.isBefore(today))
+            .toList()
+          ..sort(
+            (first, second) => first.scheduledAt.compareTo(second.scheduledAt),
+          );
+    _selectedDate = upcoming.firstOrNull?.scheduledAt ?? today;
   }
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context)!;
     final jobs = widget.repository.jobs.toList()
       ..sort(
         (first, second) => first.scheduledAt.compareTo(second.scheduledAt),
@@ -52,7 +63,7 @@ class _OperatorScheduleScreenState extends State<OperatorScheduleScreen> {
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Choose date',
+                    tooltip: strings.chooseDate,
                     onPressed: _pickDate,
                     icon: const Icon(Icons.keyboard_arrow_down),
                   ),
@@ -72,8 +83,13 @@ class _OperatorScheduleScreenState extends State<OperatorScheduleScreen> {
                     Expanded(
                       child: Text(
                         selectedCount == 0
-                            ? 'No assignments on ${formatShortDate(_selectedDate)}.'
-                            : '$selectedCount assignment${selectedCount == 1 ? '' : 's'} on ${formatShortDate(_selectedDate)}.',
+                            ? strings.noAssignmentsOn(
+                                formatShortDate(_selectedDate),
+                              )
+                            : strings.assignmentsOn(
+                                selectedCount,
+                                formatShortDate(_selectedDate),
+                              ),
                         style: const TextStyle(fontWeight: FontWeight.w800),
                       ),
                     ),

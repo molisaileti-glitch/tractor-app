@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../components/components.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/union_operations_repository.dart';
 import '../../domain/entities/operations_models.dart';
@@ -21,10 +22,10 @@ class ScheduleServiceScreen extends StatefulWidget {
 }
 
 class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
-  final _implementController = TextEditingController();
   int _currentStep = 0;
   String? _tractorId;
   String? _operatorId;
+  String? _selectedImplement;
   DateTime _date = DateTime.now();
   TimeOfDay _time = const TimeOfDay(hour: 8, minute: 0);
   int _duration = 4;
@@ -45,12 +46,6 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
   }
 
   @override
-  void dispose() {
-    _implementController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final request = widget.repository.requestById(widget.requestId);
     final availableTractors = widget.repository.tractors
@@ -59,333 +54,292 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
     final availableOperators = widget.repository.operators
         .where((operator) => operator.status.canSchedule)
         .toList();
+    final selectedTractor = availableTractors
+        .where((tractor) => tractor.id == _tractorId)
+        .firstOrNull;
+    final implementNames = selectedTractor?.implementNames ?? const <String>[];
     return Scaffold(
-      appBar: AppBar(title: const Text('Schedule Service')),
+      appBar: AppBar(
+        title: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.calendar_month_outlined),
+            SizedBox(width: 10),
+            Text('Schedule service'),
+          ],
+        ),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
         child: Align(
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 820),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                OperationsCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 42,
-                            height: 42,
-                            decoration: BoxDecoration(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.primary.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              Icons.agriculture_outlined,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '${request.serviceType.label} service',
-                                  style: Theme.of(context).textTheme.titleLarge,
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Review the request before assigning resources',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 18),
-                      const Divider(height: 1),
-                      const SizedBox(height: 14),
-                      _RequestSummaryRow(
-                        icon: Icons.person_outline,
-                        label: 'Farmer',
-                        value: request.farmerName,
-                      ),
-                      const SizedBox(height: 12),
-                      _RequestSummaryRow(
-                        icon: Icons.landscape_outlined,
-                        label: 'Plot',
-                        value: request.plot.name,
-                      ),
-                      const SizedBox(height: 12),
-                      _RequestSummaryRow(
-                        icon: Icons.straighten_outlined,
-                        label: 'Requested work',
-                        value: request.requestedAcres == null
-                            ? 'Not provided'
-                            : '${request.requestedAcres!.toStringAsFixed(1)} acres',
-                      ),
-                      const SizedBox(height: 12),
-                      _RequestSummaryRow(
-                        icon: Icons.event_outlined,
-                        label: 'Preferred date',
-                        value: formatDate(request.preferredDate),
-                      ),
-                      if (request.preferredWindow != null) ...[
-                        const SizedBox(height: 12),
-                        _RequestSummaryRow(
-                          icon: Icons.schedule_outlined,
-                          label: 'Preferred time',
-                          value: request.preferredWindow!,
-                        ),
-                      ],
-                    ],
-                  ),
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outlineVariant,
                 ),
-                const SizedBox(height: 12),
-                AppHorizontalStepper(
-                  currentStep: _currentStep,
-                  canContinue: _currentStep == 0
-                      ? _tractorId != null
-                      : _operatorId != null,
-                  onStepTapped: (step) {
-                    final canOpen =
-                        step == 0 ||
-                        (step == 1 && _tractorId != null) ||
-                        (step == 2 &&
-                            _tractorId != null &&
-                            _operatorId != null);
-                    if (canOpen) setState(() => _currentStep = step);
-                  },
-                  onStepContinue: () {
-                    if (_currentStep == 0 && _tractorId != null) {
-                      setState(() => _currentStep = 1);
-                    } else if (_currentStep == 1 && _operatorId != null) {
-                      setState(() => _currentStep = 2);
-                    }
-                  },
-                  onStepBack: _currentStep == 0
-                      ? null
-                      : () => setState(() => _currentStep--),
-                  steps: [
-                    Step(
-                      title: const Text('Select tractor'),
-                      subtitle: Text(
-                        _tractorId == null
-                            ? 'Choose an available tractor'
-                            : 'Tractor selected',
-                      ),
-                      isActive: _currentStep >= 0,
-                      state: _tractorId == null
-                          ? StepState.indexed
-                          : StepState.complete,
-                      content: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (availableTractors.isEmpty)
-                            const AppEmptyState(
-                              icon: Icons.agriculture_outlined,
-                              title: 'No tractors available',
-                              message:
-                                  'Available tractors will appear here when they are ready for scheduling.',
-                            ),
-                          for (final tractor in availableTractors) ...[
-                            _SelectableResourceCard(
-                              selected: _tractorId == tractor.id,
-                              title:
-                                  tractor.assetNo ??
-                                  tractor.label ??
-                                  tractor.model,
-                              subtitle: tractor.model,
-                              supportingText: tractor.note,
-                              trailing: OperationsStatusChip.tractor(
-                                tractorStatus: tractor.status,
-                              ),
-                              onTap: () => setState(() {
-                                _tractorId = _tractorId == tractor.id
-                                    ? null
-                                    : tractor.id;
-                                _availability = null;
-                              }),
-                            ),
-                            const SizedBox(height: 10),
-                          ],
-                        ],
-                      ),
-                    ),
-                    Step(
-                      title: const Text('Select operator'),
-                      subtitle: Text(
-                        _operatorId == null
-                            ? 'Choose an available operator'
-                            : 'Operator selected',
-                      ),
-                      isActive: _currentStep >= 1,
-                      state: _operatorId == null
-                          ? StepState.indexed
-                          : StepState.complete,
-                      content: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (availableOperators.isEmpty)
-                            const AppEmptyState(
-                              icon: Icons.engineering_outlined,
-                              title: 'No operators available',
-                              message:
-                                  'Registered operators will appear here when they are available for scheduling.',
-                            ),
-                          for (final operator in availableOperators) ...[
-                            _SelectableResourceCard(
-                              selected: _operatorId == operator.id,
-                              title: operator.name,
-                              supportingText: operator.note,
-                              trailing: OperationsStatusChip.operator(
-                                operatorStatus: operator.status,
-                              ),
-                              onTap: () => setState(() {
-                                _operatorId = _operatorId == operator.id
-                                    ? null
-                                    : operator.id;
-                                _availability = null;
-                              }),
-                            ),
-                            const SizedBox(height: 10),
-                          ],
-                        ],
-                      ),
-                    ),
-                    Step(
-                      title: const Text('Schedule'),
-                      subtitle: const Text('Choose the service date and time'),
-                      isActive: _currentStep >= 2,
-                      content: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          OperationsCard(
-                            child: Column(
-                              children: [
-                                _ScheduleTile(
-                                  label: 'Date',
-                                  value: formatDate(_date),
-                                  icon: Icons.calendar_month_outlined,
-                                  onTap: _pickDate,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _RequestOverview(request: request),
+                    const SizedBox(height: 22),
+                    AppHorizontalStepper(
+                      currentStep: _currentStep,
+                      canContinue: _currentStep == 0
+                          ? _tractorId != null
+                          : _operatorId != null,
+                      onStepTapped: (step) {
+                        final canOpen =
+                            step == 0 ||
+                            (step == 1 && _tractorId != null) ||
+                            (step == 2 &&
+                                _tractorId != null &&
+                                _operatorId != null);
+                        if (canOpen) setState(() => _currentStep = step);
+                      },
+                      onStepContinue: () {
+                        if (_currentStep == 0 && _tractorId != null) {
+                          setState(() => _currentStep = 1);
+                        } else if (_currentStep == 1 && _operatorId != null) {
+                          setState(() => _currentStep = 2);
+                        }
+                      },
+                      onStepBack: _currentStep == 0
+                          ? null
+                          : () => setState(() => _currentStep--),
+                      steps: [
+                        Step(
+                          title: const Text('Tractor'),
+                          subtitle: Text(
+                            _tractorId == null
+                                ? 'Choose an available tractor'
+                                : 'Tractor selected',
+                          ),
+                          isActive: _currentStep >= 0,
+                          state: _tractorId == null
+                              ? StepState.indexed
+                              : StepState.complete,
+                          content: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (availableTractors.isEmpty)
+                                const AppEmptyState(
+                                  icon: Icons.agriculture_outlined,
+                                  title: 'No tractors available',
+                                  message:
+                                      'Available tractors will appear here when they are ready for scheduling.',
                                 ),
-                                const Divider(height: 24),
-                                _ScheduleTile(
-                                  label: 'Time',
-                                  value: _time.format(context),
-                                  icon: Icons.schedule,
-                                  onTap: _pickTime,
+                              for (final tractor in availableTractors) ...[
+                                _SelectableResourceCard(
+                                  selected: _tractorId == tractor.id,
+                                  title:
+                                      tractor.assetNo ??
+                                      tractor.label ??
+                                      tractor.model,
+                                  subtitle: tractor.model,
+                                  supportingText: tractor.note,
+                                  trailing: OperationsStatusChip.tractor(
+                                    tractorStatus: tractor.status,
+                                  ),
+                                  onTap: () => setState(() {
+                                    _tractorId = _tractorId == tractor.id
+                                        ? null
+                                        : tractor.id;
+                                    _selectedImplement = null;
+                                    _availability = null;
+                                  }),
                                 ),
-                                const Divider(height: 24),
-                                Row(
+                                const SizedBox(height: 10),
+                              ],
+                            ],
+                          ),
+                        ),
+                        Step(
+                          title: const Text('Operator'),
+                          subtitle: Text(
+                            _operatorId == null
+                                ? 'Choose an available operator'
+                                : 'Operator selected',
+                          ),
+                          isActive: _currentStep >= 1,
+                          state: _operatorId == null
+                              ? StepState.indexed
+                              : StepState.complete,
+                          content: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (availableOperators.isEmpty)
+                                const AppEmptyState(
+                                  icon: Icons.engineering_outlined,
+                                  title: 'No operators available',
+                                  message:
+                                      'Registered operators will appear here when they are available for scheduling.',
+                                ),
+                              for (final operator in availableOperators) ...[
+                                _SelectableResourceCard(
+                                  selected: _operatorId == operator.id,
+                                  title: operator.name,
+                                  supportingText: operator.note,
+                                  trailing: OperationsStatusChip.operator(
+                                    operatorStatus: operator.status,
+                                  ),
+                                  onTap: () => setState(() {
+                                    _operatorId = _operatorId == operator.id
+                                        ? null
+                                        : operator.id;
+                                    _availability = null;
+                                  }),
+                                ),
+                                const SizedBox(height: 10),
+                              ],
+                            ],
+                          ),
+                        ),
+                        Step(
+                          title: const Text('Schedule'),
+                          subtitle: const Text(
+                            'Choose the service date and time',
+                          ),
+                          isActive: _currentStep >= 2,
+                          content: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _ScheduleDetailsPanel(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
                                   children: [
-                                    const Expanded(
-                                      child: Text('Estimated duration'),
+                                    _ScheduleTile(
+                                      label: 'Date',
+                                      value: formatDate(_date),
+                                      icon: Icons.calendar_month_outlined,
+                                      onTap: _pickDate,
                                     ),
-                                    DropdownButton<int>(
-                                      value: _duration,
-                                      items: [2, 3, 4, 5, 6]
-                                          .map(
-                                            (hours) => DropdownMenuItem(
-                                              value: hours,
-                                              child: Text('$hours hours'),
-                                            ),
-                                          )
-                                          .toList(),
-                                      onChanged: (value) => setState(() {
-                                        _duration = value ?? _duration;
-                                        _availability = null;
-                                      }),
+                                    const Divider(height: 1),
+                                    _ScheduleTile(
+                                      label: 'Start time',
+                                      value: _time.format(context),
+                                      icon: Icons.schedule,
+                                      onTap: _pickTime,
+                                    ),
+                                    const Divider(height: 1),
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        16,
+                                        16,
+                                        16,
+                                        18,
+                                      ),
+                                      child: _DurationSelector(
+                                        value: _duration,
+                                        onChanged: (value) => setState(() {
+                                          _duration = value;
+                                          _availability = null;
+                                        }),
+                                      ),
                                     ),
                                   ],
                                 ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          TextField(
-                            controller: _implementController,
-                            textInputAction: TextInputAction.done,
-                            decoration: const InputDecoration(
-                              labelText: 'Implement',
-                              hintText: 'For example, disc plough 3-furrow',
-                              prefixIcon: Icon(Icons.handyman_outlined),
-                            ),
-                            onChanged: (_) => setState(() {
-                              _availability = null;
-                            }),
-                          ),
-                          const SizedBox(height: 14),
-                          OutlinedButton.icon(
-                            onPressed: _checkingAvailability
-                                ? null
-                                : _checkAvailability,
-                            icon: _checkingAvailability
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Icon(Icons.event_available_outlined),
-                            label: Text(
-                              _checkingAvailability
-                                  ? 'Checking availability...'
-                                  : 'Check Availability',
-                            ),
-                          ),
-                          if (_availability != null) ...[
-                            const SizedBox(height: 10),
-                            OperationsCard(
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Icon(
-                                    _availability!.isAvailable
-                                        ? Icons.check_circle_outline
-                                        : Icons.warning_amber_outlined,
-                                    color: _availability!.isAvailable
-                                        ? Theme.of(context).colorScheme.primary
-                                        : Theme.of(context).colorScheme.error,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(child: Text(_availability!.summary)),
-                                ],
                               ),
-                            ),
-                          ],
-                          const SizedBox(height: 14),
-                          FilledButton.icon(
-                            onPressed: _submitting ? null : _confirmSchedule,
-                            icon: _submitting
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Icon(Icons.check),
-                            label: Text(
-                              _submitting
-                                  ? 'Scheduling...'
-                                  : 'Confirm Schedule',
-                            ),
+                              const SizedBox(height: 14),
+                              if (implementNames.isEmpty)
+                                const AppMessage(
+                                  message:
+                                      'The selected tractor has no configured implements. Update its tractor record before scheduling.',
+                                  type: AppMessageType.warning,
+                                )
+                              else
+                                DropdownButtonFormField<String>(
+                                  initialValue: _selectedImplement,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Implement',
+                                    prefixIcon: Icon(Icons.handyman_outlined),
+                                  ),
+                                  hint: const Text('Select an implement'),
+                                  items: [
+                                    for (final implement in implementNames)
+                                      DropdownMenuItem(
+                                        value: implement,
+                                        child: Text(implement),
+                                      ),
+                                  ],
+                                  onChanged: (value) => setState(() {
+                                    _selectedImplement = value;
+                                    _availability = null;
+                                  }),
+                                ),
+                              const SizedBox(height: 14),
+                              if (_availability == null)
+                                OutlinedButton.icon(
+                                  onPressed: _checkingAvailability
+                                      ? null
+                                      : _checkAvailability,
+                                  icon: _checkingAvailability
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons.event_available_outlined,
+                                        ),
+                                  label: Text(
+                                    _checkingAvailability
+                                        ? 'Checking availability...'
+                                        : 'Check availability',
+                                  ),
+                                )
+                              else
+                                _AvailabilityBanner(result: _availability!),
+                              const SizedBox(height: 16),
+                              FilledButton.icon(
+                                onPressed:
+                                    _submitting ||
+                                        _availability?.isAvailable != true
+                                    ? null
+                                    : _confirmSchedule,
+                                icon: _submitting
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(Icons.check),
+                                label: Text(
+                                  _submitting
+                                      ? 'Scheduling...'
+                                      : 'Confirm schedule',
+                                ),
+                              ),
+                              if (_availability != null) ...[
+                                const SizedBox(height: 8),
+                                TextButton.icon(
+                                  onPressed: _checkingAvailability
+                                      ? null
+                                      : _checkAvailability,
+                                  icon: const Icon(Icons.refresh_rounded),
+                                  label: const Text('Check availability again'),
+                                ),
+                              ],
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
@@ -451,12 +405,12 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
       );
       return;
     }
-    final implement = _implementController.text.trim();
-    if (implement.isEmpty) {
+    final implement = _selectedImplement;
+    if (implement == null) {
       await showAppErrorDialog(
         context,
         title: 'Implement required',
-        message: 'Enter the implement that will be used for this service.',
+        message: 'Select the implement that will be used for this service.',
       );
       return;
     }
@@ -476,7 +430,7 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
     );
     if (!confirmed || !mounted) return;
     setState(() => _submitting = true);
-    final jobId = await widget.repository.scheduleRequest(
+    await widget.repository.scheduleRequest(
       requestId: widget.requestId,
       tractorId: _tractorId!,
       operatorId: _operatorId!,
@@ -494,51 +448,245 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
       );
       return;
     }
-    await showAppSuccessDialog(
+    final scheduledJob = widget.repository.jobForRequest(widget.requestId);
+    final dispatchNow = await showAppConfirmationDialog(
       context,
       title: 'Service scheduled',
-      message: 'Job $jobId is ready for the assigned operator.',
+      message:
+          'The schedule has been saved. Would you like to dispatch this job to the operator now?',
+      confirmLabel: 'Dispatch now',
+      cancelLabel: 'Later',
     );
     if (!mounted) return;
+    if (dispatchNow) {
+      if (scheduledJob == null) {
+        await showAppErrorDialog(
+          context,
+          title: 'Dispatch unavailable',
+          message:
+              'The schedule was saved, but the created job could not be loaded. Refresh the Jobs section and dispatch it from the job actions menu.',
+        );
+        if (!mounted) return;
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        return;
+      }
+      await widget.repository.dispatchJob(scheduledJob.id);
+      if (!mounted) return;
+      final error = widget.repository.mechanizationActionError;
+      if (error != null) {
+        await showAppErrorDialog(
+          context,
+          title: 'Dispatch failed',
+          message: error,
+        );
+        if (!mounted) return;
+      } else {
+        await showAppSuccessDialog(
+          context,
+          title: 'Job dispatched',
+          message:
+              'The assignment has been sent to the operator. You can continue tracking it under Jobs or Schedule.',
+        );
+        if (!mounted) return;
+      }
+    } else {
+      await showAppFeedbackDialog(
+        context,
+        title: 'Dispatch later',
+        message:
+            'You can dispatch this assignment later from the Jobs section using the job actions menu.',
+        icon: Icons.schedule_send_outlined,
+        color: Theme.of(context).colorScheme.primary,
+        buttonLabel: 'Got it',
+      );
+      if (!mounted) return;
+    }
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 }
 
-class _RequestSummaryRow extends StatelessWidget {
-  const _RequestSummaryRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
+class _RequestOverview extends StatelessWidget {
+  const _RequestOverview({required this.request});
 
-  final IconData icon;
-  final String label;
-  final String value;
+  final OperationsServiceRequest request;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Row(
+    final preferredWindow = request.preferredWindow?.trim();
+    final work = request.requestedAcres == null
+        ? '${request.plot.areaHectares.toStringAsFixed(1)} ha plot'
+        : '${request.requestedAcres!.toStringAsFixed(1)} acres requested';
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 20, color: theme.colorScheme.onSurfaceVariant),
-        const SizedBox(width: 10),
-        SizedBox(
-          width: 112,
-          child: Text(label, style: theme.textTheme.bodyMedium),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            value,
-            textAlign: TextAlign.end,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurface,
-              fontWeight: FontWeight.w600,
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: theme.colorScheme.outlineVariant),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.agriculture_outlined,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        request.serviceType.label,
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '${request.farmerName} - ${request.plot.name}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                OperationsStatusChip.request(requestStatus: request.status),
+              ],
             ),
           ),
         ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 5,
+          children: [
+            Text(
+              work,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            Text(
+              '- Preferred ${formatDate(request.preferredDate)}',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            if (preferredWindow != null && preferredWindow.isNotEmpty)
+              Text(
+                '- $preferredWindow',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+          ],
+        ),
       ],
+    );
+  }
+}
+
+class _ScheduleDetailsPanel extends StatelessWidget {
+  const _ScheduleDetailsPanel({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _DurationSelector extends StatelessWidget {
+  const _DurationSelector({required this.value, required this.onChanged});
+
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Estimated duration', style: theme.textTheme.labelLarge),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (final hours in const [2, 4, 6, 8])
+              ChoiceChip(
+                label: Text('$hours h'),
+                selected: value == hours,
+                onSelected: (_) => onChanged(hours),
+                showCheckmark: false,
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _AvailabilityBanner extends StatelessWidget {
+  const _AvailabilityBanner({required this.result});
+
+  final RequestAvailabilityResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = result.isAvailable
+        ? AppColors.adaptiveSuccess(context)
+        : theme.colorScheme.error;
+    return AnimatedContainer(
+      duration: AppMotion.standard,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            result.isAvailable
+                ? Icons.check_circle_outline
+                : Icons.warning_amber_outlined,
+            color: color,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              result.summary,
+              style: theme.textTheme.bodyMedium?.copyWith(color: color),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -636,26 +784,30 @@ class _ScheduleTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      child: Row(
-        children: [
-          Icon(icon),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: Theme.of(context).textTheme.labelLarge),
-                Text(
-                  value,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+        child: Row(
+          children: [
+            Icon(icon),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: Theme.of(context).textTheme.labelLarge),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const Icon(Icons.chevron_right),
-        ],
+            const Icon(Icons.chevron_right),
+          ],
+        ),
       ),
     );
   }

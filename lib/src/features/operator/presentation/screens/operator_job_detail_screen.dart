@@ -30,6 +30,7 @@ class OperatorJobDetailScreen extends StatelessWidget {
               Positioned.fill(
                 child: OperatorMapCard(
                   job: job,
+                  tractorPosition: repository.trackerPositionFor(job.tractorId),
                   label: 'JOB LOCATION',
                   fill: true,
                 ),
@@ -120,16 +121,14 @@ class OperatorJobDetailScreen extends StatelessWidget {
       confirmLabel: 'Accept',
     );
     if (!confirmed || !context.mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
     final ok = await repository.acceptAssignment(job.id);
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          ok
-              ? 'Assignment accepted. You can start the journey when ready.'
-              : repository.lastActionError ?? 'Accept failed.',
-        ),
-      ),
+    if (!context.mounted) return;
+    showAppSnackBar(
+      context,
+      message: ok
+          ? 'Assignment accepted. Start the journey from this job when ready.'
+          : repository.lastActionError ?? 'Accept failed.',
+      type: ok ? AppSnackType.success : AppSnackType.error,
     );
   }
 
@@ -143,13 +142,13 @@ class OperatorJobDetailScreen extends StatelessWidget {
     );
     if (!confirmed || !context.mounted) return;
     final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
     final ok = await repository.startJourney(job.id);
+    if (!context.mounted) return;
     if (!ok) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(repository.lastActionError ?? 'Could not go en route.'),
-        ),
+      showAppSnackBar(
+        context,
+        message: repository.lastActionError ?? 'Could not start the journey.',
+        type: AppSnackType.error,
       );
       return;
     }
@@ -200,29 +199,27 @@ class OperatorJobDetailScreen extends StatelessWidget {
             AppDialogActions(
               onCancel: () => Navigator.of(context).pop(),
               onConfirm: () async {
-                final messenger = ScaffoldMessenger.of(screenContext);
                 final ok = await repository.reportProblem(
                   jobId: job.id,
                   reason: reason,
                   notes: notesController.text.trim(),
                 );
+                if (!screenContext.mounted) return;
                 Navigator.of(context).pop();
-                messenger.showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      ok
-                          ? 'Problem sent to dispatcher for review.'
-                          : repository.lastActionError ??
-                                'Could not report problem.',
-                    ),
-                  ),
+                showAppSnackBar(
+                  screenContext,
+                  message: ok
+                      ? 'Problem sent to operations for review.'
+                      : repository.lastActionError ??
+                            'Could not report problem.',
+                  type: ok ? AppSnackType.success : AppSnackType.error,
                 );
               },
             ),
           ],
         ),
       ),
-    ).whenComplete(notesController.dispose);
+    ).whenComplete(() => disposeAppDialogController(notesController));
   }
 }
 

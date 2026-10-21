@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:animations/animations.dart';
 
 import '../../../../components/components.dart';
-import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/generated/app_localizations.dart';
 import '../../../../shared/application/app_preferences_controller.dart';
 import '../../data/repositories/operator_local_repository.dart';
 import 'operator_history_screen.dart';
@@ -34,6 +34,7 @@ class _OperatorShellState extends State<OperatorShell> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context)!;
     final screens = [
       OperatorJobsScreen(
         repository: widget.repository,
@@ -45,6 +46,7 @@ class _OperatorShellState extends State<OperatorShell> {
       OperatorProfileScreen(
         repository: widget.repository,
         preferences: widget.preferences,
+        onLogout: widget.onLogout,
         onThemeChanged: widget.onThemeChanged,
       ),
     ];
@@ -54,22 +56,10 @@ class _OperatorShellState extends State<OperatorShell> {
       builder: (context, _) {
         return Scaffold(
           appBar: AppBar(
-            title: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Image.asset(
-                  'assets/images/logo.png',
-                  width: 30,
-                  height: 30,
-                  semanticLabel: 'Kwanza Track logo',
-                ),
-                const SizedBox(width: 10),
-                Flexible(child: Text(_titleForIndex(_selectedIndex))),
-              ],
-            ),
+            title: Text(_titleForIndex(_selectedIndex, strings)),
             actions: [
               IconButton(
-                tooltip: 'Refresh',
+                tooltip: strings.refresh,
                 onPressed: widget.repository.isSyncingMechanization
                     ? null
                     : _refreshData,
@@ -81,10 +71,6 @@ class _OperatorShellState extends State<OperatorShell> {
                     : const Icon(Icons.refresh_rounded),
               ),
             ],
-          ),
-          drawer: _OperatorDrawer(
-            repository: widget.repository,
-            onLogout: widget.onLogout,
           ),
           body: SafeArea(
             top: false,
@@ -114,26 +100,26 @@ class _OperatorShellState extends State<OperatorShell> {
             onDestinationSelected: (index) {
               setState(() => _selectedIndex = index);
             },
-            destinations: const [
+            destinations: [
               NavigationDestination(
-                icon: Icon(Icons.dashboard_outlined),
-                selectedIcon: Icon(Icons.dashboard),
-                label: 'Dashboard',
+                icon: const Icon(Icons.dashboard_outlined),
+                selectedIcon: const Icon(Icons.dashboard),
+                label: strings.dashboard,
               ),
               NavigationDestination(
-                icon: Icon(Icons.calendar_month_outlined),
-                selectedIcon: Icon(Icons.calendar_month),
-                label: 'Schedule',
+                icon: const Icon(Icons.calendar_month_outlined),
+                selectedIcon: const Icon(Icons.calendar_month),
+                label: strings.schedule,
               ),
               NavigationDestination(
-                icon: Icon(Icons.history_outlined),
-                selectedIcon: Icon(Icons.history),
-                label: 'History',
+                icon: const Icon(Icons.history_outlined),
+                selectedIcon: const Icon(Icons.history),
+                label: strings.history,
               ),
               NavigationDestination(
-                icon: Icon(Icons.person_outline),
-                selectedIcon: Icon(Icons.person),
-                label: 'Profile',
+                icon: const Icon(Icons.person_outline),
+                selectedIcon: const Icon(Icons.person),
+                label: strings.profile,
               ),
             ],
           ),
@@ -142,12 +128,12 @@ class _OperatorShellState extends State<OperatorShell> {
     );
   }
 
-  String _titleForIndex(int index) {
+  String _titleForIndex(int index, AppLocalizations strings) {
     return switch (index) {
-      0 => 'Operator Dashboard',
-      1 => 'Schedule',
-      2 => 'Job History',
-      _ => 'Profile',
+      0 => strings.operatorDashboard,
+      1 => strings.schedule,
+      2 => strings.jobHistory,
+      _ => strings.profile,
     };
   }
 
@@ -157,90 +143,8 @@ class _OperatorShellState extends State<OperatorShell> {
     final error = widget.repository.mechanizationSyncError;
     showAppSnackBar(
       context,
-      message: error ?? 'Assignments refreshed successfully.',
+      message: error ?? AppLocalizations.of(context)!.assignmentsRefreshed,
       type: error == null ? AppSnackType.success : AppSnackType.error,
-    );
-  }
-}
-
-class _OperatorDrawer extends StatelessWidget {
-  const _OperatorDrawer({required this.repository, required this.onLogout});
-
-  final OperatorLocalRepository repository;
-  final VoidCallback onLogout;
-
-  @override
-  Widget build(BuildContext context) {
-    final name = repository.operatorName ?? 'Operator';
-    final role = repository.operatorRole ?? 'Mechanization operator';
-    final email = repository.operatorEmail;
-    final activeJobs = repository.jobs.where((job) => !job.isComplete).length;
-
-    return Drawer(
-      child: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              child: Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
-                    child: Image.asset(
-                      'assets/images/logo.png',
-                      width: 50,
-                      height: 50,
-                      fit: BoxFit.cover,
-                      semanticLabel: 'Kwanza Track logo',
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name,
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                        Text(
-                          email == null || email.isEmpty
-                              ? role
-                              : '$role\n$email',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: AppColors.adaptiveMutedText(context),
-                              ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          '$activeJobs active assignment${activeJobs == 1 ? '' : 's'}',
-                          style: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(color: AppColors.fieldGreen),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            const Spacer(),
-            const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: OutlinedButton.icon(
-                onPressed: onLogout,
-                icon: const Icon(Icons.logout),
-                label: const Text('Logout'),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

@@ -92,17 +92,17 @@ class AppSettingsScreen extends StatelessWidget {
                     ),
                   ),
                   const Divider(height: 1),
-                  SwitchListTile(
+                  ListTile(
                     contentPadding: EdgeInsets.zero,
-                    secondary: const Icon(Icons.language_outlined),
+                    leading: const Icon(Icons.language_outlined),
                     title: Text(strings.language),
                     subtitle: Text(
                       preferences.usesSwahili
                           ? strings.swahili
                           : strings.english,
                     ),
-                    value: preferences.usesSwahili,
-                    onChanged: preferences.setSwahili,
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => _selectLanguage(context),
                   ),
                 ],
               ),
@@ -111,6 +111,18 @@ class AppSettingsScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _selectLanguage(BuildContext context) async {
+    final selected = await showAppLanguagePicker(
+      context,
+      selectedLocale: preferences.locale,
+    );
+    if (selected == null ||
+        selected.languageCode == preferences.locale.languageCode) {
+      return;
+    }
+    await preferences.setLocale(selected);
   }
 }
 

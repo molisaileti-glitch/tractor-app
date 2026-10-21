@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -10,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/generated/app_localizations.dart';
 import '../../domain/entities/operator_job.dart';
 
 const _googleRoutesAndroidApiKey = 'AIzaSyAARTXTKRaYC011X_ruaKhK_R4uzgWtt0U';
@@ -70,7 +70,7 @@ class OperatorStatusPill extends StatelessWidget {
           Icon(Icons.circle, size: 10, color: color),
           const SizedBox(width: 6),
           Text(
-            status.label,
+            localizedOperatorStatus(context, status),
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
               color: color,
               fontWeight: FontWeight.w800,
@@ -82,6 +82,20 @@ class OperatorStatusPill extends StatelessWidget {
   }
 }
 
+String localizedOperatorStatus(BuildContext context, OperatorJobStatus status) {
+  final strings = AppLocalizations.of(context)!;
+  return switch (status) {
+    OperatorJobStatus.scheduled => strings.scheduled,
+    OperatorJobStatus.assigned => strings.assigned,
+    OperatorJobStatus.dispatched => strings.dispatched,
+    OperatorJobStatus.enRoute => strings.enRoute,
+    OperatorJobStatus.arrived => strings.arrived,
+    OperatorJobStatus.inProgress => strings.jobInProgress,
+    OperatorJobStatus.completedPendingConfirmation =>
+      strings.completedPendingConfirmation,
+  };
+}
+
 class OperatorMapCard extends StatefulWidget {
   const OperatorMapCard({
     super.key,
@@ -91,6 +105,7 @@ class OperatorMapCard extends StatefulWidget {
     this.showTrack = false,
     this.routeFromLatitude,
     this.routeFromLongitude,
+    this.tractorPosition,
     this.routeEnabled = false,
     this.label = 'ASSIGNED FARM',
     this.fill = false,
@@ -102,6 +117,7 @@ class OperatorMapCard extends StatefulWidget {
   final bool showTrack;
   final double? routeFromLatitude;
   final double? routeFromLongitude;
+  final TractorTrackerPosition? tractorPosition;
   final bool routeEnabled;
   final String label;
   final bool fill;
@@ -131,6 +147,32 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
   void didUpdateWidget(covariant OperatorMapCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     unawaited(_loadRouteIfNeeded());
+    final oldTracker = oldWidget.tractorPosition;
+    final trackerMoved =
+        oldTracker?.latitude != widget.tractorPosition?.latitude ||
+        oldTracker?.longitude != widget.tractorPosition?.longitude;
+    final phoneMoved =
+        oldWidget.routeFromLatitude != widget.routeFromLatitude ||
+        oldWidget.routeFromLongitude != widget.routeFromLongitude;
+    if (trackerMoved || phoneMoved) {
+      final mappedJobs = [
+        if (widget.job != null) widget.job!,
+        ...widget.jobs.where((item) => item.id != widget.job?.id),
+      ].where((item) => item.plot.boundaryPoints.isNotEmpty).toList();
+      final routeStart = _routeStart;
+      final destination = mappedJobs.isEmpty
+          ? null
+          : _jobPoint(mappedJobs.first);
+      unawaited(
+        _fitMap(
+          mappedJobs,
+          routeStart,
+          destination,
+          _phonePoint,
+          _tractorPoint,
+        ),
+      );
+    }
   }
 
   @override
@@ -153,6 +195,8 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
         )
         .toList();
     final routeStart = _routeStart;
+    final phonePoint = _phonePoint;
+    final tractorPoint = _tractorPoint;
     final hasRoute = routeStart != null && mappedJobs.isNotEmpty;
     final routeDestination = hasRoute ? _jobPoint(mappedJobs.first) : null;
 
@@ -171,9 +215,10 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
                     ? 15
                     : 12,
               ),
-              markers: _markers(mappedJobs, routeStart),
+              markers: _markers(mappedJobs, phonePoint, tractorPoint),
               polygons: _polygons(mappedJobs),
               polylines: _polylines(mappedJobs, routeStart, routeDestination),
+              mapType: MapType.hybrid,
               compassEnabled: true,
               mapToolbarEnabled: false,
               myLocationButtonEnabled: false,
@@ -183,7 +228,15 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
               },
               onMapCreated: (controller) {
                 _controller = controller;
-                unawaited(_fitMap(mappedJobs, routeStart, routeDestination));
+                unawaited(
+                  _fitMap(
+                    mappedJobs,
+                    routeStart,
+                    routeDestination,
+                    phonePoint,
+                    tractorPoint,
+                  ),
+                );
               },
             ),
     );
@@ -192,6 +245,12 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
       fit: StackFit.expand,
       children: [
         map,
+        if (widget.tractorPosition != null)
+          Positioned(
+            left: 12,
+            top: 12,
+            child: _TrackerStatusBadge(position: widget.tractorPosition!),
+          ),
         if (_routeSummary != null && _routePoints.isNotEmpty)
           Positioned(
             right: 12,
@@ -345,10 +404,21 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
   }
 
   LatLng? get _routeStart {
+    if (widget.tractorPosition?.isLive == true) return _tractorPoint;
+    return _phonePoint ?? _tractorPoint;
+  }
+
+  LatLng? get _phonePoint {
     final latitude = widget.routeFromLatitude;
     final longitude = widget.routeFromLongitude;
     if (latitude == null || longitude == null) return null;
     return LatLng(latitude, longitude);
+  }
+
+  LatLng? get _tractorPoint {
+    final position = widget.tractorPosition;
+    if (position == null) return null;
+    return LatLng(position.latitude, position.longitude);
   }
 
   LatLng _midpoint(LatLng first, LatLng second) {
@@ -358,16 +428,35 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
     );
   }
 
-  Set<Marker> _markers(List<OperatorJob> jobs, LatLng? routeStart) {
+  Set<Marker> _markers(
+    List<OperatorJob> jobs,
+    LatLng? phonePoint,
+    LatLng? tractorPoint,
+  ) {
     return {
-      if (routeStart != null)
+      if (tractorPoint != null)
         Marker(
-          markerId: const MarkerId('tractor-current-location'),
-          position: routeStart,
+          markerId: const MarkerId('tractor-tracker-location'),
+          position: tractorPoint,
           icon:
               _tractorMarkerIcon ??
               BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
-          infoWindow: const InfoWindow(title: 'Tractor / current location'),
+          rotation: widget.tractorPosition?.course ?? 0,
+          flat: widget.tractorPosition?.course != null,
+          infoWindow: InfoWindow(
+            title: widget.tractorPosition?.isLive == true
+                ? 'Tractor location'
+                : 'Tractor last known location',
+          ),
+        ),
+      if (phonePoint != null)
+        Marker(
+          markerId: const MarkerId('operator-phone-location'),
+          position: phonePoint,
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueAzure,
+          ),
+          infoWindow: const InfoWindow(title: 'Your phone location'),
         ),
       for (final job in jobs)
         Marker(
@@ -517,6 +606,8 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
     List<OperatorJob> mappedJobs,
     LatLng? routeStart,
     LatLng? routeDestination,
+    LatLng? phonePoint,
+    LatLng? tractorPoint,
   ) async {
     final controller = _controller;
     if (controller == null || mappedJobs.isEmpty) return;
@@ -530,6 +621,8 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
           LatLng(point.latitude, point.longitude),
       ?routeStart,
       ?routeDestination,
+      ?phonePoint,
+      ?tractorPoint,
       ..._routePoints,
     ];
     if (points.length < 2) return;
@@ -620,7 +713,9 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
         '[Routes API] Received ${result.points.length} route points'
         '${result.summary != null ? ' (${result.summary})' : ''}',
       );
-      unawaited(_fitMap(mappedJobs, start, destination));
+      unawaited(
+        _fitMap(mappedJobs, start, destination, _phonePoint, _tractorPoint),
+      );
     } catch (error) {
       debugPrint('[Routes API] $error');
       if (!mounted || _routeKey != nextKey) return;
@@ -795,6 +890,59 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
     }
 
     return points;
+  }
+}
+
+class _TrackerStatusBadge extends StatelessWidget {
+  const _TrackerStatusBadge({required this.position});
+
+  final TractorTrackerPosition position;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = position.isLive
+        ? AppColors.adaptiveSuccess(context)
+        : AppColors.warning;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.32)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.agriculture, size: 16, color: color),
+            const SizedBox(width: 6),
+            Text(
+              _label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String get _label {
+    if (position.isLive) return 'Tractor live';
+    final age = position.ageSeconds;
+    if (age == null) return 'Tracker offline';
+    if (age < 60) return 'Last fix ${age}s ago';
+    if (age < 3600) return 'Last fix ${age ~/ 60}m ago';
+    return 'Last fix ${age ~/ 3600}h ago';
   }
 }
 

@@ -256,7 +256,12 @@ class AuthRemoteDataSource {
         if (normalized.contains('password') ||
             normalized == 'code' ||
             normalized.contains('token') ||
-            normalized.contains('api_key')) {
+            normalized.contains('api_key') ||
+            normalized == 'challenge_id' ||
+            normalized == 'identifier' ||
+            normalized == 'phone' ||
+            normalized == 'email' ||
+            normalized == 'destination') {
           return MapEntry(key.toString(), '***');
         }
         return MapEntry(key.toString(), _redact(value));

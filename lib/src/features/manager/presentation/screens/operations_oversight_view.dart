@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:animations/animations.dart';
 
 import '../../../../components/components.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/generated/app_localizations.dart';
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/union_operations_repository.dart';
 import '../../domain/entities/operations_models.dart';
@@ -25,6 +27,7 @@ class _OperationsOversightViewState extends State<OperationsOversightView> {
   @override
   Widget build(BuildContext context) {
     final repository = widget.repository;
+    final strings = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -32,21 +35,21 @@ class _OperationsOversightViewState extends State<OperationsOversightView> {
           children: [
             Expanded(
               child: Text(
-                'Oversight',
+                strings.oversight,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w900,
                 ),
               ),
             ),
             IconButton.filledTonal(
-              tooltip: 'Refresh oversight',
+              tooltip: '${strings.refresh} ${strings.oversight.toLowerCase()}',
               onPressed: repository.refreshOversightData,
               icon: const Icon(Icons.refresh),
             ),
           ],
         ),
         const SizedBox(height: 4),
-        const Text('Overrides, exceptions and field control decisions'),
+        Text(strings.oversightDescription),
         if (repository.mechanizationActionError != null) ...[
           const SizedBox(height: 14),
           _ActionError(message: repository.mechanizationActionError!),
@@ -58,7 +61,7 @@ class _OperationsOversightViewState extends State<OperationsOversightView> {
               child: _OversightTabButton(
                 selected: _tab == _OversightTab.overrides,
                 icon: Icons.rule_folder_outlined,
-                label: 'Overrides',
+                label: strings.overrides,
                 count: repository.overrides.length,
                 onTap: () => setState(() => _tab = _OversightTab.overrides),
               ),
@@ -68,7 +71,7 @@ class _OperationsOversightViewState extends State<OperationsOversightView> {
               child: _OversightTabButton(
                 selected: _tab == _OversightTab.exceptions,
                 icon: Icons.report_problem_outlined,
-                label: 'Exceptions',
+                label: strings.exceptions,
                 count: repository.exceptions.length,
                 onTap: () => setState(() => _tab = _OversightTab.exceptions),
               ),
@@ -90,9 +93,9 @@ class _OperationsOversightViewState extends State<OperationsOversightView> {
             child: switch (_tab) {
               _OversightTab.overrides =>
                 repository.overrides.isEmpty
-                    ? const _OversightEmptyState(
+                    ? _OversightEmptyState(
                         icon: Icons.rule_folder_outlined,
-                        message: 'No overrides found.',
+                        message: strings.noOverridesFound,
                       )
                     : Column(
                         children: [
@@ -104,9 +107,9 @@ class _OperationsOversightViewState extends State<OperationsOversightView> {
                       ),
               _OversightTab.exceptions =>
                 repository.exceptions.isEmpty
-                    ? const _OversightEmptyState(
+                    ? _OversightEmptyState(
                         icon: Icons.report_problem_outlined,
-                        message: 'No exceptions found.',
+                        message: strings.noExceptionsFound,
                       )
                     : Column(
                         children: [
@@ -234,6 +237,7 @@ class _OverrideCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final strings = AppLocalizations.of(context)!;
     final isPending = item.status.toLowerCase() == 'pending';
     return OperationsCard(
       child: Column(
@@ -255,11 +259,11 @@ class _OverrideCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 3),
-                    Text('Requested by ${item.requestedBy}'),
+                    Text(strings.requestedBy(item.requestedBy)),
                   ],
                 ),
               ),
-              _SmallStatus(label: item.status),
+              _SmallStatus(label: item.status, color: theme.colorScheme.error),
             ],
           ),
           const SizedBox(height: 12),
@@ -279,11 +283,11 @@ class _OverrideCard extends StatelessWidget {
           _FactsLine(
             values: [
               if (item.requestedAt != null)
-                'Requested ${formatDateTime(item.requestedAt!)}',
+                strings.requestedAt(formatDateTime(item.requestedAt!)),
               if (item.expiresAt != null)
-                'Expires ${formatDateTime(item.expiresAt!)}',
+                strings.expiresAt(formatDateTime(item.expiresAt!)),
               if (item.distanceToPlotMeters != null)
-                '${item.distanceToPlotMeters!.round()} m from plot',
+                strings.metersFromPlot(item.distanceToPlotMeters!.round()),
             ],
           ),
           const SizedBox(height: 14),
@@ -295,8 +299,10 @@ class _OverrideCard extends StatelessWidget {
                       ? () async {
                           final note = await _promptNote(
                             context,
-                            title: 'Deny Override',
-                            label: 'Decision note',
+                            title: strings.denyOverride,
+                            label: strings.decisionNote,
+                            cancelLabel: strings.cancel,
+                            confirmLabel: strings.submit,
                           );
                           if (note == null || note.trim().isEmpty) return;
                           if (!context.mounted) return;
@@ -314,10 +320,18 @@ class _OverrideCard extends StatelessWidget {
                             approve: false,
                             note: note.trim(),
                           );
+                          if (!context.mounted) return;
+                          await _showOversightActionResult(
+                            context,
+                            repository,
+                            successTitle: 'Override denied',
+                            successMessage:
+                                'The operator cannot use this override. It is now recorded under decided overrides.',
+                          );
                         }
                       : null,
                   icon: const Icon(Icons.close),
-                  label: const Text('Deny'),
+                  label: Text(strings.deny),
                 ),
               ),
               const SizedBox(width: 10),
@@ -327,8 +341,10 @@ class _OverrideCard extends StatelessWidget {
                       ? () async {
                           final note = await _promptNote(
                             context,
-                            title: 'Approve Override',
-                            label: 'Decision note',
+                            title: strings.approveOverride,
+                            label: strings.decisionNote,
+                            cancelLabel: strings.cancel,
+                            confirmLabel: strings.submit,
                           );
                           if (note == null || note.trim().isEmpty) return;
                           if (!context.mounted) return;
@@ -345,10 +361,18 @@ class _OverrideCard extends StatelessWidget {
                             approve: true,
                             note: note.trim(),
                           );
+                          if (!context.mounted) return;
+                          await _showOversightActionResult(
+                            context,
+                            repository,
+                            successTitle: 'Override approved',
+                            successMessage:
+                                'The operator can rerun the start check and use this override before it expires.',
+                          );
                         }
                       : null,
                   icon: const Icon(Icons.check),
-                  label: const Text('Approve'),
+                  label: Text(strings.approve),
                 ),
               ),
             ],
@@ -368,6 +392,7 @@ class _ExceptionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final strings = AppLocalizations.of(context)!;
     final status = item.status.toLowerCase();
     final canAcknowledge = status == 'open';
     final canResolve = status == 'open' || status == 'acknowledged';
@@ -445,7 +470,7 @@ class _ExceptionCard extends StatelessWidget {
                         }
                       : null,
                   icon: const Icon(Icons.visibility_outlined),
-                  label: const Text('Ack'),
+                  label: Text(strings.acknowledge),
                 ),
               ),
               const SizedBox(width: 10),
@@ -455,8 +480,10 @@ class _ExceptionCard extends StatelessWidget {
                       ? () async {
                           final note = await _promptNote(
                             context,
-                            title: 'Resolve Exception',
-                            label: 'Resolution note',
+                            title: strings.resolveException,
+                            label: strings.resolutionNote,
+                            cancelLabel: strings.cancel,
+                            confirmLabel: strings.submit,
                           );
                           if (note == null || note.trim().isEmpty) return;
                           if (!context.mounted) return;
@@ -472,10 +499,18 @@ class _ExceptionCard extends StatelessWidget {
                             exceptionId: item.id,
                             remarks: note.trim(),
                           );
+                          if (!context.mounted) return;
+                          await _showOversightActionResult(
+                            context,
+                            repository,
+                            successTitle: 'Exception resolved',
+                            successMessage:
+                                'The resolution has been recorded and the item is no longer an open exception.',
+                          );
                         }
                       : null,
                   icon: const Icon(Icons.done_all),
-                  label: const Text('Resolve'),
+                  label: Text(strings.resolve),
                 ),
               ),
             ],
@@ -486,34 +521,42 @@ class _ExceptionCard extends StatelessWidget {
   }
 }
 
+Future<void> _showOversightActionResult(
+  BuildContext context,
+  UnionOperationsRepository repository, {
+  required String successTitle,
+  required String successMessage,
+}) async {
+  final error = repository.mechanizationActionError;
+  if (error != null) {
+    await showAppErrorDialog(
+      context,
+      title: AppLocalizations.of(context)!.actionNotCompleted,
+      message: error,
+    );
+    return;
+  }
+  await showAppSuccessDialog(
+    context,
+    title: successTitle,
+    message: successMessage,
+  );
+}
+
 Future<String?> _promptNote(
   BuildContext context, {
   required String title,
   required String label,
+  String? cancelLabel,
+  String? confirmLabel,
 }) {
-  final controller = TextEditingController();
-  return showDialog<String>(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: Text(title),
-      content: TextField(
-        controller: controller,
-        autofocus: true,
-        maxLines: 3,
-        decoration: InputDecoration(labelText: label),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(controller.text),
-          child: const Text('Submit'),
-        ),
-      ],
-    ),
-  ).whenComplete(controller.dispose);
+  return showAppTextInputDialog(
+    context,
+    title: title,
+    label: label,
+    cancelLabel: cancelLabel ?? 'Cancel',
+    confirmLabel: confirmLabel ?? 'Submit',
+  );
 }
 
 class _ActionError extends StatelessWidget {
@@ -563,23 +606,35 @@ class _FactsLine extends StatelessWidget {
 }
 
 class _SmallStatus extends StatelessWidget {
-  const _SmallStatus({required this.label});
+  const _SmallStatus({required this.label, this.color});
 
   final String label;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme.primary;
+    final statusColor = color ?? _statusColor(context, label);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
+        color: statusColor.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
-        style: TextStyle(color: color, fontWeight: FontWeight.w900),
+        style: TextStyle(color: statusColor, fontWeight: FontWeight.w900),
       ),
     );
+  }
+
+  Color _statusColor(BuildContext context, String value) {
+    final normalized = value.trim().toLowerCase();
+    final scheme = Theme.of(context).colorScheme;
+    return switch (normalized) {
+      'critical' || 'error' || 'failed' || 'denied' => scheme.error,
+      'warning' || 'acknowledged' => AppColors.warning,
+      'resolved' || 'approved' => AppColors.adaptiveSuccess(context),
+      _ => scheme.primary,
+    };
   }
 }

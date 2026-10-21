@@ -24,7 +24,8 @@ class OperatorArrivalScreen extends StatefulWidget {
   State<OperatorArrivalScreen> createState() => _OperatorArrivalScreenState();
 }
 
-class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
+class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
+    with WidgetsBindingObserver {
   final LocationRepository _phoneLocationRepository =
       const GeolocatorLocationRepository();
   final CheckPlotGeofence _checkPlotGeofence = const CheckPlotGeofence();
@@ -39,13 +40,38 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
   OperatorStartCheckResult? _startCheck;
   String? _locationError;
   final _hourMeterController = TextEditingController();
-  final _implementController = TextEditingController();
+  String? _selectedImplement;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    widget.repository.addListener(_repositoryChanged);
+    widget.repository.startTrackerPolling();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      widget.repository.startTrackerPolling();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      widget.repository.stopTrackerPolling();
+    }
+  }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    widget.repository.removeListener(_repositoryChanged);
+    widget.repository.stopTrackerPolling();
     _hourMeterController.dispose();
-    _implementController.dispose();
     super.dispose();
+  }
+
+  void _repositoryChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -72,6 +98,12 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
         job.status == OperatorJobStatus.arrived ||
         job.status == OperatorJobStatus.inProgress;
     final routeLocation = _geofenceResult?.location;
+    final trackerPosition = widget.repository.trackerPositionFor(job.tractorId);
+    final implementNames = widget.repository.implementNamesFor(job.tractorId);
+    if (_selectedImplement != null &&
+        !implementNames.contains(_selectedImplement)) {
+      _selectedImplement = null;
+    }
     return Scaffold(
       appBar: AppBar(
         title: Text(hasArrived ? 'ARRIVAL & START' : 'JOURNEY TO FARM'),
@@ -90,6 +122,7 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
                   label: hasArrived ? 'FARM LOCATION' : 'ROUTE TO FARM',
                   routeFromLatitude: routeLocation?.latitude,
                   routeFromLongitude: routeLocation?.longitude,
+                  tractorPosition: trackerPosition,
                   routeEnabled: true,
                 ),
                 const SizedBox(height: 16),
@@ -254,15 +287,38 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
                             ),
                           ),
                           const SizedBox(height: 10),
-                          TextField(
-                            controller: _implementController,
-                            decoration: const InputDecoration(
-                              labelText: 'Implement',
+                          if (implementNames.isEmpty)
+                            const AppMessage(
+                              message:
+                                  'No implements are configured for this tractor. Ask the union officer to update the tractor before starting.',
+                              type: AppMessageType.warning,
+                            )
+                          else
+                            DropdownButtonFormField<String>(
+                              initialValue: _selectedImplement,
+                              decoration: const InputDecoration(
+                                labelText: 'Implement',
+                                prefixIcon: Icon(Icons.handyman_outlined),
+                              ),
+                              hint: const Text('Select an implement'),
+                              items: [
+                                for (final implement in implementNames)
+                                  DropdownMenuItem(
+                                    value: implement,
+                                    child: Text(implement),
+                                  ),
+                              ],
+                              onChanged: (value) =>
+                                  setState(() => _selectedImplement = value),
                             ),
-                          ),
                           const SizedBox(height: 10),
                           FilledButton.icon(
-                            onPressed: _submittingStart ? null : _startJob,
+                            onPressed:
+                                _submittingStart ||
+                                    implementNames.isEmpty ||
+                                    _selectedImplement == null
+                                ? null
+                                : _startJob,
                             icon: const Icon(Icons.play_arrow),
                             label: Text(
                               _submittingStart
@@ -380,7 +436,7 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
     showAppSnackBar(
       context,
       message: arrived
-          ? 'Arrival recorded.'
+          ? 'Arrival recorded. Next, inspect the tractor before running the start check.'
           : widget.repository.lastActionError ?? 'Could not record arrival.',
       type: arrived ? AppSnackType.success : AppSnackType.error,
     );
@@ -390,7 +446,7 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
     final navigator = Navigator.of(context);
     final location = _geofenceResult?.location;
     final hourMeter = num.tryParse(_hourMeterController.text.trim());
-    final implement = _implementController.text.trim();
+    final implement = _selectedImplement;
     final confirmed = await showAppConfirmationDialog(
       context,
       title: 'Start service?',
@@ -404,7 +460,7 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
       widget.jobId,
       phone: location,
       hourMeter: hourMeter,
-      implement: implement.isEmpty ? null : implement,
+      implement: implement,
     );
     if (!mounted) return;
     setState(() => _submittingStart = false);
@@ -501,7 +557,7 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
     showAppSnackBar(
       context,
       message: ok
-          ? 'Override request sent to the union.'
+          ? 'Override request sent. Wait for the union decision, then run the start check again.'
           : widget.repository.lastActionError ?? 'Could not request override.',
       type: ok ? AppSnackType.success : AppSnackType.error,
     );
@@ -547,7 +603,7 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
     showAppSnackBar(
       context,
       message: ok
-          ? 'Inspection recorded.'
+          ? 'Inspection recorded. Run the start check to confirm the job is ready.'
           : widget.repository.lastActionError ??
                 'Inspection could not be recorded.',
       type: ok ? AppSnackType.success : AppSnackType.error,
@@ -846,20 +902,30 @@ class _InspectionCheckRow extends StatelessWidget {
           child: Row(
             children: [
               Expanded(child: Text(label)),
-              Radio<bool>(
-                value: true,
-                groupValue: value,
-                onChanged: (choice) {
-                  if (choice != null) onChanged(choice);
-                },
+              InkWell(
+                onTap: () => onChanged(true),
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Icon(
+                    value == true
+                        ? Icons.radio_button_checked_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                  ),
+                ),
               ),
               const Text('Pass'),
-              Radio<bool>(
-                value: false,
-                groupValue: value,
-                onChanged: (choice) {
-                  if (choice != null) onChanged(choice);
-                },
+              InkWell(
+                onTap: () => onChanged(false),
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Icon(
+                    value == false
+                        ? Icons.radio_button_checked_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                  ),
+                ),
               ),
               const Text('Issue'),
             ],
@@ -980,14 +1046,12 @@ class _OverrideReasonDialogState extends State<_OverrideReasonDialog> {
           hintText: 'Explain why the start check should be overridden',
         ),
       ),
+      actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(_controller.text),
-          child: const Text('Send'),
+        AppDialogActions(
+          onCancel: () => Navigator.of(context).pop(),
+          onConfirm: () => Navigator.of(context).pop(_controller.text),
+          confirmLabel: 'Send',
         ),
       ],
     );

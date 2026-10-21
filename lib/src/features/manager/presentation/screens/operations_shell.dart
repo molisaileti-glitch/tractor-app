@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:animations/animations.dart';
 
 import '../../../../components/components.dart';
 import '../../../../l10n/generated/app_localizations.dart';
@@ -73,6 +72,7 @@ class _OperationsShellState extends State<OperationsShell> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context)!;
     return AnimatedBuilder(
       animation: widget.repository,
       builder: (context, _) {
@@ -81,10 +81,11 @@ class _OperationsShellState extends State<OperationsShell> {
             final compact = constraints.maxWidth < 880;
             return Scaffold(
               appBar: AppBar(
-                title: const Text('Union Operations'),
+                title: Text(strings.unionOperations),
                 actions: [
                   IconButton(
-                    tooltip: 'Refresh ${_section.label.toLowerCase()}',
+                    tooltip:
+                        '${strings.refresh} ${_sectionLabel(_section, strings).toLowerCase()}',
                     onPressed: _isRefreshingCurrentSection
                         ? null
                         : _refreshCurrentSection,
@@ -130,21 +131,17 @@ class _OperationsShellState extends State<OperationsShell> {
                       ),
                     ),
                   Expanded(
-                    child: PageTransitionSwitcher(
+                    child: AnimatedSwitcher(
                       duration: AppMotion.duration(
                         context,
-                        const Duration(milliseconds: 600),
+                        const Duration(milliseconds: 450),
                       ),
-                      transitionBuilder:
-                          (child, primaryAnimation, secondaryAnimation) =>
-                              FadeThroughTransition(
-                                animation: primaryAnimation,
-                                secondaryAnimation: secondaryAnimation,
-                                fillColor: Theme.of(
-                                  context,
-                                ).scaffoldBackgroundColor,
-                                child: child,
-                              ),
+                      switchInCurve: Curves.easeOutCubic,
+                      switchOutCurve: Curves.easeInCubic,
+                      transitionBuilder: (child, animation) => FadeTransition(
+                        opacity: animation,
+                        child: child,
+                      ),
                       child: widget.repository.isSyncingMechanization
                           ? const AppScreenSkeleton(key: ValueKey('loading'))
                           : RefreshIndicator(
@@ -179,31 +176,31 @@ class _OperationsShellState extends State<OperationsShell> {
                       onDestinationSelected: (index) {
                         _selectSection(_primarySections[index]);
                       },
-                      destinations: const [
+                      destinations: [
                         NavigationDestination(
-                          icon: Icon(Icons.dashboard_outlined),
-                          selectedIcon: Icon(Icons.dashboard),
-                          label: 'Overview',
+                          icon: const Icon(Icons.dashboard_outlined),
+                          selectedIcon: const Icon(Icons.dashboard),
+                          label: strings.overview,
                         ),
                         NavigationDestination(
-                          icon: Icon(Icons.fact_check_outlined),
-                          selectedIcon: Icon(Icons.fact_check),
-                          label: 'Requests',
+                          icon: const Icon(Icons.fact_check_outlined),
+                          selectedIcon: const Icon(Icons.fact_check),
+                          label: strings.requests,
                         ),
                         NavigationDestination(
-                          icon: Icon(Icons.calendar_month_outlined),
-                          selectedIcon: Icon(Icons.calendar_month),
-                          label: 'Schedule',
+                          icon: const Icon(Icons.calendar_month_outlined),
+                          selectedIcon: const Icon(Icons.calendar_month),
+                          label: strings.schedule,
                         ),
                         NavigationDestination(
-                          icon: Icon(Icons.route_outlined),
-                          selectedIcon: Icon(Icons.route),
-                          label: 'Jobs',
+                          icon: const Icon(Icons.route_outlined),
+                          selectedIcon: const Icon(Icons.route),
+                          label: strings.jobs,
                         ),
                         NavigationDestination(
-                          icon: Icon(Icons.rule_folder_outlined),
-                          selectedIcon: Icon(Icons.rule_folder),
-                          label: 'Oversight',
+                          icon: const Icon(Icons.rule_folder_outlined),
+                          selectedIcon: const Icon(Icons.rule_folder),
+                          label: strings.oversight,
                         ),
                       ],
                     )
@@ -223,11 +220,7 @@ class _OperationsShellState extends State<OperationsShell> {
           ListTile(
             selected: _section == section,
             leading: Icon(section.icon),
-            title: Text(
-              section == OperationsSection.settings
-                  ? AppLocalizations.of(context)!.settings
-                  : section.label,
-            ),
+            title: Text(_sectionLabel(section, AppLocalizations.of(context)!)),
             onTap: () {
               _selectSection(section);
               if (Navigator.of(context).canPop()) Navigator.of(context).pop();
@@ -235,6 +228,22 @@ class _OperationsShellState extends State<OperationsShell> {
           ),
       ],
     );
+  }
+
+  String _sectionLabel(OperationsSection section, AppLocalizations strings) {
+    return switch (section) {
+      OperationsSection.dashboard => strings.dashboard,
+      OperationsSection.requests => strings.serviceRequests,
+      OperationsSection.schedule => strings.schedule,
+      OperationsSection.jobs => strings.jobs,
+      OperationsSection.oversight => strings.oversight,
+      OperationsSection.tractors => strings.tractors,
+      OperationsSection.operators => strings.operators,
+      OperationsSection.farmers => strings.farmers,
+      OperationsSection.maintenance => strings.maintenance,
+      OperationsSection.reports => strings.reports,
+      OperationsSection.settings => strings.settings,
+    };
   }
 
   Widget _currentView() {
@@ -295,7 +304,10 @@ class _OperationsShellState extends State<OperationsShell> {
   }
 
   Future<void> _refreshCurrentSection() async {
-    final label = _section.label.toLowerCase();
+    final label = _sectionLabel(
+      _section,
+      AppLocalizations.of(context)!,
+    ).toLowerCase();
     switch (_section) {
       case OperationsSection.tractors:
         await widget.repository.refreshTractors();
@@ -339,7 +351,7 @@ class _OperationsDrawer extends StatelessWidget {
         child: Column(
           children: [
             ListTile(
-              title: const Text('Union Operations'),
+              title: Text(AppLocalizations.of(context)!.unionOperations),
               subtitle: Text(subtitle),
             ),
             Expanded(child: child),
@@ -364,7 +376,7 @@ class _LogoutButton extends StatelessWidget {
       child: OutlinedButton.icon(
         onPressed: onPressed,
         icon: const Icon(Icons.logout),
-        label: const Text('Logout'),
+        label: Text(AppLocalizations.of(context)!.logout),
       ),
     );
   }

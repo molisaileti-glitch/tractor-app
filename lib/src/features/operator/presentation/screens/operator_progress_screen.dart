@@ -73,12 +73,6 @@ class OperatorProgressScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
                 OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.note_add_outlined),
-                  label: const Text('Add Note'),
-                ),
-                const SizedBox(height: 10),
-                OutlinedButton.icon(
                   onPressed: () => _pause(context, job),
                   icon: const Icon(Icons.pause_circle_outline),
                   label: const Text('Pause'),
@@ -131,14 +125,14 @@ class OperatorProgressScreen extends StatelessWidget {
       confirmLabel: 'Pause',
     );
     if (!confirmed || !context.mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
     final ok = await repository.pauseJob(jobId: job.id, reason: 'Paused');
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          ok ? 'Job paused.' : repository.lastActionError ?? 'Pause failed.',
-        ),
-      ),
+    if (!context.mounted) return;
+    showAppSnackBar(
+      context,
+      message: ok
+          ? 'Work paused. Use Resume when you are ready to continue.'
+          : repository.lastActionError ?? 'Pause failed.',
+      type: ok ? AppSnackType.success : AppSnackType.error,
     );
   }
 
@@ -150,14 +144,14 @@ class OperatorProgressScreen extends StatelessWidget {
       confirmLabel: 'Resume',
     );
     if (!confirmed || !context.mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
     final ok = await repository.resumeJob(job.id);
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          ok ? 'Job resumed.' : repository.lastActionError ?? 'Resume failed.',
-        ),
-      ),
+    if (!context.mounted) return;
+    showAppSnackBar(
+      context,
+      message: ok
+          ? 'Work resumed. Continue the service and end the job when complete.'
+          : repository.lastActionError ?? 'Resume failed.',
+      type: ok ? AppSnackType.success : AppSnackType.error,
     );
   }
 
@@ -200,29 +194,27 @@ class OperatorProgressScreen extends StatelessWidget {
             AppDialogActions(
               onCancel: () => Navigator.of(context).pop(),
               onConfirm: () async {
-                final messenger = ScaffoldMessenger.of(screenContext);
                 final ok = await repository.reportProblem(
                   jobId: job.id,
                   reason: reason,
                   notes: notesController.text.trim(),
                 );
+                if (!screenContext.mounted) return;
                 Navigator.of(context).pop();
-                messenger.showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      ok
-                          ? 'Problem sent to dispatcher for review.'
-                          : repository.lastActionError ??
-                                'Could not report problem.',
-                    ),
-                  ),
+                showAppSnackBar(
+                  screenContext,
+                  message: ok
+                      ? 'Problem sent to operations for review.'
+                      : repository.lastActionError ??
+                            'Could not report problem.',
+                  type: ok ? AppSnackType.success : AppSnackType.error,
                 );
               },
             ),
           ],
         ),
       ),
-    ).whenComplete(notesController.dispose);
+    ).whenComplete(() => disposeAppDialogController(notesController));
   }
 }
 

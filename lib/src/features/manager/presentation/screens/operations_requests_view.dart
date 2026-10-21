@@ -56,11 +56,27 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Service Requests',
-          style: Theme.of(
-            context,
-          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Service Requests',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            FilledButton.icon(
+              onPressed: _openRegisterRequest,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 44),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+              ),
+              icon: const Icon(Icons.add),
+              label: const Text('Register'),
+            ),
+          ],
         ),
         const SizedBox(height: 14),
         _RemoteRequestsBanner(
@@ -154,6 +170,18 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
         ),
       ),
     );
+  }
+
+  Future<void> _openRegisterRequest() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => _RegisterRequestSheet(repository: widget.repository),
+    );
+    if (!mounted) return;
+    await _loadRemoteRequests();
   }
 
   Future<void> _loadRemoteRequests() async {
@@ -705,50 +733,39 @@ class OperationsRequestDetailScreen extends StatelessWidget {
       isScrollControlled: true,
       builder: (_) => _ApproveRequestSheet(
         onSubmit:
-            ({required num amount, required String priority, String? note}) {
-              unawaited(
-                repository.approveRequest(
-                  id: id,
-                  estimateAmount: amount,
-                  priority: priority,
-                  note: note,
-                ),
+            ({
+              required num amount,
+              required String priority,
+              String? note,
+            }) async {
+              await repository.approveRequest(
+                id: id,
+                estimateAmount: amount,
+                priority: priority,
+                note: note,
               );
-              _showSchedulePrompt(context, id);
+              if (!context.mounted) return;
+              final error = repository.mechanizationActionError;
+              if (error != null) {
+                await showAppErrorDialog(
+                  context,
+                  title: 'Request not approved',
+                  message: error,
+                );
+                return;
+              }
+              final scheduleNow = await showAppConfirmationDialog(
+                context,
+                title: 'Request approved',
+                message:
+                    'The request is ready for scheduling. Schedule it now, or find it later under the Approved tab.',
+                confirmLabel: 'Schedule',
+                cancelLabel: 'Later',
+              );
+              if (scheduleNow && context.mounted) {
+                _openSchedule(context, id);
+              }
             },
-      ),
-    );
-  }
-
-  void _showSchedulePrompt(BuildContext context, String id) {
-    showDialog<void>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Request Approved'),
-        content: const Text('Next step: schedule service.'),
-        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-        actions: [
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Later'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    _openSchedule(context, id);
-                  },
-                  child: const Text('Schedule'),
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
@@ -772,7 +789,23 @@ class OperationsRequestDetailScreen extends StatelessWidget {
       confirmLabel: 'Return',
     );
     if (!confirmed) return;
-    unawaited(repository.returnRequest(id: request.id, reason: reason.trim()));
+    await repository.returnRequest(id: request.id, reason: reason.trim());
+    if (!context.mounted) return;
+    final error = repository.mechanizationActionError;
+    if (error != null) {
+      await showAppErrorDialog(
+        context,
+        title: 'Request not returned',
+        message: error,
+      );
+      return;
+    }
+    await showAppSuccessDialog(
+      context,
+      title: 'Returned for correction',
+      message:
+          'The request is now under the Returned tab and can be corrected from the farmer side.',
+    );
     if (context.mounted) Navigator.of(context).pop();
   }
 
@@ -796,12 +829,25 @@ class OperationsRequestDetailScreen extends StatelessWidget {
       danger: true,
     );
     if (!confirmed) return;
-    unawaited(
-      repository.cancelRequest(
-        id: request.id,
-        reason: reason.trim(),
-        notes: '',
-      ),
+    await repository.cancelRequest(
+      id: request.id,
+      reason: reason.trim(),
+      notes: '',
+    );
+    if (!context.mounted) return;
+    final error = repository.mechanizationActionError;
+    if (error != null) {
+      await showAppErrorDialog(
+        context,
+        title: 'Request not cancelled',
+        message: error,
+      );
+      return;
+    }
+    await showAppSuccessDialog(
+      context,
+      title: 'Request cancelled',
+      message: 'The request is now available under the Cancelled tab.',
     );
     if (context.mounted) Navigator.of(context).pop();
   }
@@ -811,29 +857,10 @@ class OperationsRequestDetailScreen extends StatelessWidget {
     required String title,
     required String label,
   }) {
-    final controller = TextEditingController();
     return showDialog<String>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Text(title),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLines: 3,
-          decoration: InputDecoration(labelText: label),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(controller.text),
-            child: const Text('Submit'),
-          ),
-        ],
-      ),
-    ).whenComplete(controller.dispose);
+      builder: (_) => _RequestReasonDialog(title: title, label: label),
+    );
   }
 
   void _openSchedule(BuildContext context, String id) {
@@ -858,8 +885,48 @@ class OperationsRequestDetailScreen extends StatelessWidget {
   }
 }
 
+class _RequestReasonDialog extends StatefulWidget {
+  const _RequestReasonDialog({required this.title, required this.label});
+
+  final String title;
+  final String label;
+
+  @override
+  State<_RequestReasonDialog> createState() => _RequestReasonDialogState();
+}
+
+class _RequestReasonDialogState extends State<_RequestReasonDialog> {
+  final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        maxLines: 3,
+        decoration: InputDecoration(labelText: widget.label),
+      ),
+      actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+      actions: [
+        AppDialogActions(
+          onCancel: () => Navigator.of(context).pop(),
+          onConfirm: () => Navigator.of(context).pop(_controller.text),
+        ),
+      ],
+    );
+  }
+}
+
 typedef _ApproveSubmit =
-    void Function({
+    Future<void> Function({
       required num amount,
       required String priority,
       String? note,
@@ -913,7 +980,7 @@ class _ApproveRequestSheetState extends State<_ApproveRequestSheet> {
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
-            value: _priority,
+            initialValue: _priority,
             decoration: const InputDecoration(labelText: 'Priority'),
             items: const [
               DropdownMenuItem(value: 'normal', child: Text('Normal')),
@@ -955,8 +1022,10 @@ class _ApproveRequestSheetState extends State<_ApproveRequestSheet> {
   Future<void> _submit() async {
     final amount = num.tryParse(_amountController.text.trim());
     if (amount == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid estimate amount.')),
+      showAppSnackBar(
+        context,
+        message: 'Enter a valid estimate amount.',
+        type: AppSnackType.warning,
       );
       return;
     }
@@ -969,7 +1038,7 @@ class _ApproveRequestSheetState extends State<_ApproveRequestSheet> {
     );
     if (!confirmed || !mounted) return;
     Navigator.of(context).pop();
-    widget.onSubmit(
+    await widget.onSubmit(
       amount: amount,
       priority: _priority,
       note: _noteController.text.trim().isEmpty
@@ -1060,7 +1129,7 @@ class _RegisterRequestSheetState extends State<_RegisterRequestSheet> {
             ),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
-              value: _window,
+              initialValue: _window,
               decoration: const InputDecoration(labelText: 'Preferred window'),
               items: const [
                 DropdownMenuItem(value: 'morning', child: Text('Morning')),
@@ -1071,7 +1140,7 @@ class _RegisterRequestSheetState extends State<_RegisterRequestSheet> {
             ),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
-              value: _priority,
+              initialValue: _priority,
               decoration: const InputDecoration(labelText: 'Priority'),
               items: const [
                 DropdownMenuItem(value: 'normal', child: Text('Normal')),
@@ -1252,13 +1321,28 @@ class _RejectRequestSheetState extends State<_RejectRequestSheet> {
                       danger: true,
                     );
                     if (!confirmed) return;
-                    unawaited(
-                      widget.repository.rejectRequest(
-                        id: widget.request.id,
-                        reason: _reason,
-                        notes: '',
-                      ),
+                    await widget.repository.rejectRequest(
+                      id: widget.request.id,
+                      reason: _reason,
+                      notes: '',
                     );
+                    if (!context.mounted) return;
+                    final error = widget.repository.mechanizationActionError;
+                    if (error != null) {
+                      await showAppErrorDialog(
+                        context,
+                        title: 'Request not rejected',
+                        message: error,
+                      );
+                      return;
+                    }
+                    await showAppSuccessDialog(
+                      context,
+                      title: 'Request rejected',
+                      message:
+                          'The request is now available under the Rejected tab.',
+                    );
+                    if (!context.mounted) return;
                     navigator.pop();
                     navigator.pop();
                   },

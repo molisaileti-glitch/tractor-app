@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/operations_models.dart';
 
 class OperationsCard extends StatelessWidget {
@@ -141,16 +142,16 @@ class OperationsStatusChip extends StatelessWidget {
     if (requestStatus != null) {
       return switch (requestStatus!) {
         OperationsRequestStatus.pending => const Color(0xFF9A6B00),
-        OperationsRequestStatus.approved => scheme.primary,
+        OperationsRequestStatus.approved => AppColors.adaptiveSuccess(context),
         OperationsRequestStatus.rejected => scheme.error,
         OperationsRequestStatus.returned => const Color(0xFFC8872B),
-        OperationsRequestStatus.scheduled => scheme.tertiary,
+        OperationsRequestStatus.scheduled => AppColors.info,
         OperationsRequestStatus.cancelled => scheme.error,
       };
     }
     if (tractorStatus != null) {
       return switch (tractorStatus!) {
-        TractorStatus.available => scheme.primary,
+        TractorStatus.available => AppColors.adaptiveSuccess(context),
         TractorStatus.scheduled => const Color(0xFF9A6B00),
         TractorStatus.underMaintenance => scheme.secondary,
         TractorStatus.outOfService => scheme.error,
@@ -158,20 +159,20 @@ class OperationsStatusChip extends StatelessWidget {
     }
     if (operatorStatus != null) {
       return switch (operatorStatus!) {
-        OperatorStatus.available => scheme.primary,
+        OperatorStatus.available => AppColors.adaptiveSuccess(context),
         OperatorStatus.assigned => const Color(0xFF9A6B00),
         OperatorStatus.unavailable => scheme.error,
       };
     }
     return switch (jobStatus!) {
-      JobStatus.scheduled => scheme.tertiary,
-      JobStatus.dispatched => const Color(0xFF7B4BD2),
-      JobStatus.enRoute => const Color(0xFF7B4BD2),
-      JobStatus.arrived => const Color(0xFF0EA5E9),
-      JobStatus.inProgress => const Color(0xFF7B4BD2),
+      JobStatus.scheduled => AppColors.info,
+      JobStatus.dispatched => AppColors.purple,
+      JobStatus.enRoute => AppColors.tractorOrange,
+      JobStatus.arrived => AppColors.routeBlue,
+      JobStatus.inProgress => AppColors.purple,
       JobStatus.completedPendingConfirmation => const Color(0xFF9A6B00),
       JobStatus.flagged => scheme.error,
-      JobStatus.closed => scheme.primary,
+      JobStatus.closed => AppColors.adaptiveSuccess(context),
       JobStatus.cancelled => scheme.error,
     };
   }

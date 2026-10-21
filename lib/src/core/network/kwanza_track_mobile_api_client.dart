@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 import '../constants/kwanza_track_endpoints.dart';
 
 class KwanzaTrackApiException implements Exception {
@@ -30,6 +32,7 @@ class KwanzaTrackMobileApiClient {
   });
 
   static FutureOr<void> Function()? onUnauthorized;
+  static int _requestSequence = 0;
 
   final String baseUrl;
   final String apiPrefix;
@@ -784,10 +787,16 @@ class KwanzaTrackMobileApiClient {
     Map<String, Object?>? body,
     Map<String, Object?>? query,
   }) async {
+    final requestId = ++_requestSequence;
+    final stopwatch = Stopwatch()..start();
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 10);
     try {
       final uri = _uri(path, query);
+      _log(requestId, '--> $method $uri');
+      if (body != null) {
+        _logJson(requestId, 'request body', _cleanBody(body));
+      }
       final request = switch (method) {
         'GET' => await client.getUrl(uri).timeout(const Duration(seconds: 10)),
         'PUT' => await client.putUrl(uri).timeout(const Duration(seconds: 10)),
@@ -807,6 +816,11 @@ class KwanzaTrackMobileApiClient {
       final decoded = responseBody.trim().isEmpty
           ? <String, Object?>{}
           : _map(jsonDecode(responseBody));
+      _log(
+        requestId,
+        '<-- HTTP ${response.statusCode} ${stopwatch.elapsedMilliseconds}ms',
+      );
+      _logJson(requestId, 'response body', decoded);
       if (response.statusCode < 200 || response.statusCode >= 300) {
         if (response.statusCode == 401 || response.statusCode == 419) {
           await onUnauthorized?.call();
@@ -827,14 +841,86 @@ class KwanzaTrackMobileApiClient {
       }
       return decoded;
     } on TimeoutException {
+      _log(requestId, 'xx> timeout after ${stopwatch.elapsedMilliseconds}ms');
       throw const KwanzaTrackApiException('Request timed out.');
-    } on SocketException {
+    } on SocketException catch (error) {
+      _log(requestId, 'xx> socket error: $error');
       throw const KwanzaTrackApiException('Server is unreachable.');
-    } on FormatException {
+    } on FormatException catch (error) {
+      _log(requestId, 'xx> invalid JSON: $error');
       throw const KwanzaTrackApiException('Server returned invalid JSON.');
+    } on KwanzaTrackApiException catch (error) {
+      _log(
+        requestId,
+        'xx> API error status=${error.statusCode} code=${error.code} '
+        'message=${error.message}',
+      );
+      rethrow;
+    } catch (error, stackTrace) {
+      _log(requestId, 'xx> unexpected error: $error\n$stackTrace');
+      rethrow;
     } finally {
+      stopwatch.stop();
       client.close(force: true);
     }
+  }
+
+  void _log(int requestId, String message) {
+    if (kDebugMode) debugPrint('[Mech API #$requestId] $message');
+  }
+
+  void _logJson(int requestId, String label, Object? value) {
+    if (!kDebugMode) return;
+    final encoded = jsonEncode(_sanitizeForLog(value));
+    const chunkSize = 900;
+    final total = (encoded.length / chunkSize).ceil();
+    for (var index = 0; index < total; index++) {
+      final start = index * chunkSize;
+      final end = (start + chunkSize).clamp(0, encoded.length);
+      _log(
+        requestId,
+        '$label [${index + 1}/$total] ${encoded.substring(start, end)}',
+      );
+    }
+  }
+
+  Object? _sanitizeForLog(Object? value, [String? parentKey]) {
+    if (value is Map) {
+      return value.map((key, item) {
+        final name = key.toString();
+        return MapEntry(name, _sanitizeForLog(item, name));
+      });
+    }
+    if (value is Iterable) {
+      return value.map((item) => _sanitizeForLog(item, parentKey)).toList();
+    }
+    final key = parentKey?.toLowerCase();
+    if (key == null) return value;
+    const secrets = {
+      'password',
+      'password_confirmation',
+      'pin',
+      'otp',
+      'farmer_otp',
+      'code',
+      'token',
+      'access_token',
+      'refresh_token',
+      'api_key',
+      'authorization',
+      'challenge_id',
+      'qr_token',
+      'national_id',
+    };
+    if (secrets.contains(key)) return '***';
+    if ((key == 'phone' ||
+            key == 'email' ||
+            key == 'identifier' ||
+            key == 'destination') &&
+        value is String) {
+      return '***';
+    }
+    return value;
   }
 
   Uri _uri(String path, Map<String, Object?>? query) {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../components/components.dart';
+import '../../../../l10n/generated/app_localizations.dart';
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/operator_local_repository.dart';
 import '../widgets/operator_widgets.dart';
@@ -12,6 +13,7 @@ class OperatorHistoryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context)!;
     final history = repository.pastAssignments;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -23,7 +25,7 @@ class OperatorHistoryScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Past assignments',
+                strings.pastAssignments,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w900,
                 ),
@@ -32,10 +34,10 @@ class OperatorHistoryScreen extends StatelessWidget {
               if (history.isEmpty)
                 SizedBox(
                   height: MediaQuery.sizeOf(context).height * 0.55,
-                  child: const AppEmptyState(
+                  child: AppEmptyState(
                     icon: Icons.history_toggle_off_outlined,
-                    title: 'No past assignments yet',
-                    message: 'Completed jobs will appear here.',
+                    title: strings.noPastAssignments,
+                    message: strings.completedJobsAppearHere,
                   ),
                 ),
               for (final job in history) ...[
@@ -59,12 +61,16 @@ class OperatorHistoryScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
                       Text('${job.farmerName} - ${job.plot.name}'),
-                      Text('Scheduled ${formatDateTime(job.scheduledAt)}'),
+                      Text(
+                        strings.scheduledAt(formatDateTime(job.scheduledAt)),
+                      ),
                       if (job.finishedAt != null)
-                        Text('Finished ${formatTime(job.finishedAt!)}'),
+                        Text(strings.finishedAt(formatTime(job.finishedAt!))),
                       if (job.areaServicedHectares != null)
                         Text(
-                          'Area serviced ${job.areaServicedHectares!.toStringAsFixed(1)} ha',
+                          strings.areaServiced(
+                            job.areaServicedHectares!.toStringAsFixed(1),
+                          ),
                         ),
                     ],
                   ),

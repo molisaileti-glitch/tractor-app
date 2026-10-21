@@ -287,9 +287,16 @@ class _JobCard extends StatelessWidget {
               ListTile(
                 leading: const Icon(Icons.insights_outlined),
                 title: const Text('Refresh verification'),
-                onTap: () {
+                onTap: () async {
                   Navigator.of(context).pop();
-                  repository.refreshJobVerification(job.id);
+                  await repository.refreshJobVerification(job.id);
+                  if (!context.mounted) return;
+                  await _showActionResult(
+                    context,
+                    successTitle: 'Verification refreshed',
+                    successMessage:
+                        'The latest verification details are now shown on this job.',
+                  );
                 },
               ),
               ListTile(
@@ -351,7 +358,15 @@ class _JobCard extends StatelessWidget {
           'This will send the assignment to ${job.operator.name} using ${job.tractor.assetNo ?? job.tractor.label ?? job.tractor.model}.',
       confirmLabel: 'Dispatch',
     );
-    if (confirmed) await repository.dispatchJob(job.id);
+    if (!confirmed) return;
+    await repository.dispatchJob(job.id);
+    if (!context.mounted) return;
+    await _showActionResult(
+      context,
+      successTitle: 'Job dispatched',
+      successMessage:
+          'The assignment was sent to ${job.operator.name}. You can continue tracking it under Jobs or Schedule.',
+    );
   }
 
   Future<void> _confirmClose(BuildContext context) async {
@@ -362,7 +377,14 @@ class _JobCard extends StatelessWidget {
           'Closing finalizes the job as paid. Confirm that verification and farmer confirmation are complete.',
       confirmLabel: 'Close Job',
     );
-    if (confirmed) await repository.closeJob(job.id);
+    if (!confirmed) return;
+    await repository.closeJob(job.id);
+    if (!context.mounted) return;
+    await _showActionResult(
+      context,
+      successTitle: 'Job closed',
+      successMessage: 'The job has been finalized and moved to closed records.',
+    );
   }
 
   Future<void> _confirmCancel(BuildContext context) async {
@@ -379,6 +401,13 @@ class _JobCard extends StatelessWidget {
         jobId: job.id,
         reason: JobCancellationReason.other,
         notes: '',
+      );
+      if (!context.mounted) return;
+      await _showActionResult(
+        context,
+        successTitle: 'Job cancelled',
+        successMessage:
+            'The assignment has been cancelled and the operator should no longer continue it.',
       );
     }
   }
@@ -399,19 +428,18 @@ class _JobCard extends StatelessWidget {
           minLines: 2,
           maxLines: 3,
         ),
+        actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
-            child: const Text('Flag'),
+          AppDialogActions(
+            onCancel: () => Navigator.of(context).pop(),
+            onConfirm: () => Navigator.of(context).pop(controller.text.trim()),
+            confirmLabel: 'Flag',
+            danger: true,
           ),
         ],
       ),
     );
-    controller.dispose();
+    disposeAppDialogController(controller);
     if (reason == null || reason.isEmpty) return;
     if (!context.mounted) return;
     final confirmed = await showAppConfirmationDialog(
@@ -424,6 +452,13 @@ class _JobCard extends StatelessWidget {
     );
     if (confirmed) {
       await repository.flagJob(jobId: job.id, reason: reason);
+      if (!context.mounted) return;
+      await _showActionResult(
+        context,
+        successTitle: 'Job flagged',
+        successMessage:
+            'The concern is recorded and the job is now marked for operations review.',
+      );
     }
   }
 
@@ -443,19 +478,17 @@ class _JobCard extends StatelessWidget {
           minLines: 2,
           maxLines: 3,
         ),
+        actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
-            child: const Text('Clear'),
+          AppDialogActions(
+            onCancel: () => Navigator.of(context).pop(),
+            onConfirm: () => Navigator.of(context).pop(controller.text.trim()),
+            confirmLabel: 'Clear',
           ),
         ],
       ),
     );
-    controller.dispose();
+    disposeAppDialogController(controller);
     if (note == null || note.isEmpty) return;
     if (!context.mounted) return;
     final confirmed = await showAppConfirmationDialog(
@@ -467,6 +500,12 @@ class _JobCard extends StatelessWidget {
     );
     if (confirmed) {
       await repository.unflagJob(jobId: job.id, note: note);
+      if (!context.mounted) return;
+      await _showActionResult(
+        context,
+        successTitle: 'Flag cleared',
+        successMessage: 'The review concern has been marked as resolved.',
+      );
     }
   }
 
@@ -505,13 +544,11 @@ class _JobCard extends StatelessWidget {
             ),
           ],
         ),
+        actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
+          AppDialogActions(
+            onCancel: () => Navigator.of(context).pop(),
+            onConfirm: () {
               final acres = num.tryParse(acresController.text.trim());
               if (acres == null || acres <= 0) return;
               Navigator.of(context).pop(
@@ -521,13 +558,13 @@ class _JobCard extends StatelessWidget {
                 ),
               );
             },
-            child: const Text('Verify'),
+            confirmLabel: 'Verify',
           ),
         ],
       ),
     );
-    acresController.dispose();
-    noteController.dispose();
+    disposeAppDialogController(acresController);
+    disposeAppDialogController(noteController);
     if (input == null) return;
     if (!context.mounted) return;
     final confirmed = await showAppConfirmationDialog(
@@ -542,6 +579,13 @@ class _JobCard extends StatelessWidget {
       jobId: job.id,
       verifiedAcres: input.verifiedAcres,
       note: input.note.isEmpty ? null : input.note,
+    );
+    if (!context.mounted) return;
+    await _showActionResult(
+      context,
+      successTitle: 'Job verified',
+      successMessage:
+          'The verified acreage has been saved. Complete any required confirmation before closing the job.',
     );
   }
 
@@ -588,13 +632,11 @@ class _JobCard extends StatelessWidget {
               ),
             ],
           ),
+          actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
+            AppDialogActions(
+              onCancel: () => Navigator.of(context).pop(),
+              onConfirm: () {
                 final note = noteController.text.trim();
                 if (dispute && note.isEmpty) return;
                 Navigator.of(context).pop(
@@ -605,13 +647,13 @@ class _JobCard extends StatelessWidget {
                   ),
                 );
               },
-              child: const Text('Submit'),
+              confirmLabel: 'Submit',
             ),
           ],
         ),
       ),
     );
-    noteController.dispose();
+    disposeAppDialogController(noteController);
     if (input == null) return;
     if (!context.mounted) return;
     final confirmed = await showAppConfirmationDialog(
@@ -629,6 +671,37 @@ class _JobCard extends StatelessWidget {
       rating: input.rating,
       note: input.note.isEmpty ? null : input.note,
       dispute: input.dispute,
+    );
+    if (!context.mounted) return;
+    await _showActionResult(
+      context,
+      successTitle: input.dispute
+          ? 'Dispute recorded'
+          : 'Confirmation recorded',
+      successMessage: input.dispute
+          ? 'The farmer dispute has been saved for operations review.'
+          : 'The manual farmer confirmation has been saved on this job.',
+    );
+  }
+
+  Future<void> _showActionResult(
+    BuildContext context, {
+    required String successTitle,
+    required String successMessage,
+  }) async {
+    final error = repository.mechanizationActionError;
+    if (error != null) {
+      await showAppErrorDialog(
+        context,
+        title: 'Action not completed',
+        message: error,
+      );
+      return;
+    }
+    await showAppSuccessDialog(
+      context,
+      title: successTitle,
+      message: successMessage,
     );
   }
 }
@@ -820,6 +893,22 @@ class _RescheduleJobScreenState extends State<RescheduleJobScreen> {
       operatorId: job.operator.id,
       reason: _reason,
       notes: '',
+    );
+    if (!mounted) return;
+    final error = widget.repository.mechanizationActionError;
+    if (error != null) {
+      await showAppErrorDialog(
+        context,
+        title: 'Job not rescheduled',
+        message: error,
+      );
+      return;
+    }
+    await showAppSuccessDialog(
+      context,
+      title: 'Job rescheduled',
+      message:
+          'The updated date and time are now shown under Jobs and Schedule.',
     );
     if (!mounted) return;
     Navigator.of(context).pop();

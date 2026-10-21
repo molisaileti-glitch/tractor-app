@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../core/theme/app_theme.dart';
 
+void disposeAppDialogController(TextEditingController controller) {
+  Future<void>.delayed(const Duration(milliseconds: 350), controller.dispose);
+}
+
 class AppDialogActions extends StatelessWidget {
   const AppDialogActions({
     super.key,
@@ -53,6 +57,84 @@ class AppDialogActions extends StatelessWidget {
                   )
                 : Text(confirmLabel),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+Future<String?> showAppTextInputDialog(
+  BuildContext context, {
+  required String title,
+  required String label,
+  String? hintText,
+  String cancelLabel = 'Cancel',
+  String confirmLabel = 'Submit',
+  int maxLines = 3,
+}) {
+  return showDialog<String>(
+    context: context,
+    builder: (_) => _AppTextInputDialog(
+      title: title,
+      label: label,
+      hintText: hintText,
+      cancelLabel: cancelLabel,
+      confirmLabel: confirmLabel,
+      maxLines: maxLines,
+    ),
+  );
+}
+
+class _AppTextInputDialog extends StatefulWidget {
+  const _AppTextInputDialog({
+    required this.title,
+    required this.label,
+    required this.cancelLabel,
+    required this.confirmLabel,
+    required this.maxLines,
+    this.hintText,
+  });
+
+  final String title;
+  final String label;
+  final String? hintText;
+  final String cancelLabel;
+  final String confirmLabel;
+  final int maxLines;
+
+  @override
+  State<_AppTextInputDialog> createState() => _AppTextInputDialogState();
+}
+
+class _AppTextInputDialogState extends State<_AppTextInputDialog> {
+  final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        maxLines: widget.maxLines,
+        decoration: InputDecoration(
+          labelText: widget.label,
+          hintText: widget.hintText,
+        ),
+      ),
+      actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+      actions: [
+        AppDialogActions(
+          onCancel: () => Navigator.of(context).pop(),
+          onConfirm: () => Navigator.of(context).pop(_controller.text.trim()),
+          cancelLabel: widget.cancelLabel,
+          confirmLabel: widget.confirmLabel,
         ),
       ],
     );

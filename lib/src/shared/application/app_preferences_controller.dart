@@ -36,7 +36,11 @@ class AppPreferencesController extends ChangeNotifier {
   }
 
   Future<void> setSwahili(bool enabled) async {
-    _locale = Locale(enabled ? 'sw' : 'en');
+    await setLocale(Locale(enabled ? 'sw' : 'en'));
+  }
+
+  Future<void> setLocale(Locale locale) async {
+    _locale = Locale(locale.languageCode == 'sw' ? 'sw' : 'en');
     await _storage.write(key: _localeKey, value: _locale.languageCode);
     notifyListeners();
   }

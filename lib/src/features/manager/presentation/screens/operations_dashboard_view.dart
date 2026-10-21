@@ -492,7 +492,10 @@ class _AllClearNotice extends StatelessWidget {
       child: Center(
         child: Column(
           children: [
-            Icon(Icons.check_circle_outline, color: theme.colorScheme.primary),
+            Icon(
+              Icons.check_circle_outline,
+              color: AppColors.adaptiveSuccess(context),
+            ),
             const SizedBox(height: 8),
             Text(
               'Nothing needs attention right now.',

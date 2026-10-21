@@ -677,12 +677,6 @@ class _MaintenanceCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          OutlinedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.edit_note_outlined),
-            label: const Text('Log Maintenance'),
-          ),
         ],
       ),
     );

@@ -5,7 +5,9 @@ class AppColors {
 
   static const deepGreen = Color(0xFF102A30);
   static const fieldGreen = Color(0xFF16A99A);
-  static const successGreen = Color(0xFF16A99A);
+  static const darkAccent = Color(0xFF087A72);
+  static const successGreen = Color(0xFF08B83E);
+  static const darkSuccessGreen = Color(0xFF39E66B);
   static const mint = Color(0xFFE7F7F5);
   static const cream = Color(0xFFFFF8E8);
   static const pageBackground = Color(0xFFF5F7FA);
@@ -31,6 +33,11 @@ class AppColors {
       Theme.of(context).brightness == Brightness.dark
       ? darkMutedText
       : mutedText;
+
+  static Color adaptiveSuccess(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+      ? darkSuccessGreen
+      : successGreen;
 }
 
 class AppTheme {
@@ -163,7 +170,7 @@ class AppTheme {
   }
 
   static ThemeData dark() {
-    const seed = AppColors.fieldGreen;
+    const seed = AppColors.darkAccent;
     final scheme =
         ColorScheme.fromSeed(
           seedColor: seed,
@@ -183,39 +190,41 @@ class AppTheme {
     final textTheme = baseTextTheme
         .apply(bodyColor: AppColors.darkText, displayColor: AppColors.darkText)
         .copyWith(
-      headlineLarge: baseTextTheme.headlineLarge?.copyWith(
-        fontWeight: FontWeight.w700,
-      ),
-      headlineMedium: baseTextTheme.headlineMedium?.copyWith(
-        fontWeight: FontWeight.w700,
-      ),
-      headlineSmall: baseTextTheme.headlineSmall?.copyWith(
-        fontWeight: FontWeight.w700,
-      ),
-      titleLarge: baseTextTheme.titleLarge?.copyWith(
-        fontWeight: FontWeight.w700,
-      ),
-      titleMedium: baseTextTheme.titleMedium?.copyWith(
-        fontWeight: FontWeight.w600,
-      ),
-      titleSmall: baseTextTheme.titleSmall?.copyWith(
-        fontWeight: FontWeight.w600,
-      ),
-      bodyLarge: baseTextTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w400),
-      bodyMedium: baseTextTheme.bodyMedium?.copyWith(
-        fontWeight: FontWeight.w400,
-      ),
-      labelLarge: baseTextTheme.labelLarge?.copyWith(
-        color: AppColors.darkText,
-        fontWeight: FontWeight.w600,
-      ),
-      labelMedium: baseTextTheme.labelMedium?.copyWith(
-        color: AppColors.darkText,
-      ),
-      labelSmall: baseTextTheme.labelSmall?.copyWith(
-        color: AppColors.darkMutedText,
-      ),
-    );
+          headlineLarge: baseTextTheme.headlineLarge?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+          headlineMedium: baseTextTheme.headlineMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+          headlineSmall: baseTextTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+          titleLarge: baseTextTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+          titleMedium: baseTextTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+          titleSmall: baseTextTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+          bodyLarge: baseTextTheme.bodyLarge?.copyWith(
+            fontWeight: FontWeight.w400,
+          ),
+          bodyMedium: baseTextTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w400,
+          ),
+          labelLarge: baseTextTheme.labelLarge?.copyWith(
+            color: AppColors.darkText,
+            fontWeight: FontWeight.w600,
+          ),
+          labelMedium: baseTextTheme.labelMedium?.copyWith(
+            color: AppColors.darkText,
+          ),
+          labelSmall: baseTextTheme.labelSmall?.copyWith(
+            color: AppColors.darkMutedText,
+          ),
+        );
 
     return ThemeData(
       useMaterial3: true,
@@ -264,7 +273,7 @@ class AppTheme {
       listTileTheme: const ListTileThemeData(
         textColor: AppColors.darkText,
         iconColor: AppColors.darkMutedText,
-        selectedColor: AppColors.fieldGreen,
+        selectedColor: AppColors.darkAccent,
       ),
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: AppColors.darkSurface,

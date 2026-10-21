@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../../../components/components.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/generated/app_localizations.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
   const OtpVerificationScreen({
@@ -108,15 +109,11 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         counterText: '',
         contentPadding: const EdgeInsets.symmetric(vertical: 13),
         filled: true,
-        fillColor: isDark
-            ? AppColors.darkSurface
-            : const Color(0xFFF4F5F3),
+        fillColor: isDark ? AppColors.darkSurface : const Color(0xFFF4F5F3),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(
-            color: isDark
-                ? theme.colorScheme.outline
-                : Colors.transparent,
+            color: isDark ? theme.colorScheme.outline : Colors.transparent,
           ),
         ),
         focusedBorder: OutlineInputBorder(
@@ -176,8 +173,10 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       _errorText = error;
     });
     if (error == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('A new verification code was sent.')),
+      showAppSnackBar(
+        context,
+        message: 'A new verification code was sent.',
+        type: AppSnackType.success,
       );
     }
   }
@@ -204,6 +203,7 @@ class _OtpPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context)!;
     return ClipRRect(
       borderRadius: BorderRadius.circular(28),
       child: BackdropFilter(
@@ -238,7 +238,7 @@ class _OtpPanel extends StatelessWidget {
                 ),
                 const SizedBox(height: 28),
                 Text(
-                  'Enter the 6-digit code sent to your phone',
+                  strings.enterOtpCode,
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w900,
                     color: AppColors.adaptiveText(context),
@@ -247,7 +247,7 @@ class _OtpPanel extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'We sent a verification code to $phoneNumber.',
+                  strings.verificationCodeSent(phoneNumber),
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppColors.adaptiveMutedText(context),
                     height: 1.35,
@@ -277,13 +277,13 @@ class _OtpPanel extends StatelessWidget {
                 AppGlowButton(
                   onPressed: onVerify,
                   loading: verifying,
-                  label: verifying ? 'Verifying...' : 'Continue',
+                  label: verifying ? strings.verifying : strings.continueLabel,
                   trailing: Icons.arrow_forward,
                 ),
                 const SizedBox(height: 10),
                 TextButton(
                   onPressed: resending || verifying ? null : onResend,
-                  child: Text(resending ? 'Sending...' : 'Resend code'),
+                  child: Text(resending ? strings.sending : strings.resendCode),
                 ),
               ],
             ),
@@ -373,8 +373,9 @@ class _BackButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context)!;
     return IconButton(
-      tooltip: 'Back',
+      tooltip: strings.back,
       onPressed: onPressed,
       icon: const Icon(Icons.arrow_back),
       color: AppColors.adaptiveText(context),

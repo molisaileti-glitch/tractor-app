@@ -27,6 +27,32 @@ enum OperatorProblemReason {
   final String label;
 }
 
+class TractorTrackerPosition {
+  const TractorTrackerPosition({
+    required this.tractorId,
+    required this.latitude,
+    required this.longitude,
+    required this.online,
+    this.trackerImei,
+    this.speedKph,
+    this.course,
+    this.fixTime,
+    this.ageSeconds,
+  });
+
+  final String tractorId;
+  final String? trackerImei;
+  final double latitude;
+  final double longitude;
+  final double? speedKph;
+  final double? course;
+  final bool online;
+  final DateTime? fixTime;
+  final int? ageSeconds;
+
+  bool get isLive => online;
+}
+
 class OperatorProblemReport {
   const OperatorProblemReport({
     required this.id,

@@ -72,7 +72,7 @@ class AppGlowButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-            color: AppColors.successGreen.withValues(alpha: 0.18),
+            color: AppColors.fieldGreen.withValues(alpha: 0.18),
             blurRadius: 14,
             offset: const Offset(0, 6),
           ),
@@ -85,7 +85,7 @@ class AppGlowButton extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
-          backgroundColor: AppColors.successGreen,
+          backgroundColor: AppColors.fieldGreen,
           foregroundColor: Colors.white,
         ),
         child: loading

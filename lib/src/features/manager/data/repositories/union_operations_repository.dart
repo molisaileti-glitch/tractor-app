@@ -41,6 +41,7 @@ class UnionOperationsRepository extends ChangeNotifier {
   Map<String, Object?> _dashboardData = const {};
   int? _remoteBacklogCount;
   int _syncGeneration = 0;
+  String? _lastScheduledJobId;
 
   List<OperationsServiceRequest> get requests => List.unmodifiable(_requests);
   List<TractorAsset> get tractors => List.unmodifiable(_tractors);
@@ -53,6 +54,14 @@ class UnionOperationsRepository extends ChangeNotifier {
   bool get isRefreshingTractors => _isRefreshingTractors;
   bool get isRefreshingOperators => _isRefreshingOperators;
   bool get isRefreshingFarmers => _isRefreshingFarmers;
+
+  OperationsJob? jobForRequest(String requestId) {
+    for (final job in _jobs) {
+      if (job.requestId == requestId) return job;
+    }
+    return null;
+  }
+
   String? get mechanizationSyncError => _mechanizationSyncError;
   String? get mechanizationActionError => _mechanizationActionError;
   String? get mechanizationUserName => _mechanizationUserName;
@@ -545,6 +554,7 @@ class UnionOperationsRepository extends ChangeNotifier {
     required String implement,
   }) async {
     final request = requestById(requestId);
+    _lastScheduledJobId = null;
     if (await _tryRemoteRequestSchedule(
       requestId: requestId,
       tractorId: tractorId,
@@ -554,7 +564,7 @@ class UnionOperationsRepository extends ChangeNotifier {
       request: request,
       implement: implement,
     )) {
-      return requestId;
+      return _lastScheduledJobId ?? requestId;
     }
     final tractor = _tractors.firstWhere((item) => item.id == tractorId);
     final operator = _operators.firstWhere((item) => item.id == operatorId);
@@ -634,12 +644,30 @@ class UnionOperationsRepository extends ChangeNotifier {
 
   Future<void> dispatchJob(String jobId) async {
     final job = jobById(jobId);
+    final tractorId = _registryTractorId(job.tractor);
+    final operatorId = _registryOperatorId(job.operator);
+    if (kDebugMode) {
+      debugPrint(
+        '[Dispatch] job=$jobId '
+        'tractor=${job.tractor.id} resolved_tractor=$tractorId '
+        'operator=${job.operator.id} resolved_operator=$operatorId',
+      );
+    }
+    if (!_isUuid(tractorId) || !_isUuid(operatorId)) {
+      _mechanizationActionError = !_isUuid(tractorId)
+          ? 'The assigned tractor could not be matched to its registry ID. '
+                'Refresh Tractors and Jobs, then try dispatching again.'
+          : 'The assigned operator could not be matched to their registry ID. '
+                'Refresh Operators and Jobs, then try dispatching again.';
+      notifyListeners();
+      return;
+    }
     if (await _tryRemoteJobUpdate(
       () => mobileApiClient.dispatchJob(
         token: _accessToken!,
         jobId: jobId,
-        tractorId: job.tractor.id,
-        operatorId: job.operator.id,
+        tractorId: tractorId,
+        operatorId: operatorId,
       ),
     )) {
       return;
@@ -659,6 +687,35 @@ class UnionOperationsRepository extends ChangeNotifier {
       ),
     );
   }
+
+  String _registryTractorId(TractorAsset assigned) {
+    if (_isUuid(assigned.id)) return assigned.id;
+    for (final tractor in _tractors) {
+      final matches =
+          tractor.id == assigned.id ||
+          tractor.assetNo == assigned.id ||
+          tractor.label == assigned.id ||
+          (assigned.assetNo != null && tractor.assetNo == assigned.assetNo) ||
+          (assigned.label != null && tractor.label == assigned.label);
+      if (matches && _isUuid(tractor.id)) return tractor.id;
+    }
+    return assigned.id;
+  }
+
+  String _registryOperatorId(OperatorProfile assigned) {
+    if (_isUuid(assigned.id)) return assigned.id;
+    for (final operator in _operators) {
+      if ((operator.id == assigned.id || operator.name == assigned.name) &&
+          _isUuid(operator.id)) {
+        return operator.id;
+      }
+    }
+    return assigned.id;
+  }
+
+  bool _isUuid(String value) => RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  ).hasMatch(value);
 
   Future<void> closeJob(String jobId, {String paymentStatus = 'paid'}) async {
     final job = jobById(jobId);
@@ -1121,22 +1178,49 @@ class UnionOperationsRepository extends ChangeNotifier {
         .map((item) => _registryFarmerFromJson(_stringKeyedMap(item)))
         .whereType<RegistryFarmer>()
         .toList();
-    final unique = <String, RegistryFarmer>{};
+    final unique = <RegistryFarmer>[];
+    final seenKeys = <String>{};
     for (final farmer in parsed) {
-      final key = farmer.externalRef?.trim().toLowerCase().isNotEmpty == true
-          ? 'external:${farmer.externalRef!.trim().toLowerCase()}'
-          : farmer.phone?.trim().isNotEmpty == true
-          ? 'phone:${farmer.phone!.trim()}'
-          : 'id:${farmer.id}';
-      unique[key] = farmer;
+      final keys = _farmerIdentityKeys(farmer);
+      if (keys.any(seenKeys.contains)) continue;
+
+      unique.add(farmer);
+      seenKeys.addAll(keys);
     }
-    final farmers = unique.values.toList();
     _farmers
       ..clear()
-      ..addAll(farmers);
+      ..addAll(unique);
     if (kDebugMode) {
-      debugPrint('[Mechanization Registry] farmers: ${farmers.length}');
+      debugPrint(
+        '[Mechanization Registry] farmers: ${unique.length} '
+        '(removed ${parsed.length - unique.length} duplicate rows)',
+      );
     }
+  }
+
+  Set<String> _farmerIdentityKeys(RegistryFarmer farmer) {
+    final keys = <String>{'id:${farmer.id.trim().toLowerCase()}'};
+    final externalRef = farmer.externalRef?.trim().toLowerCase();
+    if (externalRef != null && externalRef.isNotEmpty) {
+      keys.add('external:$externalRef');
+    }
+
+    final phone = _normalizeFarmerPhone(farmer.phone);
+    if (phone != null) keys.add('phone:$phone');
+    return keys;
+  }
+
+  String? _normalizeFarmerPhone(String? value) {
+    if (value == null) return null;
+    var digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) return null;
+
+    if (digits.startsWith('0') && digits.length == 10) {
+      digits = '255${digits.substring(1)}';
+    } else if (digits.length == 9) {
+      digits = '255$digits';
+    }
+    return digits;
   }
 
   RegistryFarmer? _registryFarmerFromJson(Map<String, Object?> json) {
@@ -1199,7 +1283,10 @@ class UnionOperationsRepository extends ChangeNotifier {
       _mechanizationActionError = null;
       final response = await request();
       final job = _jobFromJson(_dataMap(response));
-      if (job != null) _upsertJob(job);
+      if (job != null) {
+        _lastScheduledJobId = job.id;
+        _upsertJob(job);
+      }
       notifyListeners();
       return true;
     } on KwanzaTrackApiException catch (error) {
@@ -1337,9 +1424,7 @@ class UnionOperationsRepository extends ChangeNotifier {
       estimatedHours: estimatedHours,
       status: status,
       startedAt: status == JobStatus.inProgress ? start : null,
-      alert: event['geofence_verified'] == false
-          ? 'Geofence not verified'
-          : null,
+      alert: _geofenceAlert(status, _asBool(event['geofence_verified'])),
     );
   }
 
@@ -1499,10 +1584,19 @@ class UnionOperationsRepository extends ChangeNotifier {
       completedAt: _dateTime(json['completed_at']),
       alert:
           _text(json, const ['flag_reason', 'cancel_reason', 'dispute_note']) ??
-          (_asBool(json['geofence_verified']) == false
-              ? 'Geofence not verified'
-              : null),
+          _geofenceAlert(status, _asBool(json['geofence_verified'])),
     );
+  }
+
+  String? _geofenceAlert(JobStatus status, bool? verified) {
+    if (verified != false) return null;
+    return switch (status) {
+      JobStatus.arrived ||
+      JobStatus.inProgress ||
+      JobStatus.completedPendingConfirmation ||
+      JobStatus.flagged => 'Geofence not verified',
+      _ => null,
+    };
   }
 
   MechanizationOverride? _overrideFromJson(Map<String, Object?> json) {

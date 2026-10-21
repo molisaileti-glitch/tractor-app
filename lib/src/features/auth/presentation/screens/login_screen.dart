@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../components/components.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/generated/app_localizations.dart';
 import '../../data/remote/auth_remote_data_source.dart';
 import '../../data/repositories/auth_local_repository.dart';
 import '../../domain/entities/auth_session.dart';
@@ -244,11 +245,12 @@ class _LoginPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Welcome Back',
+          strings.welcomeBack,
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.w700,
@@ -258,7 +260,7 @@ class _LoginPanel extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          'Sign in to continue',
+          strings.signInToContinue,
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             color: AppColors.adaptiveMutedText(context),
@@ -270,9 +272,9 @@ class _LoginPanel extends StatelessWidget {
           controller: identifierController,
           keyboardType: TextInputType.emailAddress,
           textInputAction: TextInputAction.next,
-          decoration: const InputDecoration(
-            hintText: 'Phone number or email',
-            prefixIcon: Icon(Icons.person_outline),
+          decoration: InputDecoration(
+            hintText: strings.phoneOrEmail,
+            prefixIcon: const Icon(Icons.person_outline),
           ),
         ),
         const SizedBox(height: 14),
@@ -281,11 +283,13 @@ class _LoginPanel extends StatelessWidget {
           obscureText: obscurePassword,
           style: const TextStyle(fontWeight: FontWeight.w400),
           decoration: InputDecoration(
-            hintText: 'Enter password',
+            hintText: strings.enterPassword,
             hintStyle: const TextStyle(fontWeight: FontWeight.w400),
             prefixIcon: const Icon(Icons.lock_outline),
             suffixIcon: IconButton(
-              tooltip: obscurePassword ? 'Show password' : 'Hide password',
+              tooltip: obscurePassword
+                  ? strings.showPassword
+                  : strings.hidePassword,
               onPressed: onTogglePassword,
               icon: Icon(
                 obscurePassword
@@ -310,7 +314,7 @@ class _LoginPanel extends StatelessWidget {
         AppGlowButton(
           onPressed: onSendOtp,
           loading: isLoading,
-          label: 'Send OTP',
+          label: strings.sendOtp,
           trailing: Icons.arrow_forward,
         ),
       ],
@@ -323,6 +327,7 @@ class _BrandLockup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context)!;
     return SizedBox(
       width: double.infinity,
       child: Column(
@@ -348,7 +353,7 @@ class _BrandLockup extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Mechanization operations',
+            strings.mechanizationOperations,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(
@@ -369,8 +374,9 @@ class _BackButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context)!;
     return IconButton(
-      tooltip: 'Back',
+      tooltip: strings.back,
       onPressed: onPressed,
       icon: const Icon(Icons.arrow_back),
       color: AppColors.adaptiveText(context),

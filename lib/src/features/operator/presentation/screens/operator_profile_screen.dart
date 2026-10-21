@@ -11,11 +11,13 @@ class OperatorProfileScreen extends StatelessWidget {
     super.key,
     required this.repository,
     required this.preferences,
+    required this.onLogout,
     this.onThemeChanged,
   });
 
   final OperatorLocalRepository repository;
   final AppPreferencesController preferences;
+  final VoidCallback onLogout;
   final Future<void> Function(BuildContext origin, bool enabled)?
   onThemeChanged;
 
@@ -71,6 +73,18 @@ class OperatorProfileScreen extends StatelessWidget {
                                 strings.informationUpToDate,
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: onLogout,
+                  icon: const Icon(Icons.logout_rounded),
+                  label: Text(strings.logout),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.error,
+                  ),
                 ),
               ),
             ],

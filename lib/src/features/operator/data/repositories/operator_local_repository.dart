@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
@@ -14,6 +16,8 @@ class OperatorLocalRepository extends ChangeNotifier {
 
   final KwanzaTrackMobileApiClient mobileApiClient;
   final List<OperatorJob> _jobs;
+  final Map<String, TractorTrackerPosition> _trackerPositions = {};
+  final Map<String, List<String>> _tractorImplements = {};
   String? _accessToken;
   bool _isSyncingMechanization = false;
   String? _mechanizationSyncError;
@@ -22,14 +26,24 @@ class OperatorLocalRepository extends ChangeNotifier {
   String? _operatorEmail;
   String? _operatorRole;
   int _syncGeneration = 0;
+  Timer? _trackerPollTimer;
+  bool _isRefreshingTrackerPositions = false;
 
   List<OperatorJob> get jobs => List.unmodifiable(_jobs);
+  Map<String, TractorTrackerPosition> get trackerPositions =>
+      Map.unmodifiable(_trackerPositions);
   bool get isSyncingMechanization => _isSyncingMechanization;
   String? get mechanizationSyncError => _mechanizationSyncError;
   String? get lastActionError => _lastActionError;
   String? get operatorName => _operatorName;
   String? get operatorEmail => _operatorEmail;
   String? get operatorRole => _operatorRole;
+
+  TractorTrackerPosition? trackerPositionFor(String tractorId) =>
+      _trackerPositions[tractorId];
+
+  List<String> implementNamesFor(String tractorId) =>
+      List.unmodifiable(_tractorImplements[tractorId] ?? const <String>[]);
 
   OperatorJob? get todayJob {
     for (final job in _jobs) {
@@ -62,14 +76,18 @@ class OperatorLocalRepository extends ChangeNotifier {
   void setMechanizationAccessToken(String? token) {
     final normalized = token?.trim();
     if (_accessToken == normalized) return;
+    stopTrackerPolling();
     _accessToken = normalized?.isEmpty == true ? null : normalized;
     _mechanizationSyncError = null;
     _lastActionError = null;
     if (_accessToken == null) {
+      stopTrackerPolling();
       _operatorName = null;
       _operatorEmail = null;
       _operatorRole = null;
       _jobs.clear();
+      _trackerPositions.clear();
+      _tractorImplements.clear();
       notifyListeners();
       return;
     }
@@ -88,23 +106,23 @@ class OperatorLocalRepository extends ChangeNotifier {
     try {
       final today = DateTime.now();
       final from = _dateOnly(today.subtract(const Duration(days: 90)));
-      final to = _dateOnly(today.add(const Duration(days: 7)));
+      final to = _dateOnly(today.add(const Duration(days: 365)));
       final responses = await Future.wait<Map<String, Object?>>([
         mobileApiClient.me(token: token),
         mobileApiClient.calendar(token: token, from: from, to: to, mine: true),
         mobileApiClient.jobs(
           token: token,
-          from: from,
-          to: to,
+          status: 'active',
           mine: true,
-          perPage: 100,
         ),
+        mobileApiClient.tractors(token: token, mine: true, live: true),
       ]);
       if (generation != _syncGeneration) return;
 
       _applyMeResponse(responses[0]);
       _applyCalendarResponse(responses[1]);
       _applyJobsResponse(responses[2]);
+      _applyTrackerPositionsResponse(responses[3]);
       await _refreshJobPaths(token);
       _mechanizationSyncError = null;
     } on KwanzaTrackApiException catch (error) {
@@ -120,6 +138,45 @@ class OperatorLocalRepository extends ChangeNotifier {
         _isSyncingMechanization = false;
         notifyListeners();
       }
+    }
+  }
+
+  void startTrackerPolling() {
+    if (_trackerPollTimer != null || _accessToken == null) return;
+    unawaited(refreshTrackerPositions());
+    _trackerPollTimer = Timer.periodic(
+      const Duration(seconds: 12),
+      (_) => unawaited(refreshTrackerPositions()),
+    );
+  }
+
+  void stopTrackerPolling() {
+    _trackerPollTimer?.cancel();
+    _trackerPollTimer = null;
+  }
+
+  Future<void> refreshTrackerPositions() async {
+    final token = _accessToken;
+    if (token == null || token.isEmpty || _isRefreshingTrackerPositions) {
+      return;
+    }
+    _isRefreshingTrackerPositions = true;
+    try {
+      final response = await mobileApiClient.tractors(
+        token: token,
+        mine: true,
+        live: true,
+      );
+      _applyTrackerPositionsResponse(response);
+      notifyListeners();
+    } on KwanzaTrackApiException catch (error) {
+      if (kDebugMode) {
+        debugPrint('[Tracker Poll] ${error.message}');
+      }
+    } catch (error) {
+      if (kDebugMode) debugPrint('[Tracker Poll] $error');
+    } finally {
+      _isRefreshingTrackerPositions = false;
     }
   }
 
@@ -408,15 +465,37 @@ class OperatorLocalRepository extends ChangeNotifier {
   }
 
   void _applyMeResponse(Map<String, Object?> response) {
-    final user = _map(_map(response['data'])['user']);
-    _operatorName = user['name']?.toString();
+    final data = _map(response['data']);
+    final nestedUser = _map(data['user']);
+    final operator = _map(data['operator']);
+    final user = nestedUser.isEmpty ? data : nestedUser;
+    _operatorName = operator['name']?.toString() ?? user['name']?.toString();
     _operatorEmail = user['email']?.toString();
     _operatorRole = user['role']?.toString();
+    if (kDebugMode) {
+      debugPrint(
+        '[Operator Sync] signed in as name=$_operatorName '
+        'email=$_operatorEmail role=$_operatorRole '
+        'user_id=${user['id']} operator_id=${operator['id']}',
+      );
+    }
   }
 
   void _applyCalendarResponse(Map<String, Object?> response) {
-    final events = _map(response['data'])['events'];
-    if (events is! List) return;
+    final data = response['data'];
+    final dataMap = _map(data);
+    final events = data is List
+        ? data
+        : dataMap['events'] ?? dataMap['data'] ?? dataMap['items'];
+    if (events is! List) {
+      if (kDebugMode) {
+        debugPrint(
+          '[Operator Sync] calendar response has no event list; '
+          'data_type=${data.runtimeType} data_keys=${dataMap.keys.toList()}',
+        );
+      }
+      return;
+    }
     final remoteJobs = events
         .whereType<Map>()
         .map((event) => _jobFromCalendarEvent(_stringKeyedMap(event)))
@@ -425,6 +504,9 @@ class OperatorLocalRepository extends ChangeNotifier {
     _jobs
       ..clear()
       ..addAll(remoteJobs);
+    if (kDebugMode) {
+      debugPrint('[Operator Sync] calendar assignments=${remoteJobs.length}');
+    }
   }
 
   void _applyJobsResponse(Map<String, Object?> response) {
@@ -442,9 +524,79 @@ class OperatorLocalRepository extends ChangeNotifier {
                 );
         })
         .toList();
+    final merged = <String, OperatorJob>{
+      for (final job in _jobs) job.id: job,
+      for (final job in remoteJobs) job.id: job,
+    };
     _jobs
       ..clear()
-      ..addAll(remoteJobs);
+      ..addAll(merged.values);
+    if (kDebugMode) {
+      final meta = _map(response['meta']);
+      debugPrint(
+        '[Operator Sync] jobs endpoint=${remoteJobs.length} '
+        'merged assignments=${_jobs.length} '
+        'server_total=${meta['total'] ?? meta['count'] ?? 'unknown'} '
+        'mine=${meta['mine'] ?? 'unknown'}',
+      );
+      for (final job in _jobs) {
+        debugPrint(
+          '[Operator Sync] job=${job.reference ?? job.id} '
+          'tractor=${job.tractorLabel ?? job.tractorId} '
+          'status=${job.status.name} scheduled=${job.scheduledAt.toIso8601String()}',
+        );
+      }
+    }
+  }
+
+  void _applyTrackerPositionsResponse(Map<String, Object?> response) {
+    final updated = <String, TractorTrackerPosition>{};
+    final implementsByTractor = <String, List<String>>{};
+    for (final item in _dataList(response).whereType<Map>()) {
+      final tractor = _stringKeyedMap(item);
+      final tractorId = _text(tractor, const ['id']);
+      if (tractorId == null) continue;
+      implementsByTractor[tractorId] = _stringList(tractor['implements']);
+      final live = _map(tractor['live']);
+      final position = _map(live['position']);
+      final latitude = _asDouble(position['latitude'] ?? position['lat']);
+      final longitude = _asDouble(
+        position['longitude'] ?? position['lng'] ?? position['lon'],
+      );
+      if (latitude == null || longitude == null) continue;
+
+      updated[tractorId] = TractorTrackerPosition(
+        tractorId: tractorId,
+        trackerImei: _text(tractor, const ['tracker_imei']),
+        latitude: latitude,
+        longitude: longitude,
+        speedKph: _asDouble(position['speed_kph']),
+        course: _asDouble(position['course']),
+        online: _asBool(live['online']) ?? _asBool(tractor['online']) ?? false,
+        fixTime: _dateTime(position['fix_time']),
+        ageSeconds: _asInt(position['age_s']),
+      );
+      if (kDebugMode) {
+        final tracker = updated[tractorId]!;
+        debugPrint(
+          '[Tracker Poll] tractor=$tractorId online=${tracker.online} '
+          'age_s=${tracker.ageSeconds} '
+          'lat=${tracker.latitude} lng=${tracker.longitude}',
+        );
+      }
+    }
+
+    _trackerPositions
+      ..clear()
+      ..addAll(updated);
+    _tractorImplements
+      ..clear()
+      ..addAll(implementsByTractor);
+    if (kDebugMode) {
+      debugPrint(
+        '[Tracker Poll] received ${updated.length} tractor position(s)',
+      );
+    }
   }
 
   Future<void> _refreshJobPaths(String token) async {
@@ -798,6 +950,30 @@ class OperatorLocalRepository extends ChangeNotifier {
     return double.tryParse(value?.toString() ?? '');
   }
 
+  int? _asInt(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '');
+  }
+
+  bool? _asBool(Object? value) {
+    if (value is bool) return value;
+    final normalized = value?.toString().trim().toLowerCase();
+    if (normalized == 'true' || normalized == '1') return true;
+    if (normalized == 'false' || normalized == '0') return false;
+    return null;
+  }
+
+  List<String> _stringList(Object? value) {
+    if (value is! List) return const [];
+    return value
+        .map((item) => item?.toString().trim())
+        .whereType<String>()
+        .where((item) => item.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+  }
+
   ServiceType _serviceType(String? value) {
     final normalized = value?.toLowerCase() ?? '';
     if (normalized.contains('harrow')) return ServiceType.harrowing;
@@ -838,6 +1014,12 @@ class OperatorLocalRepository extends ChangeNotifier {
       'longitude': location.longitude,
       'accuracy_m': location.accuracyMeters,
     };
+  }
+
+  @override
+  void dispose() {
+    stopTrackerPolling();
+    super.dispose();
   }
 
   void _replace(String jobId, OperatorJob updated, {bool notify = true}) {
