@@ -38,7 +38,15 @@ class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final job = widget.repository.jobById(widget.jobId);
+    final job = widget.repository.maybeJobById(widget.jobId);
+    if (job == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Job unavailable')),
+        body: const Center(
+          child: Text('This assignment is no longer available.'),
+        ),
+      );
+    }
     return Scaffold(
       appBar: AppBar(title: const Text('Complete Job')),
       body: SingleChildScrollView(
@@ -115,7 +123,7 @@ class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
 
   Future<void> _submit() async {
     final area = double.tryParse(_areaController.text.trim());
-    if (area == null || area <= 0) {
+    if (area == null || !area.isFinite || area <= 0) {
       await showAppErrorDialog(
         context,
         title: 'Missing acres',
@@ -134,13 +142,28 @@ class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
 
     final endHourMeter = num.tryParse(_endHourMeterController.text.trim());
     final fuelUsed = num.tryParse(_fuelUsedController.text.trim());
+    if ((_endHourMeterController.text.trim().isNotEmpty &&
+            (endHourMeter == null ||
+                !endHourMeter.isFinite ||
+                endHourMeter < 0)) ||
+        (_fuelUsedController.text.trim().isNotEmpty &&
+            (fuelUsed == null || !fuelUsed.isFinite || fuelUsed < 0))) {
+      await showAppErrorDialog(
+        context,
+        title: 'Invalid readings',
+        message: 'Enter valid non-negative meter and fuel readings.',
+      );
+      return;
+    }
     setState(() => _submitting = true);
+    final phone = await widget.repository.captureFieldLocation();
     final ok = await widget.repository.completeJob(
       jobId: widget.jobId,
       reportedAcres: area,
       notes: _notesController.text.trim(),
       endHourMeter: endHourMeter,
       fuelUsedLitres: fuelUsed,
+      phone: phone,
     );
     if (!mounted) return;
     setState(() => _submitting = false);

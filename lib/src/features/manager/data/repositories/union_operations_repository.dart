@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/network/kwanza_track_mobile_api_client.dart';
+import '../../../../core/network/mechanization_data.dart';
 import '../../../farmer/domain/entities/farm_plot.dart';
 import '../../../farmer/domain/entities/service_request.dart';
 import '../remote/service_orders_remote_data_source.dart';
@@ -21,11 +22,20 @@ class UnionOperationsRepository extends ChangeNotifier {
 
   final ServiceOrdersRemoteDataSource remoteDataSource;
   final KwanzaTrackMobileApiClient mobileApiClient;
+  final Map<String, Map<String, Object?>> _jobPayloads = {};
+  final Map<String, Map<String, Object?>> _requestPayloads = {};
+  Set<String>? _permissions;
+  Map<String, Object?> _policy = {};
+  int _dataVersion = 0;
+  bool _hasLoadedMechanization = false;
+  bool _disposed = false;
+  int _sessionVersion = 0;
   final List<OperationsServiceRequest> _requests;
   final List<TractorAsset> _tractors;
   final List<OperatorProfile> _operators;
   final List<RegistryFarmer> _farmers = [];
   final List<OperationsJob> _jobs;
+  final List<OperationsJob> _calendarJobs = [];
   final List<MechanizationOverride> _overrides = [];
   final List<MechanizationException> _exceptions = [];
   String? _accessToken;
@@ -43,13 +53,35 @@ class UnionOperationsRepository extends ChangeNotifier {
   int _syncGeneration = 0;
   String? _lastScheduledJobId;
 
+  bool can(String permission) => _permissions?.contains(permission) ?? true;
+  bool get requiresFarmerConfirmation =>
+      _policy['require_farmer_confirmation'] != false;
+  bool _currentSession(String token, int version) =>
+      !_disposed && _accessToken == token && _sessionVersion == version;
+
+  Future<Map<String, Object?>> _loadModule(
+    Future<Map<String, Object?>> Function() read, {
+    String? permission,
+  }) async {
+    if (permission != null && !can(permission)) return {'data': <Object?>[]};
+    try {
+      return await read();
+    } on KwanzaTrackApiException catch (error) {
+      if (error.statusCode == 401 || error.statusCode == 419) rethrow;
+      return {'data': <Object?>[], '_load_error': error.message};
+    }
+  }
+
   List<OperationsServiceRequest> get requests => List.unmodifiable(_requests);
   List<TractorAsset> get tractors => List.unmodifiable(_tractors);
   List<OperatorProfile> get operators => List.unmodifiable(_operators);
   List<RegistryFarmer> get farmers => List.unmodifiable(_farmers);
   List<OperationsJob> get jobs => List.unmodifiable(_jobs);
+  List<OperationsJob> get scheduleJobs => List.unmodifiable(_calendarJobs);
   List<MechanizationOverride> get overrides => List.unmodifiable(_overrides);
   List<MechanizationException> get exceptions => List.unmodifiable(_exceptions);
+  bool get isInitialMechanizationLoad =>
+      _isSyncingMechanization && !_hasLoadedMechanization;
   bool get isSyncingMechanization => _isSyncingMechanization;
   bool get isRefreshingTractors => _isRefreshingTractors;
   bool get isRefreshingOperators => _isRefreshingOperators;
@@ -74,9 +106,25 @@ class UnionOperationsRepository extends ChangeNotifier {
     return remoteDataSource.fetchServiceOrders();
   }
 
-  void setMechanizationAccessToken(String? token) {
-    final normalized = token?.trim();
+  void setMechanizationAccessToken(String? token, {List<String>? permissions}) {
+    final trimmed = token?.trim();
+    final normalized = trimmed == null || trimmed.isEmpty ? null : trimmed;
+    if (permissions != null) _permissions = permissions.toSet();
     if (_accessToken == normalized) return;
+    _sessionVersion++;
+    _syncGeneration++;
+    _isSyncingMechanization = false;
+    _hasLoadedMechanization = false;
+    _isRefreshingTractors = false;
+    _isRefreshingOperators = false;
+    _isRefreshingFarmers = false;
+    _mechanizationActionError = null;
+    _jobPayloads.clear();
+    _dataVersion++;
+    _requestPayloads.clear();
+    _policy = {};
+    _dashboardData = {};
+    _remoteBacklogCount = null;
     _accessToken = normalized?.isEmpty == true ? null : normalized;
     _mechanizationSyncError = null;
     _requests.clear();
@@ -84,9 +132,11 @@ class UnionOperationsRepository extends ChangeNotifier {
     _operators.clear();
     _farmers.clear();
     _jobs.clear();
+    _calendarJobs.clear();
     _overrides.clear();
     _exceptions.clear();
     if (_accessToken == null) {
+      _permissions = null;
       _mechanizationUserName = null;
       _mechanizationUserEmail = null;
       _mechanizationUserRole = null;
@@ -100,8 +150,10 @@ class UnionOperationsRepository extends ChangeNotifier {
 
   Future<void> refreshMechanizationData() async {
     final token = _accessToken;
+    final session = _sessionVersion;
     if (token == null || token.isEmpty || _isSyncingMechanization) return;
 
+    final dataVersion = _dataVersion;
     final generation = ++_syncGeneration;
     _isSyncingMechanization = true;
     _mechanizationSyncError = null;
@@ -110,38 +162,71 @@ class UnionOperationsRepository extends ChangeNotifier {
 
     try {
       final today = DateTime.now();
-      final from = _dateOnly(today.subtract(const Duration(days: 2)));
-      final to = _dateOnly(today.add(const Duration(days: 7)));
+      final from = _dateOnly(today.subtract(const Duration(days: 365)));
+      final to = _dateOnly(today.add(const Duration(days: 365)));
       final responses = await Future.wait<Map<String, Object?>>([
         mobileApiClient.me(token: token),
-        mobileApiClient.dashboard(token: token, days: 30),
-        mobileApiClient.calendar(token: token, from: from, to: to, mine: true),
-        mobileApiClient.calendar(
-          token: token,
-          from: from,
-          to: to,
-          mine: false,
-          status:
-              'scheduled,dispatched,en_route,arrived,in_progress,completed,flagged,closed,cancelled',
+        _loadModule(() => mobileApiClient.dashboard(token: token, days: 30)),
+        _loadModule(
+          () => allApiPages(
+            (page) => mobileApiClient.jobs(
+              token: token,
+              mine: false,
+              perPage: 50,
+              page: page,
+            ),
+            isCurrent: () => _currentSession(token, session),
+          ),
         ),
-        mobileApiClient.calendarBacklog(token: token),
-        mobileApiClient.requests(token: token, status: 'queue'),
-        mobileApiClient.tractors(token: token, mine: true, live: true),
-        mobileApiClient.tractors(token: token, mine: false),
-        mobileApiClient.operators(token: token),
-        mobileApiClient.overrides(token: token),
-        mobileApiClient.exceptions(token: token),
-        mobileApiClient.farmers(token: token),
+        _loadModule(
+          () => mobileApiClient.calendar(
+            token: token,
+            from: from,
+            to: to,
+            mine: false,
+            status:
+                'scheduled,dispatched,en_route,arrived,in_progress,paused,completed,verified,flagged,closed,cancelled',
+          ),
+        ),
+        _loadModule(
+          () => mobileApiClient.calendarBacklog(token: token),
+          permission: 'mech.jobs.manage',
+        ),
+        _loadModule(() => _loadAllRequests(token)),
+        _loadModule(
+          () => mobileApiClient.tractors(token: token, mine: true, live: true),
+        ),
+        _loadModule(() => mobileApiClient.tractors(token: token, mine: false)),
+        _loadModule(() => mobileApiClient.operators(token: token)),
+        _loadModule(() => mobileApiClient.overrides(token: token)),
+        _loadModule(() => mobileApiClient.exceptions(token: token)),
+        _loadModule(
+          () => allApiPages(
+            (page) => mobileApiClient.farmers(token: token, page: page),
+            isCurrent: () => _currentSession(token, session),
+          ),
+        ),
       ]);
+      if (!_currentSession(token, session) || dataVersion != _dataVersion) {
+        return;
+      }
       if (generation != _syncGeneration) return;
 
       _applyMeResponse(responses[0]);
-      _dashboardData = _dataMap(responses[1]);
-      _remoteBacklogCount =
-          _metaCount(responses[4]) ?? _dataList(responses[4]).length;
+      if (!responses[1].containsKey('_load_error')) {
+        _dashboardData = _dataMap(responses[1]);
+      }
+      _applyJobsResponse(responses[2]);
+      if (!responses[4].containsKey('_load_error')) {
+        _remoteBacklogCount =
+            _metaCount(responses[4]) ?? _dataList(responses[4]).length;
+      }
       _applyRequestsResponse(responses[5], replace: true);
-      await _refreshAllRequestBuckets(token);
+      // Request list above already includes every status and page;
       await _enrichRequestBoundaries(token);
+      if (!_currentSession(token, session) || dataVersion != _dataVersion) {
+        return;
+      }
       _applyTractorsResponse(responses[7], replace: true, source: 'all');
       _applyTractorsResponse(responses[6]);
       _applyOperatorsResponse(responses[8]);
@@ -149,18 +234,31 @@ class UnionOperationsRepository extends ChangeNotifier {
       _applyOverridesResponse(responses[9]);
       _applyExceptionsResponse(responses[10]);
       _applyFarmersResponse(responses[11]);
-      _mechanizationSyncError = null;
+      final moduleErrors = responses
+          .map((item) => item['_load_error'])
+          .whereType<String>()
+          .toSet();
+      _mechanizationSyncError = moduleErrors.isEmpty
+          ? null
+          : moduleErrors.join('\n');
     } on KwanzaTrackApiException catch (error) {
+      if (!_currentSession(token, session) || dataVersion != _dataVersion) {
+        return;
+      }
       if (generation == _syncGeneration) {
         _mechanizationSyncError = error.message;
       }
     } catch (error) {
+      if (!_currentSession(token, session) || dataVersion != _dataVersion) {
+        return;
+      }
       if (generation == _syncGeneration) {
         _mechanizationSyncError =
             'Could not refresh mechanization data: $error';
       }
     } finally {
       if (generation == _syncGeneration) {
+        _hasLoadedMechanization = true;
         _isSyncingMechanization = false;
         notifyListeners();
       }
@@ -169,6 +267,7 @@ class UnionOperationsRepository extends ChangeNotifier {
 
   Future<void> refreshTractors() async {
     final token = _accessToken;
+    final session = _sessionVersion;
     if (token == null ||
         token.isEmpty ||
         _isSyncingMechanization ||
@@ -183,20 +282,26 @@ class UnionOperationsRepository extends ChangeNotifier {
         mobileApiClient.tractors(token: token, mine: false),
         mobileApiClient.tractors(token: token, mine: true, live: true),
       ]);
+      if (!_currentSession(token, session)) return;
       _applyTractorsResponse(responses[0], replace: true, source: 'all');
       _applyTractorsResponse(responses[1]);
     } on KwanzaTrackApiException catch (error) {
+      if (!_currentSession(token, session)) return;
       _mechanizationSyncError = error.message;
     } catch (error) {
+      if (!_currentSession(token, session)) return;
       _mechanizationSyncError = 'Could not refresh tractors: $error';
     } finally {
-      _isRefreshingTractors = false;
-      notifyListeners();
+      if (_currentSession(token, session)) {
+        _isRefreshingTractors = false;
+        notifyListeners();
+      }
     }
   }
 
   Future<void> refreshOperators() async {
     final token = _accessToken;
+    final session = _sessionVersion;
     if (token == null ||
         token.isEmpty ||
         _isSyncingMechanization ||
@@ -208,19 +313,25 @@ class UnionOperationsRepository extends ChangeNotifier {
     notifyListeners();
     try {
       final response = await mobileApiClient.operators(token: token);
+      if (!_currentSession(token, session)) return;
       _applyOperatorsResponse(response);
     } on KwanzaTrackApiException catch (error) {
+      if (!_currentSession(token, session)) return;
       _mechanizationSyncError = error.message;
     } catch (error) {
+      if (!_currentSession(token, session)) return;
       _mechanizationSyncError = 'Could not refresh operators: $error';
     } finally {
-      _isRefreshingOperators = false;
-      notifyListeners();
+      if (_currentSession(token, session)) {
+        _isRefreshingOperators = false;
+        notifyListeners();
+      }
     }
   }
 
   Future<void> refreshFarmers() async {
     final token = _accessToken;
+    final session = _sessionVersion;
     if (token == null ||
         token.isEmpty ||
         _isSyncingMechanization ||
@@ -231,20 +342,29 @@ class UnionOperationsRepository extends ChangeNotifier {
     _mechanizationSyncError = null;
     notifyListeners();
     try {
-      final response = await mobileApiClient.farmers(token: token);
+      final response = await allApiPages(
+        (page) => mobileApiClient.farmers(token: token, page: page),
+        isCurrent: () => _currentSession(token, session),
+      );
+      if (!_currentSession(token, session)) return;
       _applyFarmersResponse(response);
     } on KwanzaTrackApiException catch (error) {
+      if (!_currentSession(token, session)) return;
       _mechanizationSyncError = error.message;
     } catch (error) {
+      if (!_currentSession(token, session)) return;
       _mechanizationSyncError = 'Could not refresh farmers: $error';
     } finally {
-      _isRefreshingFarmers = false;
-      notifyListeners();
+      if (_currentSession(token, session)) {
+        _isRefreshingFarmers = false;
+        notifyListeners();
+      }
     }
   }
 
   Future<void> refreshTractorDetails(String tractorId) async {
     final token = _accessToken;
+    final session = _sessionVersion;
     if (token == null || token.isEmpty) return;
 
     try {
@@ -252,6 +372,7 @@ class UnionOperationsRepository extends ChangeNotifier {
         mobileApiClient.tractor(token: token, tractorId: tractorId),
         mobileApiClient.inspectionToday(token: token, tractorId: tractorId),
       ]);
+      if (!_currentSession(token, session)) return;
       final tractor = _tractorFromJson(_dataMap(responses[0]));
       if (tractor != null) _upsertTractor(tractor);
 
@@ -266,6 +387,7 @@ class UnionOperationsRepository extends ChangeNotifier {
       }
       notifyListeners();
     } on KwanzaTrackApiException catch (error) {
+      if (!_currentSession(token, session)) return;
       _mechanizationSyncError = error.message;
       notifyListeners();
     }
@@ -273,6 +395,7 @@ class UnionOperationsRepository extends ChangeNotifier {
 
   Future<TractorAsset?> lookupTractorQr(String qrToken) async {
     final token = _accessToken;
+    final session = _sessionVersion;
     if (token == null || token.isEmpty) return null;
 
     try {
@@ -280,6 +403,7 @@ class UnionOperationsRepository extends ChangeNotifier {
         token: token,
         qrToken: qrToken,
       );
+      if (!_currentSession(token, session)) return null;
       final tractor = _tractorFromJson(_dataMap(response));
       if (tractor != null) {
         _upsertTractor(tractor);
@@ -287,6 +411,7 @@ class UnionOperationsRepository extends ChangeNotifier {
       }
       return tractor;
     } on KwanzaTrackApiException catch (error) {
+      if (!_currentSession(token, session)) return null;
       _mechanizationSyncError = error.message;
       notifyListeners();
       return null;
@@ -307,7 +432,8 @@ class UnionOperationsRepository extends ChangeNotifier {
               job.status == JobStatus.dispatched ||
               job.status == JobStatus.enRoute ||
               job.status == JobStatus.arrived ||
-              job.status == JobStatus.inProgress,
+              job.status == JobStatus.inProgress ||
+              job.status == JobStatus.paused,
         )
         .toList();
   }
@@ -349,6 +475,7 @@ class UnionOperationsRepository extends ChangeNotifier {
         .where(
           (job) =>
               job.status == JobStatus.completedPendingConfirmation ||
+              job.status == JobStatus.verified ||
               job.status == JobStatus.closed,
         )
         .length;
@@ -367,6 +494,20 @@ class UnionOperationsRepository extends ChangeNotifier {
         .length;
   }
 
+  OperationsServiceRequest? maybeRequestById(String id) {
+    for (final request in _requests) {
+      if (request.id == id) return request;
+    }
+    return null;
+  }
+
+  OperationsJob? maybeJobById(String id) {
+    for (final job in _jobs) {
+      if (job.id == id) return job;
+    }
+    return null;
+  }
+
   OperationsServiceRequest requestById(String id) {
     return _requests.firstWhere((request) => request.id == id);
   }
@@ -377,21 +518,26 @@ class UnionOperationsRepository extends ChangeNotifier {
 
   Future<void> refreshServiceRequests({String? status}) async {
     final token = _accessToken;
+    final session = _sessionVersion;
     if (token == null || token.isEmpty) return;
     try {
       _mechanizationActionError = null;
       if (status == null) {
         await _refreshAllRequestBuckets(token);
+        if (!_currentSession(token, session)) return;
       } else {
         final response = await mobileApiClient.requests(
           token: token,
           status: status,
         );
+        if (!_currentSession(token, session)) return;
         _applyRequestsResponse(response, replace: true);
       }
       await _enrichRequestBoundaries(token);
+      if (!_currentSession(token, session)) return;
       notifyListeners();
     } on KwanzaTrackApiException catch (error) {
+      if (!_currentSession(token, session)) return;
       _mechanizationActionError = error.message;
       notifyListeners();
     }
@@ -399,6 +545,8 @@ class UnionOperationsRepository extends ChangeNotifier {
 
   Future<void> refreshRequestDetail(String id) async {
     final token = _accessToken;
+    final session = _sessionVersion;
+    final dataVersion = _dataVersion;
     if (token == null || token.isEmpty) return;
     try {
       _mechanizationActionError = null;
@@ -406,16 +554,76 @@ class UnionOperationsRepository extends ChangeNotifier {
         token: token,
         requestId: id,
       );
+      if (!_currentSession(token, session) || dataVersion != _dataVersion) {
+        return;
+      }
       final request = _requestFromJson(_dataMap(response));
       if (request != null) {
         _upsertRequest(request);
         await _enrichRequestBoundaries(token, requestIds: {request.id});
+        if (!_currentSession(token, session) || dataVersion != _dataVersion) {
+          return;
+        }
       }
       notifyListeners();
     } on KwanzaTrackApiException catch (error) {
+      if (!_currentSession(token, session) || dataVersion != _dataVersion) {
+        return;
+      }
       _mechanizationActionError = error.message;
       notifyListeners();
     }
+  }
+
+  Future<void> refreshJobDetail(String id) async {
+    final token = _accessToken;
+    final session = _sessionVersion;
+    final dataVersion = _dataVersion;
+    if (token == null || token.isEmpty) return;
+    try {
+      _mechanizationActionError = null;
+      final response = await mobileApiClient.job(token: token, jobId: id);
+      if (!_currentSession(token, session) || dataVersion != _dataVersion) {
+        return;
+      }
+      final job = _jobFromResponse(response);
+      if (job != null) _upsertJob(job);
+      notifyListeners();
+    } on KwanzaTrackApiException catch (error) {
+      if (!_currentSession(token, session) || dataVersion != _dataVersion) {
+        return;
+      }
+      _mechanizationActionError = error.message;
+      notifyListeners();
+    }
+  }
+
+  Future<List<Map<String, Object?>>> serviceTypeOptions() async {
+    final token = _accessToken;
+    final session = _sessionVersion;
+    if (token == null) {
+      throw const KwanzaTrackApiException('Please sign in again.');
+    }
+    final response = await mobileApiClient.serviceTypes(token: token);
+    if (!_currentSession(token, session)) return [];
+    return _dataList(response).whereType<Map>().map(_stringKeyedMap).toList();
+  }
+
+  Future<List<Map<String, Object?>>> farmerPlotOptions(String farmerId) async {
+    final token = _accessToken;
+    final session = _sessionVersion;
+    if (token == null) {
+      throw const KwanzaTrackApiException('Please sign in again.');
+    }
+    final response = await mobileApiClient.farmer(
+      token: token,
+      farmerId: farmerId,
+    );
+    if (!_currentSession(token, session)) return [];
+    final plots = _dataMap(response)['plots'];
+    return plots is List
+        ? plots.whereType<Map>().map(_stringKeyedMap).toList()
+        : [];
   }
 
   Future<void> registerRequest({
@@ -428,7 +636,14 @@ class UnionOperationsRepository extends ChangeNotifier {
     required String priority,
     String? notes,
   }) async {
+    if (!can('mech.requests.manage')) {
+      _mechanizationActionError =
+          'Your account does not have permission for this action.';
+      notifyListeners();
+      return;
+    }
     final token = _accessToken;
+    final session = _sessionVersion;
     if (token == null || token.isEmpty) return;
     try {
       _mechanizationActionError = null;
@@ -443,10 +658,13 @@ class UnionOperationsRepository extends ChangeNotifier {
         priority: priority,
         notes: notes,
       );
+      if (!_currentSession(token, session)) return;
+      _dataVersion++;
       final request = _requestFromJson(_dataMap(response));
       if (request != null) _upsertRequest(request);
       notifyListeners();
     } on KwanzaTrackApiException catch (error) {
+      if (!_currentSession(token, session)) return;
       _mechanizationActionError = error.message;
       notifyListeners();
     }
@@ -458,6 +676,12 @@ class UnionOperationsRepository extends ChangeNotifier {
     required String priority,
     String? note,
   }) async {
+    if (!can('mech.requests.manage')) {
+      _mechanizationActionError =
+          'Your account does not have permission for this action.';
+      notifyListeners();
+      return;
+    }
     if (await _tryRemoteRequestUpdate(
       () => mobileApiClient.approveRequest(
         token: _accessToken!,
@@ -480,6 +704,12 @@ class UnionOperationsRepository extends ChangeNotifier {
     required String reason,
     required String notes,
   }) async {
+    if (!can('mech.requests.manage')) {
+      _mechanizationActionError =
+          'Your account does not have permission for this action.';
+      notifyListeners();
+      return;
+    }
     if (await _tryRemoteRequestUpdate(
       () => mobileApiClient.rejectRequest(
         token: _accessToken!,
@@ -503,6 +733,12 @@ class UnionOperationsRepository extends ChangeNotifier {
     required String id,
     required String reason,
   }) async {
+    if (!can('mech.requests.manage')) {
+      _mechanizationActionError =
+          'Your account does not have permission for this action.';
+      notifyListeners();
+      return;
+    }
     if (await _tryRemoteRequestUpdate(
       () => mobileApiClient.returnRequest(
         token: _accessToken!,
@@ -526,6 +762,12 @@ class UnionOperationsRepository extends ChangeNotifier {
     required String reason,
     required String notes,
   }) async {
+    if (!can('mech.requests.manage')) {
+      _mechanizationActionError =
+          'Your account does not have permission for this action.';
+      notifyListeners();
+      return;
+    }
     if (await _tryRemoteRequestUpdate(
       () => mobileApiClient.cancelRequest(
         token: _accessToken!,
@@ -551,9 +793,20 @@ class UnionOperationsRepository extends ChangeNotifier {
     required String operatorId,
     required DateTime scheduledAt,
     required int estimatedHours,
-    required String implement,
+    String? implement,
   }) async {
-    final request = requestById(requestId);
+    if (!can('mech.jobs.manage')) {
+      _mechanizationActionError = 'Your account cannot schedule jobs.';
+      notifyListeners();
+      return requestId;
+    }
+    final request = maybeRequestById(requestId);
+    if (request == null) {
+      _mechanizationActionError =
+          'This request is no longer available. Refresh requests.';
+      notifyListeners();
+      return requestId;
+    }
     _lastScheduledJobId = null;
     if (await _tryRemoteRequestSchedule(
       requestId: requestId,
@@ -613,8 +866,12 @@ class UnionOperationsRepository extends ChangeNotifier {
     required DateTime date,
     required String tractorId,
     required String operatorId,
+    DateTime? windowStart,
+    Duration? duration,
+    String? excludeJobId,
   }) async {
     final token = _accessToken;
+    final session = _sessionVersion;
     if (token == null || token.isEmpty) return null;
     try {
       _mechanizationActionError = null;
@@ -623,10 +880,22 @@ class UnionOperationsRepository extends ChangeNotifier {
         date: _dateOnly(date),
         tractorId: tractorId,
         operatorId: operatorId,
+        excludeJobId: excludeJobId,
       );
+      if (!_currentSession(token, session)) return null;
       final data = _dataMap(response);
-      final tractor = _availabilityItems(data['tractor']);
-      final operator = _availabilityItems(data['operator']);
+      final tractor = _windowConflicts(
+        data['tractor'],
+        windowStart,
+        duration,
+        excludeJobId,
+      );
+      final operator = _windowConflicts(
+        data['operator'],
+        windowStart,
+        duration,
+        excludeJobId,
+      );
       final result = RequestAvailabilityResult(
         isAvailable: tractor.isEmpty && operator.isEmpty,
         tractorConflicts: tractor,
@@ -636,6 +905,7 @@ class UnionOperationsRepository extends ChangeNotifier {
       notifyListeners();
       return result;
     } on KwanzaTrackApiException catch (error) {
+      if (!_currentSession(token, session)) return null;
       _mechanizationActionError = error.message;
       notifyListeners();
       return null;
@@ -643,7 +913,19 @@ class UnionOperationsRepository extends ChangeNotifier {
   }
 
   Future<void> dispatchJob(String jobId) async {
-    final job = jobById(jobId);
+    if (!can('mech.jobs.manage')) {
+      _mechanizationActionError =
+          'Your account does not have permission for this action.';
+      notifyListeners();
+      return;
+    }
+    final job = maybeJobById(jobId);
+    if (job == null) {
+      _mechanizationActionError =
+          'This job is no longer available. Refresh your jobs.';
+      notifyListeners();
+      return;
+    }
     final tractorId = _registryTractorId(job.tractor);
     final operatorId = _registryOperatorId(job.operator);
     if (kDebugMode) {
@@ -717,13 +999,30 @@ class UnionOperationsRepository extends ChangeNotifier {
     r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
   ).hasMatch(value);
 
-  Future<void> closeJob(String jobId, {String paymentStatus = 'paid'}) async {
-    final job = jobById(jobId);
+  Future<void> closeJob(
+    String jobId, {
+    required String paymentStatus,
+    String? note,
+  }) async {
+    if (!can('mech.jobs.manage')) {
+      _mechanizationActionError =
+          'Your account does not have permission for this action.';
+      notifyListeners();
+      return;
+    }
+    final job = maybeJobById(jobId);
+    if (job == null) {
+      _mechanizationActionError =
+          'This job is no longer available. Refresh your jobs.';
+      notifyListeners();
+      return;
+    }
     if (await _tryRemoteJobUpdate(
       () => mobileApiClient.closeJob(
         token: _accessToken!,
         jobId: jobId,
         paymentStatus: paymentStatus,
+        note: note,
       ),
     )) {
       return;
@@ -757,7 +1056,19 @@ class UnionOperationsRepository extends ChangeNotifier {
     required JobCancellationReason reason,
     required String notes,
   }) async {
-    final job = jobById(jobId);
+    if (!can('mech.jobs.manage')) {
+      _mechanizationActionError =
+          'Your account does not have permission for this action.';
+      notifyListeners();
+      return;
+    }
+    final job = maybeJobById(jobId);
+    if (job == null) {
+      _mechanizationActionError =
+          'This job is no longer available. Refresh your jobs.';
+      notifyListeners();
+      return;
+    }
     if (await _tryRemoteJobUpdate(
       () => mobileApiClient.cancelJob(
         token: _accessToken!,
@@ -766,6 +1077,21 @@ class UnionOperationsRepository extends ChangeNotifier {
         cancelRequest: false,
       ),
     )) {
+      if (_mechanizationActionError == null && _accessToken != null) {
+        final token = _accessToken!;
+        final session = _sessionVersion;
+        if (job.requestId != job.id) await refreshRequestDetail(job.requestId);
+        if (!_currentSession(token, session)) return;
+        try {
+          final backlog = await mobileApiClient.calendarBacklog(token: token);
+          if (!_currentSession(token, session)) return;
+          _remoteBacklogCount =
+              _metaCount(backlog) ?? _dataList(backlog).length;
+          notifyListeners();
+        } on KwanzaTrackApiException {
+          /* Job cancellation remains successful. */
+        }
+      }
       return;
     }
     _replaceJob(
@@ -805,7 +1131,19 @@ class UnionOperationsRepository extends ChangeNotifier {
     required JobRescheduleReason reason,
     required String notes,
   }) async {
-    final job = jobById(jobId);
+    if (!can('mech.jobs.manage')) {
+      _mechanizationActionError =
+          'Your account does not have permission for this action.';
+      notifyListeners();
+      return;
+    }
+    final job = maybeJobById(jobId);
+    if (job == null) {
+      _mechanizationActionError =
+          'This job is no longer available. Refresh your jobs.';
+      notifyListeners();
+      return;
+    }
     if (await _tryRemoteJobUpdate(
       () => mobileApiClient.rescheduleJob(
         token: _accessToken!,
@@ -861,7 +1199,13 @@ class UnionOperationsRepository extends ChangeNotifier {
     required String reason,
     required String notes,
   }) {
-    final job = jobById(jobId);
+    final job = maybeJobById(jobId);
+    if (job == null) {
+      _mechanizationActionError =
+          'This job is no longer available. Refresh your jobs.';
+      notifyListeners();
+      return;
+    }
     _replaceJob(
       jobId,
       job.copyWith(
@@ -881,6 +1225,12 @@ class UnionOperationsRepository extends ChangeNotifier {
   }
 
   Future<void> flagJob({required String jobId, required String reason}) async {
+    if (!can('mech.jobs.manage')) {
+      _mechanizationActionError =
+          'Your account does not have permission for this action.';
+      notifyListeners();
+      return;
+    }
     if (await _tryRemoteJobUpdate(
       () => mobileApiClient.flagJob(
         token: _accessToken!,
@@ -890,11 +1240,23 @@ class UnionOperationsRepository extends ChangeNotifier {
     )) {
       return;
     }
-    final job = jobById(jobId);
+    final job = maybeJobById(jobId);
+    if (job == null) {
+      _mechanizationActionError =
+          'This job is no longer available. Refresh your jobs.';
+      notifyListeners();
+      return;
+    }
     _replaceJob(jobId, job.copyWith(status: JobStatus.flagged, alert: reason));
   }
 
   Future<void> unflagJob({required String jobId, required String note}) async {
+    if (!can('mech.jobs.manage')) {
+      _mechanizationActionError =
+          'Your account does not have permission for this action.';
+      notifyListeners();
+      return;
+    }
     if (await _tryRemoteJobUpdate(
       () => mobileApiClient.unflagJob(
         token: _accessToken!,
@@ -904,21 +1266,29 @@ class UnionOperationsRepository extends ChangeNotifier {
     )) {
       return;
     }
-    final job = jobById(jobId);
+    final job = maybeJobById(jobId);
+    if (job == null) {
+      _mechanizationActionError =
+          'This job is no longer available. Refresh your jobs.';
+      notifyListeners();
+      return;
+    }
     _replaceJob(jobId, job.copyWith(status: JobStatus.dispatched));
   }
 
   Future<void> refreshJobVerification(String jobId) async {
-    final token = _accessToken;
-    if (token == null || token.isEmpty) return;
-    try {
-      _mechanizationActionError = null;
-      await mobileApiClient.refreshVerification(token: token, jobId: jobId);
+    if (!can('mech.jobs.manage')) {
+      _mechanizationActionError =
+          'Your account does not have permission for this action.';
       notifyListeners();
-    } on KwanzaTrackApiException catch (error) {
-      _mechanizationActionError = error.message;
-      notifyListeners();
+      return;
     }
+    await _tryRemoteJobUpdate(
+      () => mobileApiClient.refreshVerification(
+        token: _accessToken!,
+        jobId: jobId,
+      ),
+    );
   }
 
   Future<void> verifyJob({
@@ -926,6 +1296,27 @@ class UnionOperationsRepository extends ChangeNotifier {
     required num verifiedAcres,
     String? note,
   }) async {
+    if (!can('mech.jobs.manage')) {
+      _mechanizationActionError =
+          'Your account does not have permission for this action.';
+      notifyListeners();
+      return;
+    }
+    final token = _accessToken;
+    final session = _sessionVersion;
+    if (token == null) return;
+    await refreshJobDetail(jobId);
+    if (!_currentSession(token, session) || _mechanizationActionError != null) {
+      return;
+    }
+    final detail = maybeJobById(jobId);
+    if (detail == null) return;
+    if (requiresFarmerConfirmation && detail.farmerConfirmedAt == null) {
+      _mechanizationActionError =
+          'Farmer confirmation is required before verification.';
+      notifyListeners();
+      return;
+    }
     await _tryRemoteJobUpdate(
       () => mobileApiClient.verifyJob(
         token: _accessToken!,
@@ -942,6 +1333,12 @@ class UnionOperationsRepository extends ChangeNotifier {
     String? note,
     bool? dispute,
   }) async {
+    if (!can('mech.jobs.manage')) {
+      _mechanizationActionError =
+          'Your account does not have permission for this action.';
+      notifyListeners();
+      return;
+    }
     await _tryRemoteJobUpdate(
       () => mobileApiClient.confirmJob(
         token: _accessToken!,
@@ -955,6 +1352,7 @@ class UnionOperationsRepository extends ChangeNotifier {
 
   Future<void> refreshOversightData() async {
     final token = _accessToken;
+    final session = _sessionVersion;
     if (token == null || token.isEmpty) return;
     try {
       _mechanizationActionError = null;
@@ -962,10 +1360,12 @@ class UnionOperationsRepository extends ChangeNotifier {
         mobileApiClient.overrides(token: token),
         mobileApiClient.exceptions(token: token),
       ]);
+      if (!_currentSession(token, session)) return;
       _applyOverridesResponse(responses[0]);
       _applyExceptionsResponse(responses[1]);
       notifyListeners();
     } on KwanzaTrackApiException catch (error) {
+      if (!_currentSession(token, session)) return;
       _mechanizationActionError = error.message;
       notifyListeners();
     }
@@ -976,7 +1376,14 @@ class UnionOperationsRepository extends ChangeNotifier {
     required bool approve,
     required String note,
   }) async {
+    if (!can('mech.override')) {
+      _mechanizationActionError =
+          'Your account does not have permission for this action.';
+      notifyListeners();
+      return;
+    }
     final token = _accessToken;
+    final session = _sessionVersion;
     if (token == null || token.isEmpty) return;
     try {
       _mechanizationActionError = null;
@@ -986,15 +1393,25 @@ class UnionOperationsRepository extends ChangeNotifier {
         approve: approve,
         note: note,
       );
+      if (!_currentSession(token, session)) return;
       await refreshOversightData();
+      if (!_currentSession(token, session)) return;
     } on KwanzaTrackApiException catch (error) {
+      if (!_currentSession(token, session)) return;
       _mechanizationActionError = error.message;
       notifyListeners();
     }
   }
 
   Future<bool> acknowledgeException(String exceptionId) async {
+    if (!can('mech.exceptions.manage')) {
+      _mechanizationActionError =
+          'Your account does not have permission for this action.';
+      notifyListeners();
+      return false;
+    }
     final token = _accessToken;
+    final session = _sessionVersion;
     if (token == null || token.isEmpty) {
       _mechanizationActionError =
           'Your session has expired. Please sign in again.';
@@ -1007,9 +1424,12 @@ class UnionOperationsRepository extends ChangeNotifier {
         token: token,
         exceptionId: exceptionId,
       );
+      if (!_currentSession(token, session)) return false;
       await refreshOversightData();
+      if (!_currentSession(token, session)) return false;
       return _mechanizationActionError == null;
     } on KwanzaTrackApiException catch (error) {
+      if (!_currentSession(token, session)) return false;
       _mechanizationActionError = error.message;
       notifyListeners();
       return false;
@@ -1021,7 +1441,14 @@ class UnionOperationsRepository extends ChangeNotifier {
     required String remarks,
     bool dismiss = false,
   }) async {
+    if (!can('mech.exceptions.manage')) {
+      _mechanizationActionError =
+          'Your account does not have permission for this action.';
+      notifyListeners();
+      return;
+    }
     final token = _accessToken;
+    final session = _sessionVersion;
     if (token == null || token.isEmpty) return;
     try {
       _mechanizationActionError = null;
@@ -1031,8 +1458,11 @@ class UnionOperationsRepository extends ChangeNotifier {
         remarks: remarks,
         dismiss: dismiss,
       );
+      if (!_currentSession(token, session)) return;
       await refreshOversightData();
+      if (!_currentSession(token, session)) return;
     } on KwanzaTrackApiException catch (error) {
+      if (!_currentSession(token, session)) return;
       _mechanizationActionError = error.message;
       notifyListeners();
     }
@@ -1052,6 +1482,12 @@ class UnionOperationsRepository extends ChangeNotifier {
   void _applyMeResponse(Map<String, Object?> response) {
     final data = _dataMap(response);
     final user = _map(data['user']);
+    if (user['permissions'] is List) {
+      _permissions = (user['permissions'] as List)
+          .map((item) => item.toString())
+          .toSet();
+    }
+    _policy = _map(data['policy']);
     _mechanizationUserName = user['name']?.toString();
     _mechanizationUserEmail = user['email']?.toString();
     _mechanizationUserRole = user['role']?.toString();
@@ -1061,6 +1497,7 @@ class UnionOperationsRepository extends ChangeNotifier {
     Map<String, Object?> response, {
     bool replace = false,
   }) {
+    if (response.containsKey('_load_error')) return;
     final remoteRequests = _requestsFromResponse(response);
     if (replace) _requests.clear();
     for (final request in remoteRequests) {
@@ -1078,41 +1515,24 @@ class UnionOperationsRepository extends ChangeNotifier {
         .toList();
   }
 
+  Future<Map<String, Object?>> _loadAllRequests(String token) {
+    final session = _sessionVersion;
+    return allApiPages(
+      (page) =>
+          mobileApiClient.requests(token: token, status: 'all', page: page),
+      isCurrent: () => _currentSession(token, session),
+    );
+  }
+
   Future<void> _refreshAllRequestBuckets(String token) async {
-    const statuses = <String?>[
-      null,
-      'queue',
-      'pending',
-      'approved',
-      'rejected',
-      'returned',
-      'cancelled',
-      'canceled',
-      'scheduled',
-    ];
-    final remoteRequests = <OperationsServiceRequest>[];
-    KwanzaTrackApiException? firstError;
-
-    for (final status in statuses) {
-      try {
-        final response = await mobileApiClient.requests(
-          token: token,
-          status: status,
-        );
-        remoteRequests.addAll(_requestsFromResponse(response));
-      } on KwanzaTrackApiException catch (error) {
-        firstError ??= error;
-      }
-    }
-
-    if (remoteRequests.isEmpty && firstError != null) throw firstError;
-    _requests.clear();
-    for (final request in remoteRequests) {
-      _upsertRequest(request);
-    }
+    final session = _sessionVersion;
+    final response = await _loadAllRequests(token);
+    if (!_currentSession(token, session)) return;
+    _applyRequestsResponse(response, replace: true);
   }
 
   void _applyCalendarResponse(Map<String, Object?> response) {
+    if (response.containsKey('_load_error')) return;
     final events = _dataMap(response)['events'];
     if (events is! List) return;
 
@@ -1121,14 +1541,21 @@ class UnionOperationsRepository extends ChangeNotifier {
         .map((event) => _jobFromCalendarEvent(_stringKeyedMap(event)))
         .whereType<OperationsJob>()
         .toList();
-    if (remoteJobs.isEmpty) return;
+    _calendarJobs
+      ..clear()
+      ..addAll(remoteJobs);
+  }
 
+  void _applyJobsResponse(Map<String, Object?> response) {
+    if (response.containsKey('_load_error')) return;
+    final remoteJobs = _dataList(response)
+        .whereType<Map>()
+        .map((item) => _jobFromJson(_stringKeyedMap(item)))
+        .whereType<OperationsJob>()
+        .toList();
     _jobs
       ..clear()
       ..addAll(remoteJobs);
-    for (final job in remoteJobs) {
-      _upsertOperator(job.operator);
-    }
   }
 
   void _applyTractorsResponse(
@@ -1136,6 +1563,7 @@ class UnionOperationsRepository extends ChangeNotifier {
     bool replace = false,
     String source = 'mine/live',
   }) {
+    if (response.containsKey('_load_error')) return;
     final tractors = _dataList(response)
         .whereType<Map>()
         .map((item) => _tractorFromJson(_stringKeyedMap(item)))
@@ -1161,6 +1589,7 @@ class UnionOperationsRepository extends ChangeNotifier {
   }
 
   void _applyOperatorsResponse(Map<String, Object?> response) {
+    if (response.containsKey('_load_error')) return;
     final operators = _dataList(response)
         .whereType<Map>()
         .map((item) => _operatorFromJson(_stringKeyedMap(item)))
@@ -1173,6 +1602,7 @@ class UnionOperationsRepository extends ChangeNotifier {
   }
 
   void _applyFarmersResponse(Map<String, Object?> response) {
+    if (response.containsKey('_load_error')) return;
     final parsed = _dataList(response)
         .whereType<Map>()
         .map((item) => _registryFarmerFromJson(_stringKeyedMap(item)))
@@ -1205,22 +1635,7 @@ class UnionOperationsRepository extends ChangeNotifier {
       keys.add('external:$externalRef');
     }
 
-    final phone = _normalizeFarmerPhone(farmer.phone);
-    if (phone != null) keys.add('phone:$phone');
     return keys;
-  }
-
-  String? _normalizeFarmerPhone(String? value) {
-    if (value == null) return null;
-    var digits = value.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.isEmpty) return null;
-
-    if (digits.startsWith('0') && digits.length == 10) {
-      digits = '255${digits.substring(1)}';
-    } else if (digits.length == 9) {
-      digits = '255$digits';
-    }
-    return digits;
   }
 
   RegistryFarmer? _registryFarmerFromJson(Map<String, Object?> json) {
@@ -1248,6 +1663,7 @@ class UnionOperationsRepository extends ChangeNotifier {
   }
 
   void _applyOverridesResponse(Map<String, Object?> response) {
+    if (response.containsKey('_load_error')) return;
     final overrides = _dataList(response)
         .whereType<Map>()
         .map((item) => _overrideFromJson(_stringKeyedMap(item)))
@@ -1259,6 +1675,7 @@ class UnionOperationsRepository extends ChangeNotifier {
   }
 
   void _applyExceptionsResponse(Map<String, Object?> response) {
+    if (response.containsKey('_load_error')) return;
     final exceptions = _dataList(response)
         .whereType<Map>()
         .map((item) => _exceptionFromJson(_stringKeyedMap(item)))
@@ -1273,6 +1690,7 @@ class UnionOperationsRepository extends ChangeNotifier {
     Future<Map<String, Object?>> Function() request,
   ) async {
     final token = _accessToken;
+    final session = _sessionVersion;
     if (token == null || token.isEmpty) {
       _mechanizationActionError =
           'Your session has expired. Please sign in again.';
@@ -1282,7 +1700,9 @@ class UnionOperationsRepository extends ChangeNotifier {
     try {
       _mechanizationActionError = null;
       final response = await request();
-      final job = _jobFromJson(_dataMap(response));
+      if (!_currentSession(token, session)) return true;
+      _dataVersion++;
+      final job = _jobFromResponse(response);
       if (job != null) {
         _lastScheduledJobId = job.id;
         _upsertJob(job);
@@ -1290,6 +1710,7 @@ class UnionOperationsRepository extends ChangeNotifier {
       notifyListeners();
       return true;
     } on KwanzaTrackApiException catch (error) {
+      if (!_currentSession(token, session)) return true;
       _mechanizationActionError = error.message;
       notifyListeners();
       return true;
@@ -1300,6 +1721,7 @@ class UnionOperationsRepository extends ChangeNotifier {
     Future<Map<String, Object?>> Function() request,
   ) async {
     final token = _accessToken;
+    final session = _sessionVersion;
     if (token == null || token.isEmpty) {
       _mechanizationActionError =
           'Your session has expired. Please sign in again.';
@@ -1309,11 +1731,14 @@ class UnionOperationsRepository extends ChangeNotifier {
     try {
       _mechanizationActionError = null;
       final response = await request();
+      if (!_currentSession(token, session)) return true;
+      _dataVersion++;
       final remoteRequest = _requestFromJson(_dataMap(response));
       if (remoteRequest != null) _upsertRequest(remoteRequest);
       notifyListeners();
       return true;
     } on KwanzaTrackApiException catch (error) {
+      if (!_currentSession(token, session)) return true;
       _mechanizationActionError = error.message;
       notifyListeners();
       return true;
@@ -1327,9 +1752,10 @@ class UnionOperationsRepository extends ChangeNotifier {
     required DateTime scheduledAt,
     required int estimatedHours,
     required OperationsServiceRequest request,
-    required String implement,
+    String? implement,
   }) async {
     final token = _accessToken;
+    final session = _sessionVersion;
     if (token == null || token.isEmpty) {
       _mechanizationActionError =
           'Your session has expired. Please sign in again.';
@@ -1349,8 +1775,13 @@ class UnionOperationsRepository extends ChangeNotifier {
         plannedAcres: request.requestedAcres,
         implement: implement,
       );
+      if (!_currentSession(token, session)) return true;
+      _dataVersion++;
       final job = _jobFromJson(_dataMap(response));
-      if (job != null) _upsertJob(job);
+      if (job != null) {
+        _lastScheduledJobId = job.id;
+        _upsertJob(job);
+      }
       _replaceRequest(
         requestId,
         request.copyWith(status: OperationsRequestStatus.scheduled),
@@ -1359,10 +1790,17 @@ class UnionOperationsRepository extends ChangeNotifier {
       notifyListeners();
       return true;
     } on KwanzaTrackApiException catch (error) {
+      if (!_currentSession(token, session)) return true;
       _mechanizationActionError = error.message;
       notifyListeners();
       return true;
     }
+  }
+
+  OperationsJob? _jobFromResponse(Map<String, Object?> response) {
+    final data = _dataMap(response);
+    final nestedJob = _map(data['job']);
+    return _jobFromJson(nestedJob.isEmpty ? data : nestedJob);
   }
 
   OperationsJob? _jobFromCalendarEvent(Map<String, Object?> event) {
@@ -1378,7 +1816,7 @@ class UnionOperationsRepository extends ChangeNotifier {
     final plotLat = _number(event, const ['plot_lat', 'latitude']);
     final plotLng = _number(event, const ['plot_lng', 'longitude']);
     final tractorId =
-        _text(event, const ['tractor', 'tractor_code', 'tractor_id']) ??
+        _text(event, const ['tractor_id', 'tractor', 'tractor_code']) ??
         'Unassigned';
     final operatorId =
         _text(event, const ['operator_id', 'operator']) ?? 'unassigned';
@@ -1422,6 +1860,7 @@ class UnionOperationsRepository extends ChangeNotifier {
       ),
       scheduledAt: start,
       estimatedHours: estimatedHours,
+      scheduledEndAt: end,
       status: status,
       startedAt: status == JobStatus.inProgress ? start : null,
       alert: _geofenceAlert(status, _asBool(event['geofence_verified'])),
@@ -1432,6 +1871,8 @@ class UnionOperationsRepository extends ChangeNotifier {
     final id = _text(json, const ['id', 'reference', 'external_ref']);
     if (id == null || id.isEmpty) return null;
 
+    json = mergeMechanizationData(_requestPayloads[id] ?? {}, json);
+    _requestPayloads[id] = json;
     final farmerJson = _map(json['farmer']);
     final plotJson = _map(json['plot']);
     final serviceTypeJson = _map(json['service_type']);
@@ -1504,6 +1945,8 @@ class UnionOperationsRepository extends ChangeNotifier {
     final id = _text(json, const ['id', 'reference']);
     if (id == null || id.isEmpty) return null;
 
+    json = mergeMechanizationData(_jobPayloads[id] ?? {}, json);
+    _jobPayloads[id] = json;
     final tractorJson = _map(json['tractor']);
     final operatorJson = _map(json['operator']);
     final farmerJson = _map(json['farmer']);
@@ -1579,9 +2022,17 @@ class UnionOperationsRepository extends ChangeNotifier {
       ),
       scheduledAt: scheduledAt,
       estimatedHours: estimatedHours.clamp(1, 24).toInt(),
+      scheduledEndAt: windowEnd,
       status: status,
       startedAt: _dateTime(json['started_at']),
       completedAt: _dateTime(json['completed_at']),
+      reportedAcres: _number(json, const ['reported_acres']),
+      verifiedAcres: _number(json, const ['verified_acres']),
+      farmerConfirmedAt: _dateTime(json['farmer_confirmed_at']),
+      verification: _map(json['verification']),
+      paymentStatus: _text(json, const ['payment_status']),
+      amount: _number(json, const ['amount']),
+      currency: _text(json, const ['currency']),
       alert:
           _text(json, const ['flag_reason', 'cancel_reason', 'dispute_note']) ??
           _geofenceAlert(status, _asBool(json['geofence_verified'])),
@@ -1593,8 +2044,7 @@ class UnionOperationsRepository extends ChangeNotifier {
     return switch (status) {
       JobStatus.arrived ||
       JobStatus.inProgress ||
-      JobStatus.completedPendingConfirmation ||
-      JobStatus.flagged => 'Geofence not verified',
+      JobStatus.paused => 'Geofence not verified',
       _ => null,
     };
   }
@@ -1760,6 +2210,17 @@ class UnionOperationsRepository extends ChangeNotifier {
     } else {
       _jobs[index] = job;
     }
+    final calendarIndex = _calendarJobs.indexWhere((item) => item.id == job.id);
+    if (calendarIndex == -1) {
+      _calendarJobs.add(job);
+    } else {
+      _calendarJobs[calendarIndex] = job;
+    }
+    final request = _jobPayloads[job.id]?['request'];
+    if (request is Map && _requests.any((item) => item.id == request['id'])) {
+      final updated = _requestFromJson(_stringKeyedMap(request));
+      if (updated != null) _upsertRequest(updated);
+    }
     _upsertOperator(job.operator);
   }
 
@@ -1894,6 +2355,8 @@ class UnionOperationsRepository extends ChangeNotifier {
     String token, {
     Set<String>? requestIds,
   }) async {
+    final session = _sessionVersion;
+    if (!_currentSession(token, session)) return;
     final candidates = _requests.where(
       (request) =>
           request.plot.boundaryPoints.length < 3 &&
@@ -1911,6 +2374,7 @@ class UnionOperationsRepository extends ChangeNotifier {
           token: token,
           farmerId: farmerId,
         );
+        if (!_currentSession(token, session)) return;
         final plots = _dataMap(response)['plots'];
         if (plots is! List) continue;
 
@@ -1958,6 +2422,7 @@ class UnionOperationsRepository extends ChangeNotifier {
           }
         }
       } on KwanzaTrackApiException catch (error) {
+        if (!_currentSession(token, session)) return;
         if (kDebugMode) {
           debugPrint(
             '[Mechanization Request] Could not load farmer $farmerId plots: '
@@ -2046,6 +2511,44 @@ class UnionOperationsRepository extends ChangeNotifier {
     return const [];
   }
 
+  List<String> _windowConflicts(
+    Object? value,
+    DateTime? start,
+    Duration? duration,
+    String? excludeJobId,
+  ) {
+    if (value is! List || start == null || duration == null) {
+      return _availabilityItems(value);
+    }
+    final end = start.add(duration);
+    final conflicts = value.where((item) {
+      if (item is! Map) return true;
+      if (excludeJobId != null && item['id']?.toString() == excludeJobId) {
+        return false;
+      }
+      if ([
+        'cancelled',
+        'completed',
+        'verified',
+        'closed',
+      ].contains(item['status'])) {
+        return false;
+      }
+      final day = item['scheduled_date'] ?? _dateOnly(start);
+      final existingStart =
+          apiScheduleTime(day, item['window_start']) ??
+          localApiTime(item['start']);
+      var existingEnd =
+          apiScheduleTime(day, item['window_end']) ?? localApiTime(item['end']);
+      if (existingStart == null || existingEnd == null) return true;
+      if (!existingEnd.isAfter(existingStart)) {
+        existingEnd = existingEnd.add(const Duration(days: 1));
+      }
+      return existingStart.isBefore(end) && start.isBefore(existingEnd);
+    }).toList();
+    return _availabilityItems(conflicts);
+  }
+
   List<String> _availabilityItems(Object? value) {
     if (value is! List) return const [];
     return value.map((item) {
@@ -2067,7 +2570,7 @@ class UnionOperationsRepository extends ChangeNotifier {
   DateTime? _dateTime(Object? value) {
     final text = value?.toString();
     if (text == null || text.isEmpty) return null;
-    return DateTime.tryParse(text);
+    return localApiTime(text);
   }
 
   ServiceType _serviceType(String? value) {
@@ -2077,19 +2580,24 @@ class UnionOperationsRepository extends ChangeNotifier {
     return ServiceType.ploughing;
   }
 
-  OperationsRequestStatus _requestStatus(String? value) {
-    final normalized = value?.toLowerCase().replaceAll('-', '_') ?? '';
-    return switch (normalized) {
-      'approved' => OperationsRequestStatus.approved,
-      'rejected' || 'declined' => OperationsRequestStatus.rejected,
-      'returned' || 'returned_to_farmer' => OperationsRequestStatus.returned,
-      'scheduled' ||
-      'dispatched' ||
-      'in_progress' => OperationsRequestStatus.scheduled,
-      'cancelled' || 'canceled' => OperationsRequestStatus.cancelled,
-      _ => OperationsRequestStatus.pending,
-    };
-  }
+  OperationsRequestStatus _requestStatus(String? value) =>
+      switch (value?.toLowerCase().replaceAll('-', '_')) {
+        'pending' => OperationsRequestStatus.pending,
+        'approved' => OperationsRequestStatus.approved,
+        'returned' || 'returned_to_farmer' => OperationsRequestStatus.returned,
+        'rejected' || 'declined' => OperationsRequestStatus.rejected,
+        'scheduled' || 'dispatched' => OperationsRequestStatus.scheduled,
+        'en_route' => OperationsRequestStatus.enRoute,
+        'arrived' => OperationsRequestStatus.arrived,
+        'in_progress' => OperationsRequestStatus.inProgress,
+        'paused' => OperationsRequestStatus.paused,
+        'completed' => OperationsRequestStatus.completed,
+        'verified' => OperationsRequestStatus.verified,
+        'closed' => OperationsRequestStatus.closed,
+        'flagged' => OperationsRequestStatus.flagged,
+        'cancelled' || 'canceled' => OperationsRequestStatus.cancelled,
+        _ => OperationsRequestStatus.unknown,
+      };
 
   JobStatus _jobStatus(String? value) {
     final normalized = value?.toLowerCase().replaceAll('-', '_') ?? '';
@@ -2099,9 +2607,10 @@ class UnionOperationsRepository extends ChangeNotifier {
       'en_route' || 'accepted' => JobStatus.enRoute,
       'arrived' => JobStatus.arrived,
       'in_progress' || 'started' || 'working' => JobStatus.inProgress,
+      'paused' => JobStatus.paused,
       'completed' ||
-      'awaiting_verification' ||
-      'verified' => JobStatus.completedPendingConfirmation,
+      'awaiting_verification' => JobStatus.completedPendingConfirmation,
+      'verified' => JobStatus.verified,
       'flagged' => JobStatus.flagged,
       'closed' || 'confirmed' => JobStatus.closed,
       'cancelled' || 'canceled' => JobStatus.cancelled,
@@ -2111,7 +2620,10 @@ class UnionOperationsRepository extends ChangeNotifier {
 
   TractorStatus _tractorStatus(JobStatus status) {
     return switch (status) {
-      JobStatus.cancelled || JobStatus.closed => TractorStatus.available,
+      JobStatus.cancelled ||
+      JobStatus.completedPendingConfirmation ||
+      JobStatus.closed ||
+      JobStatus.verified => TractorStatus.available,
       _ => TractorStatus.scheduled,
     };
   }
@@ -2123,14 +2635,15 @@ class UnionOperationsRepository extends ChangeNotifier {
       'scheduled' ||
       'assigned' ||
       'busy' ||
-      'in_use' => TractorStatus.scheduled,
+      'in_use' ||
+      'working' => TractorStatus.scheduled,
       'maintenance' ||
       'under_maintenance' ||
       'repair' => TractorStatus.underMaintenance,
       'out_of_service' ||
       'inactive' ||
       'disabled' => TractorStatus.outOfService,
-      _ => TractorStatus.available,
+      _ => TractorStatus.outOfService,
     };
   }
 
@@ -2145,7 +2658,10 @@ class UnionOperationsRepository extends ChangeNotifier {
 
   OperatorStatus _operatorStatus(JobStatus status) {
     return switch (status) {
-      JobStatus.cancelled || JobStatus.closed => OperatorStatus.available,
+      JobStatus.cancelled ||
+      JobStatus.completedPendingConfirmation ||
+      JobStatus.closed ||
+      JobStatus.verified => OperatorStatus.available,
       _ => OperatorStatus.assigned,
     };
   }
@@ -2179,12 +2695,15 @@ class UnionOperationsRepository extends ChangeNotifier {
     return '$hour:$minute';
   }
 
-  DateTime? _dateTimeFromParts(Object? dateValue, Object? timeValue) {
-    final date = dateValue?.toString();
-    final time = timeValue?.toString();
-    if (date == null || date.isEmpty) return null;
-    if (time == null || time.isEmpty) return DateTime.tryParse(date);
-    return DateTime.tryParse('${date}T$time:00');
+  DateTime? _dateTimeFromParts(Object? dateValue, Object? timeValue) =>
+      apiScheduleTime(dateValue, timeValue);
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _sessionVersion++;
+    _syncGeneration++;
+    super.dispose();
   }
 
   void _replaceRequest(

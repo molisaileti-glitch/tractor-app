@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../../components/components.dart';
@@ -216,11 +218,20 @@ class _LoginScreenState extends State<LoginScreen> {
       widget.onOpenTechnician();
       return;
     }
-    if (role.contains('farmer')) {
-      widget.onOpenFarmer();
+    if (permissions.contains('mech.view')) {
+      widget.onOpenOperations();
       return;
     }
-    widget.onOpenOperations();
+    unawaited(_rejectUnsupportedSession());
+  }
+
+  Future<void> _rejectUnsupportedSession() async {
+    await widget.repository.signOut();
+    if (!mounted) return;
+    setState(() {
+      _loginError =
+          'This account does not have access to a supported Kwanza Track mobile workspace.';
+    });
   }
 }
 

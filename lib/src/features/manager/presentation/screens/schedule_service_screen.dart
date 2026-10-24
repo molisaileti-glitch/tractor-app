@@ -36,9 +36,9 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
   @override
   void initState() {
     super.initState();
-    final preferred = widget.repository
-        .requestById(widget.requestId)
-        .preferredDate;
+    final preferred =
+        widget.repository.maybeRequestById(widget.requestId)?.preferredDate ??
+        DateTime.now();
     final today = DateTime.now();
     _date = preferred.isBefore(DateTime(today.year, today.month, today.day))
         ? today
@@ -47,7 +47,13 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final request = widget.repository.requestById(widget.requestId);
+    final request = widget.repository.maybeRequestById(widget.requestId);
+    if (request == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Request unavailable')),
+        body: const Center(child: Text('This request is no longer available.')),
+      );
+    }
     final availableTractors = widget.repository.tractors
         .where((tractor) => tractor.status.canSchedule)
         .toList();
@@ -252,7 +258,7 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
                               if (implementNames.isEmpty)
                                 const AppMessage(
                                   message:
-                                      'The selected tractor has no configured implements. Update its tractor record before scheduling.',
+                                      'No implement is configured for this tractor. The server will validate the service requirements.',
                                   type: AppMessageType.warning,
                                 )
                               else
@@ -375,6 +381,14 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
     setState(() => _checkingAvailability = true);
     final result = await widget.repository.checkRequestAvailability(
       date: _date,
+      windowStart: DateTime(
+        _date.year,
+        _date.month,
+        _date.day,
+        _time.hour,
+        _time.minute,
+      ),
+      duration: Duration(hours: _duration),
       tractorId: _tractorId!,
       operatorId: _operatorId!,
     );
@@ -394,7 +408,7 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
   }
 
   Future<void> _confirmSchedule() async {
-    final availability = _availability ?? await _checkAvailability();
+    final availability = await _checkAvailability();
     if (!mounted) return;
     if (availability == null) return;
     if (!availability.isAvailable) {
@@ -406,14 +420,6 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
       return;
     }
     final implement = _selectedImplement;
-    if (implement == null) {
-      await showAppErrorDialog(
-        context,
-        title: 'Implement required',
-        message: 'Select the implement that will be used for this service.',
-      );
-      return;
-    }
     final scheduledAt = DateTime(
       _date.year,
       _date.month,
@@ -449,6 +455,17 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
       return;
     }
     final scheduledJob = widget.repository.jobForRequest(widget.requestId);
+    if (scheduledJob?.status == JobStatus.dispatched) {
+      await showAppSuccessDialog(
+        context,
+        title: 'Service scheduled and dispatched',
+        message:
+            'The backend dispatched this assignment while scheduling it. The operator can now receive it under active jobs.',
+      );
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      return;
+    }
     final dispatchNow = await showAppConfirmationDialog(
       context,
       title: 'Service scheduled',

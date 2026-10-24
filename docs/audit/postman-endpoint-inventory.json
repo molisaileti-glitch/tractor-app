@@ -1,0 +1,1235 @@
+﻿[
+    {
+        "Group":  "1 · App sign-in",
+        "Name":  "Login (step 1)",
+        "Method":  "POST",
+        "Path":  "/api/app/login",
+        "ExampleUrl":  "{{base_url}}/api/app/login",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"identifier\": \"{{login_identifier}}\",\n    \"password\": \"{{login_password}}\",\n    \"device_name\": \"Postman\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  "noauth"
+    },
+    {
+        "Group":  "1 · App sign-in",
+        "Name":  "Verify OTP (step 2 → token)",
+        "Method":  "POST",
+        "Path":  "/api/app/verify-otp",
+        "ExampleUrl":  "{{base_url}}/api/app/verify-otp",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"challenge_id\": \"{{challenge_id}}\",\n    \"code\": \"{{otp_code}}\",\n    \"device_name\": \"Postman\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  "noauth"
+    },
+    {
+        "Group":  "1 · App sign-in",
+        "Name":  "Resend OTP",
+        "Method":  "POST",
+        "Path":  "/api/app/resend-otp",
+        "ExampleUrl":  "{{base_url}}/api/app/resend-otp",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"challenge_id\": \"{{challenge_id}}\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  "noauth"
+    },
+    {
+        "Group":  "1 · App sign-in",
+        "Name":  "Who am I (app)",
+        "Method":  "GET",
+        "Path":  "/api/app/me",
+        "ExampleUrl":  "{{base_url}}/api/app/me",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "1 · App sign-in",
+        "Name":  "Logout",
+        "Method":  "POST",
+        "Path":  "/api/app/logout",
+        "ExampleUrl":  "{{base_url}}/api/app/logout",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "2 · Home \u0026 calendar",
+        "Name":  "Me — profile, union, policy, checklist",
+        "Method":  "GET",
+        "Path":  "/api/v1/mech/me",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/me",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "2 · Home \u0026 calendar",
+        "Name":  "Dashboard numbers (staff)",
+        "Method":  "GET",
+        "Path":  "/api/v1/mech/dashboard",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/dashboard?days=30",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "2 · Home \u0026 calendar",
+        "Name":  "Calendar — my activities",
+        "Method":  "GET",
+        "Path":  "/api/v1/mech/calendar",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/calendar?from={{from}}\u0026to={{to}}\u0026mine=1",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "2 · Home \u0026 calendar",
+        "Name":  "Calendar — whole union, filtered",
+        "Method":  "GET",
+        "Path":  "/api/v1/mech/calendar",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/calendar?from={{from}}\u0026to={{to}}\u0026mine=0\u0026status=scheduled,dispatched,in_progress",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "2 · Home \u0026 calendar",
+        "Name":  "Backlog — approved, unscheduled (staff)",
+        "Method":  "GET",
+        "Path":  "/api/v1/mech/calendar/backlog",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/calendar/backlog",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "3 · Jobs — operator field flow",
+        "Name":  "My jobs (active)",
+        "Method":  "GET",
+        "Path":  "/api/v1/mech/jobs",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs?status=active\u0026mine=1",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "3 · Jobs — operator field flow",
+        "Name":  "Job detail",
+        "Method":  "GET",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "3 · Jobs — operator field flow",
+        "Name":  "Job trail (map)",
+        "Method":  "GET",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}/path",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}/path",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "3 · Jobs — operator field flow",
+        "Name":  "Accept assignment",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}/accept",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}/accept",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"phone\": {\n        \"latitude\": -6.1709,\n        \"longitude\": 35.7409,\n        \"accuracy_m\": 8\n    },\n    \"client_event_id\": \"{{$guid}}\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "3 · Jobs — operator field flow",
+        "Name":  "En route",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}/en-route",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}/en-route",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"phone\": {\n        \"latitude\": -6.1709,\n        \"longitude\": 35.7409,\n        \"accuracy_m\": 8\n    },\n    \"client_event_id\": \"{{$guid}}\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "3 · Jobs — operator field flow",
+        "Name":  "Arrived (manual)",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}/arrive",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}/arrive",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"phone\": {\n        \"latitude\": -6.1709,\n        \"longitude\": 35.7409,\n        \"accuracy_m\": 8\n    },\n    \"client_event_id\": \"{{$guid}}\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "3 · Jobs — operator field flow",
+        "Name":  "Daily inspection (before start)",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/tractors/{{tractor_id}}/inspections",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/tractors/{{tractor_id}}/inspections",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"checklist\": {\n        \"engine_oil\": true,\n        \"coolant\": true,\n        \"fuel\": true,\n        \"tyres\": true,\n        \"brakes\": true,\n        \"lights\": true,\n        \"hydraulics\": true,\n        \"implement\": true,\n        \"leaks\": true,\n        \"tracker\": true\n    },\n    \"fuel_level_pct\": 80,\n    \"hour_meter\": 1240.5,\n    \"job_id\": \"{{job_id}}\",\n    \"phone\": {\n        \"latitude\": -6.1709,\n        \"longitude\": 35.7409,\n        \"accuracy_m\": 8\n    }\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "3 · Jobs — operator field flow",
+        "Name":  "Start check (dry run — what is still red?)",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}/start-check",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}/start-check",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"phone\": {\n        \"latitude\": -6.1709,\n        \"longitude\": 35.7409,\n        \"accuracy_m\": 8\n    }\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "3 · Jobs — operator field flow",
+        "Name":  "Start (geofence-verified)",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}/start",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}/start",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"phone\": {\n        \"latitude\": -6.1709,\n        \"longitude\": 35.7409,\n        \"accuracy_m\": 8\n    },\n    \"hour_meter\": 1240.5,\n    \"implement\": \"Disc plough 3-furrow\",\n    \"client_event_id\": \"{{$guid}}\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "3 · Jobs — operator field flow",
+        "Name":  "Request override (only when override_allowed)",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}/override-request",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}/override-request",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"phone\": {\n        \"latitude\": -6.1709,\n        \"longitude\": 35.7409,\n        \"accuracy_m\": 8\n    },\n    \"reason\": \"Phone GPS cannot lock under the trees\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "3 · Jobs — operator field flow",
+        "Name":  "Start with approved override",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}/start",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}/start",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"phone\": {\n        \"latitude\": -6.1709,\n        \"longitude\": 35.7409,\n        \"accuracy_m\": 8\n    },\n    \"override_id\": \"{{override_id}}\",\n    \"client_event_id\": \"{{$guid}}\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "3 · Jobs — operator field flow",
+        "Name":  "Pause",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}/pause",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}/pause",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"phone\": {\n        \"latitude\": -6.1709,\n        \"longitude\": 35.7409,\n        \"accuracy_m\": 8\n    },\n    \"reason\": \"Lunch\",\n    \"client_event_id\": \"{{$guid}}\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "3 · Jobs — operator field flow",
+        "Name":  "Resume",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}/resume",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}/resume",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"phone\": {\n        \"latitude\": -6.1709,\n        \"longitude\": 35.7409,\n        \"accuracy_m\": 8\n    },\n    \"client_event_id\": \"{{$guid}}\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "3 · Jobs — operator field flow",
+        "Name":  "Photo (before / during / after)",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}/photos",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}/photos",
+        "Body":  {
+                     "mode":  "formdata",
+                     "formdata":  [
+                                      {
+                                          "key":  "kind",
+                                          "value":  "after",
+                                          "type":  "text"
+                                      },
+                                      {
+                                          "key":  "caption",
+                                          "value":  "Finished rows",
+                                          "type":  "text"
+                                      },
+                                      {
+                                          "key":  "file",
+                                          "type":  "file",
+                                          "src":  "",
+                                          "description":  "jpg / png / webp, max 8 MB"
+                                      }
+                                  ]
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "3 · Jobs — operator field flow",
+        "Name":  "Report an issue",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}/issue",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}/issue",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"phone\": {\n        \"latitude\": -6.1709,\n        \"longitude\": 35.7409,\n        \"accuracy_m\": 8\n    },\n    \"text\": \"Hydraulic hose leaking\",\n    \"severity\": \"warning\",\n    \"open_ticket\": true\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "3 · Jobs — operator field flow",
+        "Name":  "Complete",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}/complete",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}/complete",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"phone\": {\n        \"latitude\": -6.1709,\n        \"longitude\": 35.7409,\n        \"accuracy_m\": 8\n    },\n    \"reported_acres\": 4.8,\n    \"end_hour_meter\": 1244,\n    \"fuel_used_l\": 22,\n    \"notes\": \"Done before the rain\",\n    \"client_event_id\": \"{{$guid}}\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "3 · Jobs — operator field flow",
+        "Name":  "Farmer OTP — send code",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}/farmer-otp",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}/farmer-otp",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "3 · Jobs — operator field flow",
+        "Name":  "Farmer confirm — OTP",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}/farmer-confirm",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}/farmer-confirm",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"method\": \"otp\",\n    \"code\": \"{{farmer_otp}}\",\n    \"rating\": 5\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "3 · Jobs — operator field flow",
+        "Name":  "Farmer confirm — PIN",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}/farmer-confirm",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}/farmer-confirm",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"method\": \"pin\",\n    \"pin\": \"1234\",\n    \"rating\": 4\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "3 · Jobs — operator field flow",
+        "Name":  "Farmer confirm — signature",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}/farmer-confirm",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}/farmer-confirm",
+        "Body":  {
+                     "mode":  "formdata",
+                     "formdata":  [
+                                      {
+                                          "key":  "method",
+                                          "value":  "signature",
+                                          "type":  "text"
+                                      },
+                                      {
+                                          "key":  "rating",
+                                          "value":  "5",
+                                          "type":  "text"
+                                      },
+                                      {
+                                          "key":  "signature",
+                                          "type":  "file",
+                                          "src":  "",
+                                          "description":  "jpg / png / webp, max 8 MB"
+                                      }
+                                  ]
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "3 · Jobs — operator field flow",
+        "Name":  "Farmer dispute",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}/farmer-confirm",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}/farmer-confirm",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"method\": \"pin\",\n    \"pin\": \"1234\",\n    \"dispute\": true,\n    \"note\": \"Only half the field was done\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "3 · Jobs — operator field flow",
+        "Name":  "Log fuel",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/tractors/{{tractor_id}}/fuel",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/tractors/{{tractor_id}}/fuel",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"litres\": 40,\n    \"cost\": 128000,\n    \"hour_meter\": 1244,\n    \"source\": \"issue\",\n    \"job_id\": \"{{job_id}}\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "4 · Jobs — union desk",
+        "Name":  "All jobs (union)",
+        "Method":  "GET",
+        "Path":  "/api/v1/mech/jobs",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs?status=active\u0026mine=0\u0026per_page=50",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "4 · Jobs — union desk",
+        "Name":  "Jobs to verify",
+        "Method":  "GET",
+        "Path":  "/api/v1/mech/jobs",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs?status=completed",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "4 · Jobs — union desk",
+        "Name":  "Dispatch / reassign",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}/dispatch",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}/dispatch",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"tractor_id\": \"{{tractor_id}}\",\n    \"operator_id\": \"{{operator_id}}\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "4 · Jobs — union desk",
+        "Name":  "Reschedule",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}/reschedule",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}/reschedule",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"scheduled_date\": \"{{to}}\",\n    \"window_start\": \"07:00\",\n    \"window_end\": \"12:00\",\n    \"reason\": \"Rain\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "4 · Jobs — union desk",
+        "Name":  "Recompute work evidence",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}/refresh-verification",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}/refresh-verification",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "4 · Jobs — union desk",
+        "Name":  "Record farmer confirmation manually",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}/confirm",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}/confirm",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"rating\": 5,\n    \"note\": \"Confirmed by phone\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "4 · Jobs — union desk",
+        "Name":  "Verify acres \u0026 charge",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}/verify",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}/verify",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"verified_acres\": 4.5,\n    \"note\": \"Matches the trail\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "4 · Jobs — union desk",
+        "Name":  "Close",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}/close",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}/close",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"payment_status\": \"paid\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "4 · Jobs — union desk",
+        "Name":  "Flag",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}/flag",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}/flag",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"reason\": \"Acreage looks inflated\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "4 · Jobs — union desk",
+        "Name":  "Clear flag",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}/unflag",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}/unflag",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"note\": \"Re-measured with the farmer\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "4 · Jobs — union desk",
+        "Name":  "Cancel",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/jobs/{{job_id}}/cancel",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/jobs/{{job_id}}/cancel",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"reason\": \"Tractor broke down\",\n    \"cancel_request\": false\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "5 · Service requests (union desk)",
+        "Name":  "Queue",
+        "Method":  "GET",
+        "Path":  "/api/v1/mech/requests",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/requests?status=queue",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "5 · Service requests (union desk)",
+        "Name":  "Request detail",
+        "Method":  "GET",
+        "Path":  "/api/v1/mech/requests/{{request_id}}",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/requests/{{request_id}}",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "5 · Service requests (union desk)",
+        "Name":  "Register a request (field agent)",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/requests",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/requests",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"farmer_id\": \"{{farmer_id}}\",\n    \"plot_id\": \"{{plot_id}}\",\n    \"service_type_id\": \"{{service_type_id}}\",\n    \"requested_acres\": 5,\n    \"preferred_date\": \"{{to}}\",\n    \"preferred_window\": \"morning\",\n    \"priority\": \"normal\",\n    \"notes\": \"Before the rains\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "5 · Service requests (union desk)",
+        "Name":  "Approve",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/requests/{{request_id}}/approve",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/requests/{{request_id}}/approve",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"estimate_amount\": 300000,\n    \"priority\": \"high\",\n    \"note\": \"Priority farmer group\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "5 · Service requests (union desk)",
+        "Name":  "Return for correction",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/requests/{{request_id}}/return",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/requests/{{request_id}}/return",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"reason\": \"Plot boundary crosses the road reserve\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "5 · Service requests (union desk)",
+        "Name":  "Reject",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/requests/{{request_id}}/reject",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/requests/{{request_id}}/reject",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"reason\": \"Service not offered this season\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "5 · Service requests (union desk)",
+        "Name":  "Cancel",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/requests/{{request_id}}/cancel",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/requests/{{request_id}}/cancel",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"reason\": \"Farmer withdrew\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "5 · Service requests (union desk)",
+        "Name":  "Availability check (before scheduling)",
+        "Method":  "GET",
+        "Path":  "/api/v1/mech/requests/availability",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/requests/availability?date={{to}}\u0026tractor_id={{tractor_id}}\u0026operator_id={{operator_id}}",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "5 · Service requests (union desk)",
+        "Name":  "Schedule → job",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/requests/{{request_id}}/schedule",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/requests/{{request_id}}/schedule",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"scheduled_date\": \"{{to}}\",\n    \"window_start\": \"07:00\",\n    \"window_end\": \"12:00\",\n    \"tractor_id\": \"{{tractor_id}}\",\n    \"operator_id\": \"{{operator_id}}\",\n    \"implement\": \"Disc plough 3-furrow\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "6 · Tractors",
+        "Name":  "My tractors (live)",
+        "Method":  "GET",
+        "Path":  "/api/v1/mech/tractors",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/tractors?mine=1\u0026live=1",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "6 · Tractors",
+        "Name":  "All tractors",
+        "Method":  "GET",
+        "Path":  "/api/v1/mech/tractors",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/tractors?mine=0",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "6 · Tractors",
+        "Name":  "Tractor detail",
+        "Method":  "GET",
+        "Path":  "/api/v1/mech/tractors/{{tractor_id}}",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/tractors/{{tractor_id}}",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "6 · Tractors",
+        "Name":  "Scan asset QR",
+        "Method":  "GET",
+        "Path":  "/api/v1/mech/tractors/qr/{{qr_token}}",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/tractors/qr/{{qr_token}}",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "6 · Tractors",
+        "Name":  "Today\u0027s inspection",
+        "Method":  "GET",
+        "Path":  "/api/v1/mech/tractors/{{tractor_id}}/inspection/today",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/tractors/{{tractor_id}}/inspection/today",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "7 · Oversight — overrides \u0026 exceptions",
+        "Name":  "Pending overrides",
+        "Method":  "GET",
+        "Path":  "/api/v1/mech/overrides",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/overrides?status=pending",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "7 · Oversight — overrides \u0026 exceptions",
+        "Name":  "Approve override",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/overrides/{{override_id}}/decide",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/overrides/{{override_id}}/decide",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"approve\": true,\n    \"note\": \"Confirmed by phone with the farmer\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "7 · Oversight — overrides \u0026 exceptions",
+        "Name":  "Deny override",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/overrides/{{override_id}}/decide",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/overrides/{{override_id}}/decide",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"approve\": false,\n    \"note\": \"Operator must move to the plot\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "7 · Oversight — overrides \u0026 exceptions",
+        "Name":  "Open exceptions",
+        "Method":  "GET",
+        "Path":  "/api/v1/mech/exceptions",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/exceptions?status=open",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "7 · Oversight — overrides \u0026 exceptions",
+        "Name":  "Acknowledge exception",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/exceptions/{{exception_id}}/ack",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/exceptions/{{exception_id}}/ack",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "7 · Oversight — overrides \u0026 exceptions",
+        "Name":  "Resolve exception",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/exceptions/{{exception_id}}/resolve",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/exceptions/{{exception_id}}/resolve",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"remarks\": \"Operator warned in writing\",\n    \"dismiss\": false\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "8 · Registry — farmers, plots, pickers",
+        "Name":  "Service types",
+        "Method":  "GET",
+        "Path":  "/api/v1/mech/service-types",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/service-types",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "8 · Registry — farmers, plots, pickers",
+        "Name":  "Unions",
+        "Method":  "GET",
+        "Path":  "/api/v1/mech/unions",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/unions",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "8 · Registry — farmers, plots, pickers",
+        "Name":  "Operators",
+        "Method":  "GET",
+        "Path":  "/api/v1/mech/operators",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/operators",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "8 · Registry — farmers, plots, pickers",
+        "Name":  "Farmers (search)",
+        "Method":  "GET",
+        "Path":  "/api/v1/mech/farmers",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/farmers?q=asha",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "8 · Registry — farmers, plots, pickers",
+        "Name":  "Farmer with plots",
+        "Method":  "GET",
+        "Path":  "/api/v1/mech/farmers/{{farmer_id}}",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/farmers/{{farmer_id}}",
+        "Body":  null,
+        "Auth":  null
+    },
+    {
+        "Group":  "8 · Registry — farmers, plots, pickers",
+        "Name":  "Register farmer",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/farmers",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/farmers",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"name\": \"Bibi Neema Mrema\",\n    \"phone\": \"0712 345 678\",\n    \"village\": \"Mvumi\",\n    \"district\": \"Chamwino\",\n    \"region\": \"Dodoma\",\n    \"sex\": \"F\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "8 · Registry — farmers, plots, pickers",
+        "Name":  "Map a plot (walk the boundary)",
+        "Method":  "POST",
+        "Path":  "/api/v1/mech/farmers/{{farmer_id}}/plots",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/farmers/{{farmer_id}}/plots",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"name\": \"Lower field\",\n    \"crop\": \"Sunflower\",\n    \"boundary\": [\n        {\n            \"latitude\": -6.17,\n            \"longitude\": 35.74\n        },\n        {\n            \"latitude\": -6.17,\n            \"longitude\": 35.7418\n        },\n        {\n            \"latitude\": -6.1718,\n            \"longitude\": 35.7418\n        },\n        {\n            \"latitude\": -6.1718,\n            \"longitude\": 35.74\n        }\n    ],\n    \"tolerance_m\": 50\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "8 · Registry — farmers, plots, pickers",
+        "Name":  "Update a plot",
+        "Method":  "PUT",
+        "Path":  "/api/v1/mech/plots/{{plot_id}}",
+        "ExampleUrl":  "{{base_url}}/api/v1/mech/plots/{{plot_id}}",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"name\": \"Lower field (re-mapped)\",\n    \"boundary\": [\n        {\n            \"latitude\": -6.17,\n            \"longitude\": 35.74\n        },\n        {\n            \"latitude\": -6.17,\n            \"longitude\": 35.7418\n        },\n        {\n            \"latitude\": -6.1718,\n            \"longitude\": 35.7418\n        },\n        {\n            \"latitude\": -6.1718,\n            \"longitude\": 35.74\n        }\n    ],\n    \"tolerance_m\": 60\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  null
+    },
+    {
+        "Group":  "9 · Integration API — farmer app (server-to-server)",
+        "Name":  "Token (client credentials)",
+        "Method":  "POST",
+        "Path":  "/api/integration/token",
+        "ExampleUrl":  "{{base_url}}/api/integration/token",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"client_id\": \"{{client_id}}\",\n    \"api_key\": \"{{api_key}}\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  "noauth"
+    },
+    {
+        "Group":  "9 · Integration API — farmer app (server-to-server)",
+        "Name":  "Service types",
+        "Method":  "GET",
+        "Path":  "/api/integration/v1/mechanization/service-types",
+        "ExampleUrl":  "{{base_url}}/api/integration/v1/mechanization/service-types",
+        "Body":  null,
+        "Auth":  "bearer"
+    },
+    {
+        "Group":  "9 · Integration API — farmer app (server-to-server)",
+        "Name":  "Sync farmer + plots (upsert by your ids)",
+        "Method":  "POST",
+        "Path":  "/api/integration/v1/mechanization/farmers",
+        "ExampleUrl":  "{{base_url}}/api/integration/v1/mechanization/farmers",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"external_ref\": \"{{farmer_ref}}\",\n    \"name\": \"Bibi Neema Mrema\",\n    \"phone\": \"0712 345 678\",\n    \"union_code\": \"DODOMA\",\n    \"village\": \"Mvumi\",\n    \"sex\": \"F\",\n    \"pin\": \"4321\",\n    \"plots\": [\n        {\n            \"external_ref\": \"{{plot_ref}}\",\n            \"name\": \"Lower field\",\n            \"crop\": \"Sunflower\",\n            \"boundary\": [\n                {\n                    \"latitude\": -6.17,\n                    \"longitude\": 35.74\n                },\n                {\n                    \"latitude\": -6.17,\n                    \"longitude\": 35.7418\n                },\n                {\n                    \"latitude\": -6.1718,\n                    \"longitude\": 35.7418\n                },\n                {\n                    \"latitude\": -6.1718,\n                    \"longitude\": 35.74\n                }\n            ],\n            \"tolerance_m\": 50\n        }\n    ]\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  "bearer"
+    },
+    {
+        "Group":  "9 · Integration API — farmer app (server-to-server)",
+        "Name":  "Farmer by ref",
+        "Method":  "GET",
+        "Path":  "/api/integration/v1/mechanization/farmers/{{farmer_ref}}",
+        "ExampleUrl":  "{{base_url}}/api/integration/v1/mechanization/farmers/{{farmer_ref}}",
+        "Body":  null,
+        "Auth":  "bearer"
+    },
+    {
+        "Group":  "9 · Integration API — farmer app (server-to-server)",
+        "Name":  "Farmers (search)",
+        "Method":  "GET",
+        "Path":  "/api/integration/v1/mechanization/farmers",
+        "ExampleUrl":  "{{base_url}}/api/integration/v1/mechanization/farmers?phone=0712345678",
+        "Body":  null,
+        "Auth":  "bearer"
+    },
+    {
+        "Group":  "9 · Integration API — farmer app (server-to-server)",
+        "Name":  "Sync one plot",
+        "Method":  "POST",
+        "Path":  "/api/integration/v1/mechanization/farmers/{{farmer_ref}}/plots",
+        "ExampleUrl":  "{{base_url}}/api/integration/v1/mechanization/farmers/{{farmer_ref}}/plots",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"external_ref\": \"{{plot_ref}}\",\n    \"name\": \"Lower field\",\n    \"crop\": \"Sunflower\",\n    \"boundary\": [\n        {\n            \"latitude\": -6.17,\n            \"longitude\": 35.74\n        },\n        {\n            \"latitude\": -6.17,\n            \"longitude\": 35.7418\n        },\n        {\n            \"latitude\": -6.1718,\n            \"longitude\": 35.7418\n        },\n        {\n            \"latitude\": -6.1718,\n            \"longitude\": 35.74\n        }\n    ]\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  "bearer"
+    },
+    {
+        "Group":  "9 · Integration API — farmer app (server-to-server)",
+        "Name":  "Place an order",
+        "Method":  "POST",
+        "Path":  "/api/integration/v1/mechanization/requests",
+        "ExampleUrl":  "{{base_url}}/api/integration/v1/mechanization/requests",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"external_ref\": \"{{order_ref}}\",\n    \"farmer_ref\": \"{{farmer_ref}}\",\n    \"plot_ref\": \"{{plot_ref}}\",\n    \"service_code\": \"PLOUGH\",\n    \"requested_acres\": 6,\n    \"preferred_date\": \"{{to}}\",\n    \"preferred_window\": \"morning\",\n    \"priority\": \"normal\",\n    \"notes\": \"Before the rains\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  "bearer"
+    },
+    {
+        "Group":  "9 · Integration API — farmer app (server-to-server)",
+        "Name":  "Follow an order",
+        "Method":  "GET",
+        "Path":  "/api/integration/v1/mechanization/requests/{{order_ref}}",
+        "ExampleUrl":  "{{base_url}}/api/integration/v1/mechanization/requests/{{order_ref}}",
+        "Body":  null,
+        "Auth":  "bearer"
+    },
+    {
+        "Group":  "9 · Integration API — farmer app (server-to-server)",
+        "Name":  "A farmer\u0027s orders",
+        "Method":  "GET",
+        "Path":  "/api/integration/v1/mechanization/requests",
+        "ExampleUrl":  "{{base_url}}/api/integration/v1/mechanization/requests?farmer_ref={{farmer_ref}}\u0026updated_since={{from}}T00:00:00Z",
+        "Body":  null,
+        "Auth":  "bearer"
+    },
+    {
+        "Group":  "9 · Integration API — farmer app (server-to-server)",
+        "Name":  "Amend / resubmit",
+        "Method":  "PATCH",
+        "Path":  "/api/integration/v1/mechanization/requests/{{order_ref}}",
+        "ExampleUrl":  "{{base_url}}/api/integration/v1/mechanization/requests/{{order_ref}}",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"requested_acres\": 5.5,\n    \"preferred_window\": \"afternoon\",\n    \"notes\": \"Corrected boundary\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  "bearer"
+    },
+    {
+        "Group":  "9 · Integration API — farmer app (server-to-server)",
+        "Name":  "Cancel (before work starts)",
+        "Method":  "POST",
+        "Path":  "/api/integration/v1/mechanization/requests/{{order_ref}}/cancel",
+        "ExampleUrl":  "{{base_url}}/api/integration/v1/mechanization/requests/{{order_ref}}/cancel",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"reason\": \"Farmer changed plans\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  "bearer"
+    },
+    {
+        "Group":  "9 · Integration API — farmer app (server-to-server)",
+        "Name":  "Confirm the work (farmer)",
+        "Method":  "POST",
+        "Path":  "/api/integration/v1/mechanization/requests/{{order_ref}}/confirm",
+        "ExampleUrl":  "{{base_url}}/api/integration/v1/mechanization/requests/{{order_ref}}/confirm",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"rating\": 5\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  "bearer"
+    },
+    {
+        "Group":  "9 · Integration API — farmer app (server-to-server)",
+        "Name":  "Dispute the work (farmer)",
+        "Method":  "POST",
+        "Path":  "/api/integration/v1/mechanization/requests/{{order_ref}}/confirm",
+        "ExampleUrl":  "{{base_url}}/api/integration/v1/mechanization/requests/{{order_ref}}/confirm",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"dispute\": true,\n    \"note\": \"Only half the field was ploughed\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  "bearer"
+    },
+    {
+        "Group":  "9 · Integration API — farmer app (server-to-server)",
+        "Name":  "Calendar — a farmer\u0027s activities",
+        "Method":  "GET",
+        "Path":  "/api/integration/v1/mechanization/calendar",
+        "ExampleUrl":  "{{base_url}}/api/integration/v1/mechanization/calendar?farmer_ref={{farmer_ref}}\u0026from={{from}}\u0026to={{to}}",
+        "Body":  null,
+        "Auth":  "bearer"
+    },
+    {
+        "Group":  "9 · Integration API — farmer app (server-to-server)",
+        "Name":  "Webhook — current",
+        "Method":  "GET",
+        "Path":  "/api/integration/v1/mechanization/webhook",
+        "ExampleUrl":  "{{base_url}}/api/integration/v1/mechanization/webhook",
+        "Body":  null,
+        "Auth":  "bearer"
+    },
+    {
+        "Group":  "9 · Integration API — farmer app (server-to-server)",
+        "Name":  "Webhook — register",
+        "Method":  "PUT",
+        "Path":  "/api/integration/v1/mechanization/webhook",
+        "ExampleUrl":  "{{base_url}}/api/integration/v1/mechanization/webhook",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"url\": \"https://your-server.example/hooks/kwanzatrack\"\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  "bearer"
+    },
+    {
+        "Group":  "9 · Integration API — farmer app (server-to-server)",
+        "Name":  "Webhook — remove",
+        "Method":  "PUT",
+        "Path":  "/api/integration/v1/mechanization/webhook",
+        "ExampleUrl":  "{{base_url}}/api/integration/v1/mechanization/webhook",
+        "Body":  {
+                     "mode":  "raw",
+                     "raw":  "{\n    \"url\": null\n}",
+                     "options":  {
+                                     "raw":  {
+                                                 "language":  "json"
+                                             }
+                                 }
+                 },
+        "Auth":  "bearer"
+    },
+    {
+        "Group":  "9 · Integration API — farmer app (server-to-server)",
+        "Name":  "Tracking — vehicles (tracking:read)",
+        "Method":  "GET",
+        "Path":  "/api/integration/v1/vehicles",
+        "ExampleUrl":  "{{base_url}}/api/integration/v1/vehicles",
+        "Body":  null,
+        "Auth":  "bearer"
+    }
+]

@@ -7,6 +7,15 @@ enum OperationsRequestStatus {
   rejected('Rejected'),
   returned('Returned'),
   scheduled('Scheduled'),
+  enRoute('En route'),
+  arrived('Arrived'),
+  inProgress('In progress'),
+  paused('Paused'),
+  completed('Completed'),
+  verified('Verified'),
+  closed('Closed'),
+  flagged('Flagged'),
+  unknown('Unknown'),
   cancelled('Cancelled');
 
   const OperationsRequestStatus(this.label);
@@ -42,7 +51,9 @@ enum JobStatus {
   enRoute('En route'),
   arrived('Arrived'),
   inProgress('Work in progress'),
+  paused('Paused'),
   completedPendingConfirmation('Awaiting verification'),
+  verified('Verified'),
   flagged('Flagged'),
   closed('Closed'),
   cancelled('Cancelled');
@@ -320,10 +331,18 @@ class OperationsJob {
     required this.scheduledAt,
     required this.estimatedHours,
     required this.status,
+    this.scheduledEndAt,
     this.startedAt,
     this.completedAt,
     this.alert,
     this.history = const [],
+    this.reportedAcres,
+    this.verifiedAcres,
+    this.farmerConfirmedAt,
+    this.verification = const {},
+    this.paymentStatus,
+    this.amount,
+    this.currency,
   });
 
   final String id;
@@ -335,11 +354,19 @@ class OperationsJob {
   final OperatorProfile operator;
   final DateTime scheduledAt;
   final int estimatedHours;
+  final DateTime? scheduledEndAt;
   final JobStatus status;
   final DateTime? startedAt;
   final DateTime? completedAt;
   final String? alert;
   final List<JobHistoryEntry> history;
+  final num? reportedAcres;
+  final num? verifiedAcres;
+  final DateTime? farmerConfirmedAt;
+  final Map<String, Object?> verification;
+  final String? paymentStatus;
+  final num? amount;
+  final String? currency;
 
   OperationsJob copyWith({
     TractorAsset? tractor,
@@ -362,10 +389,18 @@ class OperationsJob {
       scheduledAt: scheduledAt ?? this.scheduledAt,
       estimatedHours: estimatedHours,
       status: status ?? this.status,
+      scheduledEndAt: scheduledEndAt,
       startedAt: startedAt ?? this.startedAt,
       completedAt: completedAt ?? this.completedAt,
       alert: alert ?? this.alert,
       history: history ?? this.history,
+      reportedAcres: reportedAcres,
+      verifiedAcres: verifiedAcres,
+      farmerConfirmedAt: farmerConfirmedAt,
+      verification: verification,
+      paymentStatus: paymentStatus,
+      amount: amount,
+      currency: currency,
     );
   }
 }

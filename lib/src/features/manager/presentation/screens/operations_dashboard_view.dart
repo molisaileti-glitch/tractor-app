@@ -23,7 +23,7 @@ class OperationsDashboardView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final jobs = repository.jobs
+    final jobs = repository.scheduleJobs
         .where(
           (job) =>
               job.scheduledAt.year == now.year &&

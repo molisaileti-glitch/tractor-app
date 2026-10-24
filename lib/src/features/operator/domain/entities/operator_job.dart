@@ -8,7 +8,12 @@ enum OperatorJobStatus {
   enRoute('En route'),
   arrived('Arrived'),
   inProgress('Job in progress'),
-  completedPendingConfirmation('Completed pending confirmation');
+  paused('Paused'),
+  completedPendingConfirmation('Completed pending confirmation'),
+  verified('Verified'),
+  closed('Closed'),
+  cancelled('Cancelled'),
+  flagged('Flagged');
 
   const OperatorJobStatus(this.label);
   final String label;
@@ -90,6 +95,12 @@ class OperatorJob {
     this.finishedAt,
     this.areaServicedHectares,
     this.completionNotes,
+    this.workSeconds,
+    this.workTimeReceivedAt,
+    this.farmerConfirmedAt,
+    this.farmerHasPin = false,
+    this.geofenceVerified = false,
+    this.startOverride,
     this.trackPoints = const [],
     this.problemReports = const [],
   });
@@ -115,11 +126,41 @@ class OperatorJob {
   final DateTime? finishedAt;
   final double? areaServicedHectares;
   final String? completionNotes;
+  final int? workSeconds;
+  final DateTime? workTimeReceivedAt;
+  final DateTime? farmerConfirmedAt;
+  final bool farmerHasPin;
+  final bool geofenceVerified;
+  final OperatorStartOverride? startOverride;
+
+  String? get usableOverrideId =>
+      startOverride?.isUsable == true ? startOverride!.id : null;
+
+  Duration? get workDuration {
+    if (workSeconds == null) return null;
+    final elapsed =
+        status == OperatorJobStatus.inProgress && workTimeReceivedAt != null
+        ? DateTime.now()
+              .difference(workTimeReceivedAt!)
+              .inSeconds
+              .clamp(0, 86400)
+        : 0;
+    return Duration(seconds: workSeconds! + elapsed);
+  }
+
   final List<BoundaryPoint> trackPoints;
   final List<OperatorProblemReport> problemReports;
 
   bool get isComplete =>
-      status == OperatorJobStatus.completedPendingConfirmation;
+      status == OperatorJobStatus.completedPendingConfirmation ||
+      status == OperatorJobStatus.verified ||
+      status == OperatorJobStatus.closed ||
+      status == OperatorJobStatus.cancelled;
+
+  bool get isCompletedWork =>
+      status == OperatorJobStatus.completedPendingConfirmation ||
+      status == OperatorJobStatus.verified ||
+      status == OperatorJobStatus.closed;
 
   OperatorJob copyWith({
     OperatorJobStatus? status,
@@ -162,6 +203,12 @@ class OperatorJob {
       finishedAt: finishedAt ?? this.finishedAt,
       areaServicedHectares: areaServicedHectares ?? this.areaServicedHectares,
       completionNotes: completionNotes ?? this.completionNotes,
+      workSeconds: workSeconds,
+      workTimeReceivedAt: workTimeReceivedAt,
+      farmerConfirmedAt: farmerConfirmedAt,
+      farmerHasPin: farmerHasPin,
+      geofenceVerified: geofenceVerified,
+      startOverride: startOverride,
       trackPoints: trackPoints ?? this.trackPoints,
       problemReports: problemReports ?? this.problemReports,
     );
@@ -194,4 +241,33 @@ class OperatorStartCheckItem {
   final String label;
   final bool passed;
   final String? detail;
+}
+
+class OperatorStartOverride {
+  const OperatorStartOverride({
+    required this.id,
+    required this.status,
+    this.expiresAt,
+    this.note,
+  });
+  final String id;
+  final String status;
+  final DateTime? expiresAt;
+  final String? note;
+  bool get isUsable =>
+      status == 'approved' &&
+      expiresAt != null &&
+      expiresAt!.isAfter(DateTime.now());
+}
+
+class WorkTrackPoint extends BoundaryPoint {
+  const WorkTrackPoint({
+    required super.label,
+    required super.latitude,
+    required super.longitude,
+    this.inside,
+    this.speedKph,
+  });
+  final bool? inside;
+  final double? speedKph;
 }

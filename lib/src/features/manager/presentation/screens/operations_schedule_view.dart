@@ -25,7 +25,7 @@ class _OperationsScheduleViewState extends State<OperationsScheduleView> {
 
   @override
   Widget build(BuildContext context) {
-    final jobs = widget.repository.jobs.toList()
+    final jobs = widget.repository.scheduleJobs.toList()
       ..sort(
         (first, second) => first.scheduledAt.compareTo(second.scheduledAt),
       );
@@ -310,7 +310,7 @@ class _OperationsCalendarBoard extends StatelessWidget {
     if (visibleJobs.isEmpty) return 19;
     final latest = visibleJobs
         .map((job) {
-          final end = job.scheduledAt.add(Duration(hours: job.estimatedHours));
+          final end = job.scheduledEndAt ?? job.scheduledAt.add(Duration(hours: job.estimatedHours));
           return end.minute == 0 ? end.hour : end.hour + 1;
         })
         .reduce((first, second) => first > second ? first : second);
@@ -377,6 +377,7 @@ class _OperationsCalendarBoard extends StatelessWidget {
   }
 
   DateTime _jobEnd(OperationsJob job) =>
+      job.scheduledEndAt ??
       job.scheduledAt.add(Duration(hours: job.estimatedHours.clamp(1, 24)));
 
   bool _sameDate(DateTime first, DateTime second) {
@@ -447,7 +448,7 @@ class _PositionedOperationsJobBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final dayIndex = days.indexWhere((day) => _sameDate(day, job.scheduledAt));
     if (dayIndex == -1) return const SizedBox.shrink();
-    final end = job.scheduledAt.add(Duration(hours: job.estimatedHours));
+    final end = job.scheduledEndAt ?? job.scheduledAt.add(Duration(hours: job.estimatedHours));
     final startMinutes =
         (job.scheduledAt.hour - minHour) * 60 + job.scheduledAt.minute;
     final durationMinutes = end.difference(job.scheduledAt).inMinutes;
@@ -527,7 +528,9 @@ class _PositionedOperationsJobBlock extends StatelessWidget {
       JobStatus.enRoute => const Color(0xFFF97316),
       JobStatus.arrived => const Color(0xFF0EA5E9),
       JobStatus.inProgress => Theme.of(context).colorScheme.primary,
+      JobStatus.paused => const Color(0xFF7C3AED),
       JobStatus.completedPendingConfirmation => const Color(0xFF16A34A),
+      JobStatus.verified => const Color(0xFF059669),
       JobStatus.flagged => Theme.of(context).colorScheme.error,
       JobStatus.closed => const Color(0xFF475569),
       JobStatus.cancelled => const Color(0xFF94A3B8),

@@ -147,6 +147,11 @@ class OperationsStatusChip extends StatelessWidget {
         OperationsRequestStatus.returned => const Color(0xFFC8872B),
         OperationsRequestStatus.scheduled => AppColors.info,
         OperationsRequestStatus.cancelled => scheme.error,
+        OperationsRequestStatus.completed ||
+        OperationsRequestStatus.verified ||
+        OperationsRequestStatus.closed => AppColors.adaptiveSuccess(context),
+        OperationsRequestStatus.flagged => scheme.error,
+        _ => AppColors.info,
       };
     }
     if (tractorStatus != null) {
@@ -165,15 +170,17 @@ class OperationsStatusChip extends StatelessWidget {
       };
     }
     return switch (jobStatus!) {
-      JobStatus.scheduled => AppColors.info,
-      JobStatus.dispatched => AppColors.purple,
-      JobStatus.enRoute => AppColors.tractorOrange,
-      JobStatus.arrived => AppColors.routeBlue,
-      JobStatus.inProgress => AppColors.purple,
-      JobStatus.completedPendingConfirmation => const Color(0xFF9A6B00),
-      JobStatus.flagged => scheme.error,
-      JobStatus.closed => AppColors.adaptiveSuccess(context),
-      JobStatus.cancelled => scheme.error,
+      JobStatus.scheduled => const Color(0xFF64748B),
+      JobStatus.dispatched => const Color(0xFFF59E0B),
+      JobStatus.enRoute => const Color(0xFFF97316),
+      JobStatus.arrived => const Color(0xFF0EA5E9),
+      JobStatus.inProgress => const Color(0xFF2563EB),
+      JobStatus.paused => const Color(0xFF7C3AED),
+      JobStatus.completedPendingConfirmation => const Color(0xFF10B981),
+      JobStatus.verified => const Color(0xFF059669),
+      JobStatus.flagged => const Color(0xFFE11D48),
+      JobStatus.closed => const Color(0xFF334155),
+      JobStatus.cancelled => const Color(0xFF94A3B8),
     };
   }
 }

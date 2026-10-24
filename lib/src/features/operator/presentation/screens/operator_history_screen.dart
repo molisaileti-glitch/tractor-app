@@ -4,6 +4,7 @@ import '../../../../components/components.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/operator_local_repository.dart';
+import '../../domain/entities/operator_job.dart';
 import '../widgets/operator_widgets.dart';
 
 class OperatorHistoryScreen extends StatelessWidget {
@@ -61,6 +62,13 @@ class OperatorHistoryScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
                       Text('${job.farmerName} - ${job.plot.name}'),
+                      if (job.status ==
+                          OperatorJobStatus.completedPendingConfirmation)
+                        Text(
+                          job.farmerConfirmedAt == null
+                              ? 'Awaiting farmer confirmation in Shamba Bora.'
+                              : 'Farmer confirmed. Awaiting union verification.',
+                        ),
                       Text(
                         strings.scheduledAt(formatDateTime(job.scheduledAt)),
                       ),

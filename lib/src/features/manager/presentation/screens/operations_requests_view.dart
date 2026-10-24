@@ -68,7 +68,9 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
             ),
             const SizedBox(width: 12),
             FilledButton.icon(
-              onPressed: _openRegisterRequest,
+              onPressed: widget.repository.can('mech.requests.manage')
+                  ? _openRegisterRequest
+                  : null,
               style: FilledButton.styleFrom(
                 minimumSize: const Size(0, 44),
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -127,6 +129,20 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
                 onSelected: () =>
                     setState(() => _status = OperationsRequestStatus.cancelled),
               ),
+              for (final status in [
+                OperationsRequestStatus.inProgress,
+                OperationsRequestStatus.paused,
+                OperationsRequestStatus.completed,
+                OperationsRequestStatus.verified,
+                OperationsRequestStatus.closed,
+                OperationsRequestStatus.flagged,
+              ])
+                _FilterChip(
+                  label:
+                      '${status.label} ${widget.repository.requestsByStatus(status).length}',
+                  selected: _status == status,
+                  onSelected: () => setState(() => _status = status),
+                ),
               _FilterChip(
                 label: 'All ${widget.repository.requests.length}',
                 selected: _status == null,
@@ -501,7 +517,15 @@ class OperationsRequestDetailScreen extends StatelessWidget {
     return AnimatedBuilder(
       animation: repository,
       builder: (context, _) {
-        final request = repository.requestById(requestId);
+        final request = repository.maybeRequestById(requestId);
+        if (request == null) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Request unavailable')),
+            body: const Center(
+              child: Text('This request is no longer available.'),
+            ),
+          );
+        }
         final requestNotes = _RequestNotes.parse(request.notes);
         return Scaffold(
           body: Stack(
@@ -636,8 +660,9 @@ class OperationsRequestDetailScreen extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 6),
                               ],
-                              if (request.status ==
-                                  OperationsRequestStatus.pending)
+                              if (repository.can('mech.requests.manage') &&
+                                  request.status ==
+                                      OperationsRequestStatus.pending)
                                 Wrap(
                                   spacing: 10,
                                   runSpacing: 10,
@@ -664,8 +689,9 @@ class OperationsRequestDetailScreen extends StatelessWidget {
                                     ),
                                   ],
                                 )
-                              else if (request.status ==
-                                  OperationsRequestStatus.approved)
+                              else if (repository.can('mech.jobs.manage') &&
+                                  request.status ==
+                                      OperationsRequestStatus.approved)
                                 Wrap(
                                   spacing: 10,
                                   runSpacing: 10,
@@ -686,8 +712,9 @@ class OperationsRequestDetailScreen extends StatelessWidget {
                                     ),
                                   ],
                                 )
-                              else if (request.status ==
-                                  OperationsRequestStatus.scheduled)
+                              else if (repository.can('mech.requests.manage') &&
+                                  request.status ==
+                                      OperationsRequestStatus.scheduled)
                                 Wrap(
                                   spacing: 10,
                                   runSpacing: 10,
@@ -1067,6 +1094,66 @@ class _RegisterRequestSheetState extends State<_RegisterRequestSheet> {
   String _window = 'morning';
   String _priority = 'normal';
   bool _submitting = false;
+  bool _loadingPickers = true;
+  bool _loadingPlots = false;
+  int _plotLoadVersion = 0;
+  String? _pickerError;
+  List<Map<String, Object?>> _serviceTypes = [];
+  List<Map<String, Object?>> _plots = [];
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadPickers());
+  }
+
+  Future<void> _loadPickers() async {
+    try {
+      await widget.repository.refreshFarmers();
+      final services = await widget.repository.serviceTypeOptions();
+      if (!mounted) return;
+      setState(() {
+        _serviceTypes = services;
+        _loadingPickers = false;
+        _pickerError = widget.repository.mechanizationSyncError;
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _pickerError = error.toString();
+          _loadingPickers = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _selectFarmer(String? farmerId) async {
+    final version = ++_plotLoadVersion;
+    setState(() {
+      _farmerIdController.text = farmerId ?? '';
+      _plotIdController.clear();
+      _plots = [];
+      _loadingPlots = true;
+      _pickerError = null;
+    });
+    try {
+      final plots = farmerId == null
+          ? <Map<String, Object?>>[]
+          : await widget.repository.farmerPlotOptions(farmerId);
+      if (!mounted || version != _plotLoadVersion) return;
+      setState(() {
+        _plots = plots;
+        _loadingPlots = false;
+      });
+    } catch (error) {
+      if (mounted && version == _plotLoadVersion) {
+        setState(() {
+          _pickerError = error.toString();
+          _loadingPlots = false;
+        });
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -1099,19 +1186,75 @@ class _RegisterRequestSheetState extends State<_RegisterRequestSheet> {
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 14),
-            TextField(
-              controller: _farmerIdController,
-              decoration: const InputDecoration(labelText: 'Farmer ID'),
+            if (_loadingPickers) const LinearProgressIndicator(),
+            if (_pickerError != null)
+              AppMessage(message: _pickerError!, type: AppMessageType.error),
+            DropdownButtonFormField<String>(
+              initialValue: _farmerIdController.text.isEmpty
+                  ? null
+                  : _farmerIdController.text,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Farmer'),
+              items: [
+                for (final farmer in widget.repository.farmers)
+                  DropdownMenuItem(
+                    value: farmer.id,
+                    child: Text(farmer.name, overflow: TextOverflow.ellipsis),
+                  ),
+              ],
+              onChanged: _loadingPickers || _submitting ? null : _selectFarmer,
             ),
             const SizedBox(height: 10),
-            TextField(
-              controller: _plotIdController,
-              decoration: const InputDecoration(labelText: 'Plot ID'),
+            if (_loadingPlots) const LinearProgressIndicator(),
+            DropdownButtonFormField<String>(
+              key: ValueKey(
+                'plots-${_farmerIdController.text}-$_plotLoadVersion',
+              ),
+              initialValue: _plotIdController.text.isEmpty
+                  ? null
+                  : _plotIdController.text,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Mapped plot'),
+              items: [
+                for (final plot in _plots)
+                  if (plot['mapped'] == true ||
+                      (plot['boundary'] is List &&
+                          (plot['boundary'] as List).length >= 3))
+                    DropdownMenuItem(
+                      value: plot['id'].toString(),
+                      child: Text(
+                        plot['name']?.toString() ?? 'Plot',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+              ],
+              onChanged: _loadingPlots || _submitting
+                  ? null
+                  : (value) =>
+                        setState(() => _plotIdController.text = value ?? ''),
             ),
             const SizedBox(height: 10),
-            TextField(
-              controller: _serviceTypeIdController,
-              decoration: const InputDecoration(labelText: 'Service type ID'),
+            DropdownButtonFormField<String>(
+              initialValue: _serviceTypeIdController.text.isEmpty
+                  ? null
+                  : _serviceTypeIdController.text,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Service'),
+              items: [
+                for (final service in _serviceTypes)
+                  DropdownMenuItem(
+                    value: service['id'].toString(),
+                    child: Text(
+                      service['name']?.toString() ?? service['code'].toString(),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+              onChanged: _loadingPickers || _submitting
+                  ? null
+                  : (value) => setState(
+                      () => _serviceTypeIdController.text = value ?? '',
+                    ),
             ),
             const SizedBox(height: 10),
             TextField(
@@ -1170,7 +1313,9 @@ class _RegisterRequestSheetState extends State<_RegisterRequestSheet> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: FilledButton(
-                    onPressed: _submitting ? null : _submit,
+                    onPressed: _submitting || _loadingPickers || _loadingPlots
+                        ? null
+                        : _submit,
                     child: Text(_submitting ? 'Registering...' : 'Register'),
                   ),
                 ),
@@ -1201,9 +1346,15 @@ class _RegisterRequestSheetState extends State<_RegisterRequestSheet> {
     if (farmerId.isEmpty ||
         plotId.isEmpty ||
         serviceTypeId.isEmpty ||
-        acres == null) {
+        acres == null ||
+        !acres.isFinite ||
+        acres <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Fill all required IDs and acres.')),
+        const SnackBar(
+          content: Text(
+            'Select a farmer, mapped plot and service, and enter positive acres.',
+          ),
+        ),
       );
       return;
     }

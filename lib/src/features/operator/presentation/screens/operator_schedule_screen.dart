@@ -26,7 +26,7 @@ class _OperatorScheduleScreenState extends State<OperatorScheduleScreen> {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final upcoming =
-        widget.repository.jobs
+        widget.repository.scheduleJobs
             .where((job) => !job.isComplete && !job.scheduledAt.isBefore(today))
             .toList()
           ..sort(
@@ -38,7 +38,7 @@ class _OperatorScheduleScreenState extends State<OperatorScheduleScreen> {
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
-    final jobs = widget.repository.jobs.toList()
+    final jobs = widget.repository.scheduleJobs.toList()
       ..sort(
         (first, second) => first.scheduledAt.compareTo(second.scheduledAt),
       );
@@ -100,14 +100,7 @@ class _OperatorScheduleScreenState extends State<OperatorScheduleScreen> {
               _OperatorCalendarBoard(
                 selectedDate: _selectedDate,
                 jobs: jobs,
-                onOpen: (job) => Navigator.of(context).push(
-                  appPageRoute(
-                    builder: (_) => OperatorJobDetailScreen(
-                      repository: widget.repository,
-                      jobId: job.id,
-                    ),
-                  ),
-                ),
+                onOpen: _openJob,
               ),
             ],
           ),
@@ -131,6 +124,29 @@ class _OperatorScheduleScreenState extends State<OperatorScheduleScreen> {
     );
     if (picked == null) return;
     setState(() => _selectedDate = picked);
+  }
+
+  Future<void> _openJob(OperatorJob job) async {
+    final loaded = await widget.repository.refreshJobDetail(job.id);
+    if (!mounted) return;
+    if (!loaded) {
+      showAppSnackBar(
+        context,
+        message:
+            widget.repository.lastActionError ??
+            'This assignment is no longer available. Refresh the schedule.',
+        type: AppSnackType.error,
+      );
+      return;
+    }
+    Navigator.of(context).push(
+      appPageRoute(
+        builder: (_) => OperatorJobDetailScreen(
+          repository: widget.repository,
+          jobId: job.id,
+        ),
+      ),
+    );
   }
 }
 
@@ -501,8 +517,13 @@ class _PositionedJobBlock extends StatelessWidget {
       OperatorJobStatus.enRoute => const Color(0xFFF97316),
       OperatorJobStatus.arrived => const Color(0xFF0EA5E9),
       OperatorJobStatus.inProgress => Theme.of(context).colorScheme.primary,
+      OperatorJobStatus.paused => const Color(0xFF7C3AED),
       OperatorJobStatus.completedPendingConfirmation => const Color(0xFF16A34A),
       OperatorJobStatus.scheduled => const Color(0xFF8B5CF6),
+      OperatorJobStatus.verified => const Color(0xFF059669),
+      OperatorJobStatus.closed => const Color(0xFF334155),
+      OperatorJobStatus.cancelled => const Color(0xFF94A3B8),
+      OperatorJobStatus.flagged => const Color(0xFFE11D48),
     };
   }
 

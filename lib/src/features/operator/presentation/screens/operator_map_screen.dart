@@ -14,7 +14,7 @@ class OperatorMapScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final jobs = repository.jobs.toList()..sort(_sortJobs);
+    final jobs = repository.dashboardJobs.toList()..sort(_sortJobs);
     final primaryJob = jobs.firstOrNull;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -118,12 +118,17 @@ class OperatorMapScreen extends StatelessWidget {
   int _statusPriority(OperatorJobStatus status) {
     return switch (status) {
       OperatorJobStatus.inProgress => 0,
-      OperatorJobStatus.arrived => 1,
-      OperatorJobStatus.enRoute => 2,
-      OperatorJobStatus.dispatched => 3,
-      OperatorJobStatus.assigned => 4,
-      OperatorJobStatus.scheduled => 5,
-      OperatorJobStatus.completedPendingConfirmation => 6,
+      OperatorJobStatus.paused => 1,
+      OperatorJobStatus.arrived => 2,
+      OperatorJobStatus.enRoute => 3,
+      OperatorJobStatus.dispatched => 4,
+      OperatorJobStatus.assigned => 5,
+      OperatorJobStatus.scheduled => 6,
+      OperatorJobStatus.flagged => 7,
+      OperatorJobStatus.completedPendingConfirmation ||
+      OperatorJobStatus.verified ||
+      OperatorJobStatus.closed ||
+      OperatorJobStatus.cancelled => 8,
     };
   }
 }

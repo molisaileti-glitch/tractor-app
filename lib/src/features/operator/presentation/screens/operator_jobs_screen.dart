@@ -25,21 +25,14 @@ class OperatorJobsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
     final displayName = repository.operatorName?.split(' ').first ?? 'Operator';
-    final now = DateTime.now();
-    final currentJobs = repository.jobs.where((job) {
-      if (job.isComplete) return false;
-      final activelyUnderway =
-          job.status == OperatorJobStatus.enRoute ||
-          job.status == OperatorJobStatus.arrived ||
-          job.status == OperatorJobStatus.inProgress;
-      final today = DateTime(now.year, now.month, now.day);
-      return activelyUnderway || !job.scheduledAt.isBefore(today);
-    }).toList()..sort(_sortJobs);
+    final dashboardJobs = repository.dashboardJobs;
+    final currentJobs = dashboardJobs.where((job) => !job.isComplete).toList()
+      ..sort(_sortJobs);
     final focusJob = currentJobs.firstOrNull;
-    final totalTodayJobs = repository.jobs
+    final totalTodayJobs = dashboardJobs
         .where((job) => _sameDate(job.scheduledAt, DateTime.now()))
         .length;
-    final activeCount = repository.jobs.where((job) => !job.isComplete).length;
+    final activeCount = dashboardJobs.where((job) => !job.isComplete).length;
     return RefreshIndicator(
       onRefresh: onRefresh,
       child: SingleChildScrollView(
@@ -74,7 +67,7 @@ class OperatorJobsScreen extends StatelessWidget {
                 _DashboardToolGrid(
                   children: [
                     _DashboardToolCard(
-                      value: '${repository.jobs.length}',
+                      value: '${dashboardJobs.length}',
                       label: strings.assignedJobs,
                       detail: strings.allAssignments,
                       icon: Icons.assignment_outlined,
@@ -98,7 +91,7 @@ class OperatorJobsScreen extends StatelessWidget {
                       iconColor: AppColors.tractorOrange,
                     ),
                     _DashboardToolCard(
-                      value: '${repository.history.length}',
+                      value: '${repository.completedJobs.length}',
                       label: strings.completed,
                       detail: strings.finishedJobs,
                       icon: Icons.task_alt_outlined,
@@ -133,6 +126,22 @@ class OperatorJobsScreen extends StatelessWidget {
                     emphasis: true,
                     onView: () => _openJob(context, focusJob),
                   ),
+                if (currentJobs.length > 1) ...[
+                  const SizedBox(height: 22),
+                  Text(
+                    strings.allAssignments.toUpperCase(),
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  for (final job in currentJobs.skip(1)) ...[
+                    const SizedBox(height: 12),
+                    _OperatorJobCard(
+                      job: job,
+                      onView: () => _openJob(context, job),
+                    ),
+                  ],
+                ],
               ],
             ),
           ),
@@ -159,16 +168,33 @@ class OperatorJobsScreen extends StatelessWidget {
   int _statusPriority(OperatorJobStatus status) {
     return switch (status) {
       OperatorJobStatus.inProgress => 0,
-      OperatorJobStatus.arrived => 1,
-      OperatorJobStatus.enRoute => 2,
-      OperatorJobStatus.dispatched => 3,
-      OperatorJobStatus.assigned => 4,
-      OperatorJobStatus.scheduled => 5,
-      OperatorJobStatus.completedPendingConfirmation => 6,
+      OperatorJobStatus.paused => 1,
+      OperatorJobStatus.arrived => 2,
+      OperatorJobStatus.enRoute => 3,
+      OperatorJobStatus.dispatched => 4,
+      OperatorJobStatus.assigned => 5,
+      OperatorJobStatus.scheduled => 6,
+      OperatorJobStatus.flagged => 7,
+      OperatorJobStatus.completedPendingConfirmation ||
+      OperatorJobStatus.verified ||
+      OperatorJobStatus.closed ||
+      OperatorJobStatus.cancelled => 8,
     };
   }
 
-  void _openJob(BuildContext context, OperatorJob job) {
+  Future<void> _openJob(BuildContext context, OperatorJob job) async {
+    final loaded = await repository.refreshJobDetail(job.id);
+    if (!context.mounted) return;
+    if (!loaded) {
+      showAppSnackBar(
+        context,
+        message:
+            repository.lastActionError ??
+            'This assignment is no longer available. Refresh your jobs.',
+        type: AppSnackType.error,
+      );
+      return;
+    }
     Navigator.of(context).push(
       appPageRoute(
         builder: (_) =>
@@ -491,11 +517,16 @@ class _OperatorJobCard extends StatelessWidget {
     return switch (status) {
       OperatorJobStatus.arrived => strings.openArrival,
       OperatorJobStatus.inProgress => strings.continueWork,
+      OperatorJobStatus.paused => 'Resume work',
       OperatorJobStatus.enRoute => strings.navigate,
       OperatorJobStatus.dispatched ||
       OperatorJobStatus.assigned ||
       OperatorJobStatus.scheduled => strings.openJob,
-      OperatorJobStatus.completedPendingConfirmation => strings.view,
+      OperatorJobStatus.completedPendingConfirmation ||
+      OperatorJobStatus.verified ||
+      OperatorJobStatus.closed ||
+      OperatorJobStatus.cancelled ||
+      OperatorJobStatus.flagged => strings.view,
     };
   }
 }

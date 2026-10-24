@@ -104,14 +104,19 @@ class _JobCard extends StatelessWidget {
   final UnionOperationsRepository repository;
   final OperationsJob job;
 
-  bool get _canDispatch => job.status == JobStatus.scheduled;
+  bool get _canDispatch =>
+      repository.can('mech.jobs.manage') && job.status == JobStatus.scheduled;
   bool get _canManage =>
-      job.status == JobStatus.scheduled ||
-      job.status == JobStatus.dispatched ||
-      job.status == JobStatus.enRoute ||
-      job.status == JobStatus.arrived ||
-      job.status == JobStatus.inProgress ||
-      job.status == JobStatus.flagged;
+      repository.can('mech.jobs.manage') &&
+      (job.status == JobStatus.scheduled ||
+          job.status == JobStatus.dispatched ||
+          job.status == JobStatus.enRoute ||
+          job.status == JobStatus.arrived ||
+          job.status == JobStatus.inProgress ||
+          job.status == JobStatus.paused ||
+          job.status == JobStatus.completedPendingConfirmation ||
+          job.status == JobStatus.verified ||
+          job.status == JobStatus.flagged);
 
   @override
   Widget build(BuildContext context) {
@@ -214,6 +219,19 @@ class _JobCard extends StatelessWidget {
                 ),
               ),
             ],
+            if (job.status == JobStatus.completedPendingConfirmation)
+              Text(
+                repository.requiresFarmerConfirmation &&
+                        job.farmerConfirmedAt == null
+                    ? 'Awaiting farmer confirmation from Shamba Bora.'
+                    : 'Ready for union verification.',
+              ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: () => _showEvidence(context),
+              icon: const Icon(Icons.insights_outlined),
+              label: const Text('Review work evidence'),
+            ),
             if (_canDispatch) ...[
               const SizedBox(height: 16),
               FilledButton.icon(
@@ -222,26 +240,22 @@ class _JobCard extends StatelessWidget {
                 label: const Text('Dispatch Job'),
               ),
             ],
-            if (job.status == JobStatus.completedPendingConfirmation) ...[
+            if (repository.can('mech.jobs.manage') &&
+                job.status == JobStatus.completedPendingConfirmation) ...[
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => _showVerifyDialog(context),
-                      icon: const Icon(Icons.verified_outlined),
-                      label: const Text('Verify'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () => _confirmClose(context),
-                      icon: const Icon(Icons.fact_check_outlined),
-                      label: const Text('Close'),
-                    ),
-                  ),
-                ],
+              OutlinedButton.icon(
+                onPressed: () => _showVerifyDialog(context),
+                icon: const Icon(Icons.verified_outlined),
+                label: const Text('Verify completed work'),
+              ),
+            ],
+            if (repository.can('mech.jobs.manage') &&
+                job.status == JobStatus.verified) ...[
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: () => _confirmClose(context),
+                icon: const Icon(Icons.fact_check_outlined),
+                label: const Text('Close verified job'),
               ),
             ],
           ],
@@ -261,52 +275,59 @@ class _JobCard extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ListTile(
-                leading: const Icon(Icons.event_repeat_outlined),
-                title: const Text('Reschedule'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).push(
-                    appPageRoute(
-                      builder: (_) => RescheduleJobScreen(
-                        repository: repository,
-                        jobId: job.id,
+              if (job.status == JobStatus.scheduled ||
+                  job.status == JobStatus.dispatched)
+                ListTile(
+                  leading: const Icon(Icons.event_repeat_outlined),
+                  title: const Text('Reschedule'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      appPageRoute(
+                        builder: (_) => RescheduleJobScreen(
+                          repository: repository,
+                          jobId: job.id,
+                        ),
                       ),
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.north_east),
-                title: const Text('Dispatch / reassign'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _confirmDispatch(context);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.insights_outlined),
-                title: const Text('Refresh verification'),
-                onTap: () async {
-                  Navigator.of(context).pop();
-                  await repository.refreshJobVerification(job.id);
-                  if (!context.mounted) return;
-                  await _showActionResult(
-                    context,
-                    successTitle: 'Verification refreshed',
-                    successMessage:
-                        'The latest verification details are now shown on this job.',
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.phone_in_talk_outlined),
-                title: const Text('Manual farmer confirm'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _showConfirmDialog(context);
-                },
-              ),
+                    );
+                  },
+                ),
+              if (job.status == JobStatus.scheduled)
+                ListTile(
+                  leading: const Icon(Icons.north_east),
+                  title: const Text('Dispatch'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _confirmDispatch(context);
+                  },
+                ),
+              if (job.status == JobStatus.completedPendingConfirmation ||
+                  job.status == JobStatus.verified)
+                ListTile(
+                  leading: const Icon(Icons.insights_outlined),
+                  title: const Text('Refresh verification'),
+                  onTap: () async {
+                    Navigator.of(context).pop();
+                    await repository.refreshJobVerification(job.id);
+                    if (!context.mounted) return;
+                    await _showActionResult(
+                      context,
+                      successTitle: 'Verification refreshed',
+                      successMessage:
+                          'The latest verification details are now shown on this job.',
+                    );
+                  },
+                ),
+              if (job.status == JobStatus.completedPendingConfirmation ||
+                  job.status == JobStatus.verified)
+                ListTile(
+                  leading: const Icon(Icons.phone_in_talk_outlined),
+                  title: const Text('Manual farmer confirm'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _showConfirmDialog(context);
+                  },
+                ),
               ListTile(
                 leading: const Icon(Icons.flag_outlined),
                 title: Text(
@@ -321,28 +342,38 @@ class _JobCard extends StatelessWidget {
                   }
                 },
               ),
-              ListTile(
-                leading: const Icon(Icons.task_alt_outlined),
-                title: const Text('Close as paid'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _confirmClose(context);
-                },
-              ),
-              ListTile(
-                leading: Icon(
-                  Icons.cancel_outlined,
-                  color: Theme.of(context).colorScheme.error,
+              if (job.status == JobStatus.verified)
+                ListTile(
+                  leading: const Icon(Icons.task_alt_outlined),
+                  title: const Text('Close job'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _confirmClose(context);
+                  },
                 ),
-                title: Text(
-                  'Cancel Job',
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+              if (job.status == JobStatus.scheduled ||
+                  job.status == JobStatus.dispatched ||
+                  job.status == JobStatus.enRoute ||
+                  job.status == JobStatus.arrived ||
+                  job.status == JobStatus.inProgress ||
+                  job.status == JobStatus.paused ||
+                  job.status == JobStatus.completedPendingConfirmation)
+                ListTile(
+                  leading: Icon(
+                    Icons.cancel_outlined,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  title: Text(
+                    'Cancel Job',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _confirmCancel(context);
+                  },
                 ),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _confirmCancel(context);
-                },
-              ),
             ],
           ),
         ),
@@ -370,20 +401,48 @@ class _JobCard extends StatelessWidget {
   }
 
   Future<void> _confirmClose(BuildContext context) async {
-    final confirmed = await showAppConfirmationDialog(
-      context,
-      title: 'Close this job?',
-      message:
-          'Closing finalizes the job as paid. Confirm that verification and farmer confirmation are complete.',
-      confirmLabel: 'Close Job',
+    var payment =
+        ['unpaid', 'deposit', 'paid', 'waived'].contains(job.paymentStatus)
+        ? job.paymentStatus!
+        : 'unpaid';
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, update) => AlertDialog(
+          title: const Text('Close verified job'),
+          content: DropdownButtonFormField<String>(
+            initialValue: payment,
+            decoration: const InputDecoration(
+              labelText: 'Actual payment status',
+            ),
+            items: [
+              for (final value in ['unpaid', 'deposit', 'paid', 'waived'])
+                DropdownMenuItem(value: value, child: Text(value)),
+            ],
+            onChanged: (value) {
+              if (value != null) update(() => payment = value);
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, payment),
+              child: const Text('Close job'),
+            ),
+          ],
+        ),
+      ),
     );
-    if (!confirmed) return;
-    await repository.closeJob(job.id);
+    if (selected == null || !context.mounted) return;
+    await repository.closeJob(job.id, paymentStatus: selected);
     if (!context.mounted) return;
     await _showActionResult(
       context,
       successTitle: 'Job closed',
-      successMessage: 'The job has been finalized and moved to closed records.',
+      successMessage: 'Job finalised with payment status: $selected.',
     );
   }
 
@@ -509,40 +568,146 @@ class _JobCard extends StatelessWidget {
     }
   }
 
+  Future<void> _showEvidence(BuildContext context) async {
+    await repository.refreshJobDetail(job.id);
+    if (!context.mounted) return;
+    final detail = repository.maybeJobById(job.id);
+    if (detail == null) return;
+    if (repository.mechanizationActionError != null) {
+      await showAppErrorDialog(
+        context,
+        title: 'Could not load job',
+        message: repository.mechanizationActionError!,
+      );
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Work evidence'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Reported acres: ${detail.reportedAcres ?? 'Not supplied'}'),
+              Text('Verified acres: ${detail.verifiedAcres ?? 'Not verified'}'),
+              Text(
+                'Farmer: ${detail.farmerConfirmedAt == null ? 'Awaiting confirmation' : 'Confirmed'}',
+              ),
+              Text('Payment: ${detail.paymentStatus ?? 'Not supplied'}'),
+              if (detail.amount != null)
+                Text('Amount: ${detail.currency ?? ''} ${detail.amount}'),
+              const Divider(),
+              if (detail.verification.isEmpty)
+                const Text('No tracker analysis is available yet.'),
+              Text(
+                'Tracker estimate: ${detail.verification['est_acres'] ?? 'Not available'} acres',
+              ),
+              Text(
+                'Work inside plot: ${detail.verification['inside_pct'] ?? 'Not available'}%',
+              ),
+              Text(
+                'Trail samples: ${detail.verification['points'] ?? 'Not available'}',
+              ),
+              if (detail.verification['work_seconds'] is num)
+                Text(
+                  'Recorded work: ${((detail.verification['work_seconds'] as num) / 60).toStringAsFixed(0)} minutes',
+                ),
+              if (detail.verification['inside_distance_m'] is num)
+                Text(
+                  'Distance worked inside plot: ${((detail.verification['inside_distance_m'] as num) / 1000).toStringAsFixed(2)} km',
+                ),
+              Text(
+                'Evidence score: ${detail.verification['score'] ?? 'Not available'}',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _showVerifyDialog(BuildContext context) async {
+    await repository.refreshJobDetail(job.id);
+    if (!context.mounted) return;
+    if (repository.mechanizationActionError != null) {
+      await showAppErrorDialog(
+        context,
+        title: 'Could not load evidence',
+        message: repository.mechanizationActionError!,
+      );
+      return;
+    }
+    final detail = repository.maybeJobById(job.id);
+    if (detail == null) return;
+    if (repository.requiresFarmerConfirmation &&
+        detail.farmerConfirmedAt == null) {
+      await showAppErrorDialog(
+        context,
+        title: 'Farmer confirmation required',
+        message:
+            'Wait for the farmer to confirm in Shamba Bora, then refresh this job. An authorised union officer may also record a confirmation received by phone or at the office.',
+      );
+      return;
+    }
     final acresController = TextEditingController(
-      text: (job.plot.areaHectares / 0.404686).toStringAsFixed(2),
+      text:
+          (detail.reportedAcres ??
+                  detail.verification['est_acres'] as num? ??
+                  0)
+              .toStringAsFixed(2),
     );
     final noteController = TextEditingController();
     final input = await showDialog<_VerifyJobInput>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Verify Job'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: acresController,
-              autofocus: true,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Reported: ${detail.reportedAcres ?? 'Not supplied'} acres'),
+              Text(
+                'Tracker estimate: ${detail.verification['est_acres'] ?? 'Not available'} acres',
               ),
-              decoration: const InputDecoration(
-                labelText: 'Verified acres',
-                hintText: '4.5',
+              Text(
+                'Inside plot: ${detail.verification['inside_pct'] ?? 'Not available'}%',
               ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: noteController,
-              decoration: const InputDecoration(
-                labelText: 'Note',
-                hintText: 'Add verification note',
+              Text(
+                'Farmer confirmation: ${detail.farmerConfirmedAt == null ? 'Not recorded' : formatDateTime(detail.farmerConfirmedAt!)}',
               ),
-              minLines: 2,
-              maxLines: 3,
-            ),
-          ],
+              const SizedBox(height: 12),
+              TextField(
+                controller: acresController,
+                autofocus: true,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Verified acres',
+                  hintText: '4.5',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: noteController,
+                decoration: const InputDecoration(
+                  labelText: 'Note',
+                  hintText: 'Add verification note',
+                ),
+                minLines: 2,
+                maxLines: 3,
+              ),
+            ],
+          ),
         ),
         actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
         actions: [
@@ -550,7 +715,7 @@ class _JobCard extends StatelessWidget {
             onCancel: () => Navigator.of(context).pop(),
             onConfirm: () {
               final acres = num.tryParse(acresController.text.trim());
-              if (acres == null || acres <= 0) return;
+              if (acres == null || !acres.isFinite || acres <= 0) return;
               Navigator.of(context).pop(
                 _VerifyJobInput(
                   verifiedAcres: acres,
@@ -585,7 +750,7 @@ class _JobCard extends StatelessWidget {
       context,
       successTitle: 'Job verified',
       successMessage:
-          'The verified acreage has been saved. Complete any required confirmation before closing the job.',
+          'The verified acreage has been saved. The job can now be closed with its actual payment status.',
     );
   }
 
@@ -746,12 +911,22 @@ class _RescheduleJobScreenState extends State<RescheduleJobScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedAt = widget.repository.jobById(widget.jobId).scheduledAt;
+    _selectedAt =
+        widget.repository.maybeJobById(widget.jobId)?.scheduledAt ??
+        DateTime.now();
   }
 
   @override
   Widget build(BuildContext context) {
-    final job = widget.repository.jobById(widget.jobId);
+    final job = widget.repository.maybeJobById(widget.jobId);
+    if (job == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Job unavailable')),
+        body: const Center(
+          child: Text('This assignment is no longer available.'),
+        ),
+      );
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('Reschedule Job'),

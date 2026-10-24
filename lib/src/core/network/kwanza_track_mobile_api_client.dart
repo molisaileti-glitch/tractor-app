@@ -7,11 +7,19 @@ import 'package:flutter/foundation.dart';
 import '../constants/kwanza_track_endpoints.dart';
 
 class KwanzaTrackApiException implements Exception {
-  const KwanzaTrackApiException(this.message, {this.code, this.statusCode});
+  const KwanzaTrackApiException(
+    this.message, {
+    this.code,
+    this.statusCode,
+    this.errors = const {},
+    this.retryAfter,
+  });
 
   final String message;
   final String? code;
   final int? statusCode;
+  final Map<String, Object?> errors;
+  final Duration? retryAfter;
 
   bool get isSessionExpired =>
       statusCode == 401 ||
@@ -31,8 +39,9 @@ class KwanzaTrackMobileApiClient {
     this.apiPrefix = '/api/v1/mech',
   });
 
-  static FutureOr<void> Function()? onUnauthorized;
+  static FutureOr<void> Function(String token)? onUnauthorized;
   static int _requestSequence = 0;
+  static final Map<String, DateTime> _retryNotBefore = {};
 
   final String baseUrl;
   final String apiPrefix;
@@ -490,6 +499,7 @@ class KwanzaTrackMobileApiClient {
     return _get(
       '/requests',
       token: token,
+      operation: 'service requests list',
       query: {
         'status': status,
         'farmer_id': farmerId,
@@ -503,7 +513,11 @@ class KwanzaTrackMobileApiClient {
     required String token,
     required String requestId,
   }) {
-    return _get('/requests/$requestId', token: token);
+    return _get(
+      '/requests/$requestId',
+      token: token,
+      operation: 'service request detail',
+    );
   }
 
   Future<Map<String, Object?>> createRequest({
@@ -520,6 +534,7 @@ class KwanzaTrackMobileApiClient {
     return _post(
       '/requests',
       token: token,
+      operation: 'register service request',
       body: {
         'farmer_id': farmerId,
         'plot_id': plotId,
@@ -543,6 +558,7 @@ class KwanzaTrackMobileApiClient {
     return _post(
       '/requests/$requestId/approve',
       token: token,
+      operation: 'approve service request',
       body: {
         'estimate_amount': estimateAmount,
         'priority': priority,
@@ -736,7 +752,11 @@ class KwanzaTrackMobileApiClient {
   }
 
   Future<Map<String, Object?>> serviceTypes({required String token}) {
-    return _get('/service-types', token: token);
+    return _get(
+      '/service-types',
+      token: token,
+      operation: 'service types list',
+    );
   }
 
   Future<Map<String, Object?>> unions({required String token}) {
@@ -760,16 +780,18 @@ class KwanzaTrackMobileApiClient {
     String path, {
     required String token,
     Map<String, Object?>? query,
+    String? operation,
   }) {
-    return _send('GET', path, token: token, query: query);
+    return _send('GET', path, token: token, query: query, operation: operation);
   }
 
   Future<Map<String, Object?>> _post(
     String path, {
     required String token,
     Map<String, Object?> body = const {},
+    String? operation,
   }) {
-    return _send('POST', path, token: token, body: body);
+    return _send('POST', path, token: token, body: body, operation: operation);
   }
 
   Future<Map<String, Object?>> _put(
@@ -786,13 +808,27 @@ class KwanzaTrackMobileApiClient {
     required String token,
     Map<String, Object?>? body,
     Map<String, Object?>? query,
+    String? operation,
   }) async {
+    final retryAt = _retryNotBefore[token];
+    if (retryAt != null && retryAt.isAfter(DateTime.now())) {
+      final remaining = retryAt.difference(DateTime.now());
+      throw KwanzaTrackApiException(
+        'Please wait ${remaining.inSeconds + 1} seconds before trying again.',
+        statusCode: 429,
+        retryAfter: remaining,
+      );
+    }
+    _retryNotBefore.remove(token);
     final requestId = ++_requestSequence;
     final stopwatch = Stopwatch()..start();
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 10);
     try {
       final uri = _uri(path, query);
+      if (operation != null) {
+        _log(requestId, 'operation: $operation');
+      }
       _log(requestId, '--> $method $uri');
       if (body != null) {
         _logJson(requestId, 'request body', _cleanBody(body));
@@ -812,24 +848,47 @@ class KwanzaTrackMobileApiClient {
       final response = await request.close().timeout(
         const Duration(seconds: 15),
       );
-      final responseBody = await response.transform(utf8.decoder).join();
-      final decoded = responseBody.trim().isEmpty
-          ? <String, Object?>{}
-          : _map(jsonDecode(responseBody));
+      if (response.statusCode == 401 || response.statusCode == 419) {
+        await onUnauthorized?.call(token);
+      }
+      final responseBody = await response
+          .transform(utf8.decoder)
+          .join()
+          .timeout(const Duration(seconds: 15));
+      Map<String, Object?> decoded;
+      try {
+        decoded = responseBody.trim().isEmpty
+            ? <String, Object?>{}
+            : _map(jsonDecode(responseBody));
+      } on FormatException {
+        if (response.statusCode >= 200 && response.statusCode < 300) rethrow;
+        decoded = {};
+      }
+      final retrySeconds = int.tryParse(
+        response.headers.value('retry-after') ?? '',
+      );
+      if (response.statusCode == 429 &&
+          retrySeconds != null &&
+          retrySeconds > 0) {
+        _retryNotBefore[token] = DateTime.now().add(
+          Duration(seconds: retrySeconds),
+        );
+      }
       _log(
         requestId,
         '<-- HTTP ${response.statusCode} ${stopwatch.elapsedMilliseconds}ms',
       );
       _logJson(requestId, 'response body', decoded);
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        if (response.statusCode == 401 || response.statusCode == 419) {
-          await onUnauthorized?.call();
-        }
         throw KwanzaTrackApiException(
           decoded['message']?.toString() ??
               'Request failed with HTTP ${response.statusCode}.',
           code: decoded['code']?.toString(),
           statusCode: response.statusCode,
+          errors: _map(decoded['errors']),
+          retryAfter: retrySeconds == null
+              ? null
+              : Duration(seconds: retrySeconds),
         );
       }
       if (decoded['success'] == false) {
@@ -837,6 +896,10 @@ class KwanzaTrackMobileApiClient {
           decoded['message']?.toString() ?? 'Request failed.',
           code: decoded['code']?.toString(),
           statusCode: response.statusCode,
+          errors: _map(decoded['errors']),
+          retryAfter: retrySeconds == null
+              ? null
+              : Duration(seconds: retrySeconds),
         );
       }
       return decoded;
@@ -846,6 +909,10 @@ class KwanzaTrackMobileApiClient {
     } on SocketException catch (error) {
       _log(requestId, 'xx> socket error: $error');
       throw const KwanzaTrackApiException('Server is unreachable.');
+    } on HttpException {
+      throw const KwanzaTrackApiException(
+        'The server connection was interrupted. Please try again.',
+      );
     } on FormatException catch (error) {
       _log(requestId, 'xx> invalid JSON: $error');
       throw const KwanzaTrackApiException('Server returned invalid JSON.');

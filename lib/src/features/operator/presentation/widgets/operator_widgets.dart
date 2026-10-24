@@ -50,13 +50,18 @@ class OperatorStatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = switch (status) {
-      OperatorJobStatus.scheduled => AppColors.info,
+      OperatorJobStatus.scheduled => const Color(0xFF64748B),
       OperatorJobStatus.assigned => const Color(0xFF64748B),
-      OperatorJobStatus.dispatched => const Color(0xFF7B4BD2),
-      OperatorJobStatus.enRoute => const Color(0xFF7B4BD2),
+      OperatorJobStatus.dispatched => const Color(0xFFF59E0B),
+      OperatorJobStatus.enRoute => const Color(0xFFF97316),
       OperatorJobStatus.arrived => const Color(0xFF0EA5E9),
-      OperatorJobStatus.inProgress => AppColors.fieldGreen,
-      OperatorJobStatus.completedPendingConfirmation => AppColors.warning,
+      OperatorJobStatus.inProgress => const Color(0xFF2563EB),
+      OperatorJobStatus.paused => const Color(0xFF7C3AED),
+      OperatorJobStatus.completedPendingConfirmation => const Color(0xFF10B981),
+      OperatorJobStatus.verified => const Color(0xFF059669),
+      OperatorJobStatus.closed => const Color(0xFF334155),
+      OperatorJobStatus.cancelled => const Color(0xFF94A3B8),
+      OperatorJobStatus.flagged => const Color(0xFFE11D48),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -91,8 +96,13 @@ String localizedOperatorStatus(BuildContext context, OperatorJobStatus status) {
     OperatorJobStatus.enRoute => strings.enRoute,
     OperatorJobStatus.arrived => strings.arrived,
     OperatorJobStatus.inProgress => strings.jobInProgress,
+    OperatorJobStatus.paused => 'Paused',
     OperatorJobStatus.completedPendingConfirmation =>
       strings.completedPendingConfirmation,
+    OperatorJobStatus.verified => 'Verified',
+    OperatorJobStatus.closed => 'Closed',
+    OperatorJobStatus.cancelled => 'Cancelled',
+    OperatorJobStatus.flagged => 'Flagged',
   };
 }
 
@@ -589,16 +599,30 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
           patterns: [PatternItem.dash(12), PatternItem.gap(8)],
         ),
       for (final job in jobs)
-        if (widget.showTrack && job.trackPoints.length >= 2)
-          Polyline(
-            polylineId: PolylineId('track-${job.id}'),
-            points: [
-              for (final point in job.trackPoints)
-                LatLng(point.latitude, point.longitude),
-            ],
-            color: const Color(0xFF7B4BD2),
-            width: 5,
-          ),
+        if (widget.showTrack)
+          for (var index = 1; index < job.trackPoints.length; index++)
+            Polyline(
+              polylineId: PolylineId('track-${job.id}-$index'),
+              points: [
+                LatLng(
+                  job.trackPoints[index - 1].latitude,
+                  job.trackPoints[index - 1].longitude,
+                ),
+                LatLng(
+                  job.trackPoints[index].latitude,
+                  job.trackPoints[index].longitude,
+                ),
+              ],
+              color: job.trackPoints[index] is WorkTrackPoint
+                  ? ((job.trackPoints[index] as WorkTrackPoint).inside == true
+                        ? const Color(0xFF10B981)
+                        : (job.trackPoints[index] as WorkTrackPoint).inside ==
+                              false
+                        ? const Color(0xFFE11D48)
+                        : const Color(0xFF64748B))
+                  : const Color(0xFF64748B),
+              width: 5,
+            ),
     };
   }
 

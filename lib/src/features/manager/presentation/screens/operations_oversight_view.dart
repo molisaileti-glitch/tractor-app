@@ -238,7 +238,9 @@ class _OverrideCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final strings = AppLocalizations.of(context)!;
-    final isPending = item.status.toLowerCase() == 'pending';
+    final isPending =
+        item.status.toLowerCase() == 'pending' &&
+        repository.can('mech.override');
     return OperationsCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -394,8 +396,11 @@ class _ExceptionCard extends StatelessWidget {
     final theme = Theme.of(context);
     final strings = AppLocalizations.of(context)!;
     final status = item.status.toLowerCase();
-    final canAcknowledge = status == 'open';
-    final canResolve = status == 'open' || status == 'acknowledged';
+    final canAcknowledge =
+        repository.can('mech.exceptions.manage') && status == 'open';
+    final canResolve =
+        repository.can('mech.exceptions.manage') &&
+        (status == 'open' || status == 'acknowledged');
     return OperationsCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

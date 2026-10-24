@@ -11,23 +11,21 @@ class GeolocatorLocationRepository implements LocationRepository {
   Future<LocationResult> getCurrentLocation() async {
     final stopwatch = Stopwatch()..start();
     debugPrint('[GPS] Check started');
-    final permissionResult = await _ensurePermission();
-    if (permissionResult != null) {
-      debugPrint('[GPS] Check stopped: $permissionResult');
-      return LocationUnavailable(LocationFailure(permissionResult));
-    }
-
     try {
+      final permissionResult = await _ensurePermission();
+      if (permissionResult != null) {
+        return LocationUnavailable(LocationFailure(permissionResult));
+      }
       debugPrint(
         '[GPS] Requesting current position '
-        '(provider=platform default, accuracy=high, no timeout)',
+        '(provider=platform default, accuracy=high, timeout=20s)',
       );
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
           distanceFilter: 5,
         ),
-      );
+      ).timeout(const Duration(seconds: 20));
       debugPrint(
         '[GPS] Current position received after ${stopwatch.elapsedMilliseconds}ms: '
         '${position.latitude},${position.longitude}; '

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:animations/animations.dart';
 
@@ -29,8 +31,39 @@ class OperatorShell extends StatefulWidget {
   State<OperatorShell> createState() => _OperatorShellState();
 }
 
-class _OperatorShellState extends State<OperatorShell> {
+class _OperatorShellState extends State<OperatorShell>
+    with WidgetsBindingObserver {
   int _selectedIndex = 0;
+
+  Timer? _refreshTimer;
+  bool _foreground = true;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted &&
+          _foreground &&
+          (ModalRoute.of(context)?.isCurrent ?? false)) {
+        unawaited(widget.repository.refreshMechanizationData());
+      }
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+    if (_foreground && (ModalRoute.of(context)?.isCurrent ?? false)) {
+      unawaited(widget.repository.refreshMechanizationData());
+    }
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -87,7 +120,7 @@ class _OperatorShellState extends State<OperatorShell> {
                         fillColor: Theme.of(context).scaffoldBackgroundColor,
                         child: child,
                       ),
-              child: widget.repository.isSyncingMechanization
+              child: widget.repository.isInitialMechanizationLoad
                   ? const AppScreenSkeleton(key: ValueKey('loading'))
                   : KeyedSubtree(
                       key: ValueKey(_selectedIndex),

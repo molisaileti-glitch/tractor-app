@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../../additional_data/location/data/repositories/geolocator_location_repository.dart';
@@ -41,6 +43,53 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
   String? _locationError;
   final _hourMeterController = TextEditingController();
   String? _selectedImplement;
+  Timer? _readinessTimer;
+  bool _pollingReadiness = false;
+
+  bool get _hasInspection =>
+      _inspectionRecorded ||
+      widget.repository.inspectedToday(
+        widget.repository.maybeJobById(widget.jobId)?.tractorId ?? '',
+      );
+  bool get _readyForChecks =>
+      !widget.repository.requiresInspection || _hasInspection;
+
+  void _startReadinessPolling() {
+    _readinessTimer ??= Timer.periodic(
+      const Duration(seconds: 6),
+      (_) => unawaited(_refreshReadiness()),
+    );
+  }
+
+  Future<void> _refreshReadiness() async {
+    if (_pollingReadiness ||
+        _submittingStart ||
+        _runningStartCheck ||
+        !mounted) {
+      return;
+    }
+    _pollingReadiness = true;
+    try {
+      await widget.repository.refreshJobDetail(widget.jobId);
+      if (!mounted) return;
+      if ((_startCheck != null ||
+              _geofenceResult != null ||
+              !widget.repository.requiresPhoneLocation) &&
+          _readyForChecks) {
+        final phone = _geofenceResult == null
+            ? null
+            : await widget.repository.captureFieldLocation();
+        if (!mounted) return;
+        final result = await widget.repository.runStartCheck(
+          jobId: widget.jobId,
+          phone: phone,
+        );
+        if (mounted) setState(() => _startCheck = result);
+      }
+    } finally {
+      _pollingReadiness = false;
+    }
+  }
 
   @override
   void initState() {
@@ -48,16 +97,24 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
     WidgetsBinding.instance.addObserver(this);
     widget.repository.addListener(_repositoryChanged);
     widget.repository.startTrackerPolling();
+    final job = widget.repository.maybeJobById(widget.jobId);
+    if (job != null) {
+      unawaited(widget.repository.refreshInspection(job.tractorId));
+    }
+    _startReadinessPolling();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       widget.repository.startTrackerPolling();
+      _startReadinessPolling();
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.detached) {
       widget.repository.stopTrackerPolling();
+      _readinessTimer?.cancel();
+      _readinessTimer = null;
     }
   }
 
@@ -66,6 +123,7 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
     WidgetsBinding.instance.removeObserver(this);
     widget.repository.removeListener(_repositoryChanged);
     widget.repository.stopTrackerPolling();
+    _readinessTimer?.cancel();
     _hourMeterController.dispose();
     super.dispose();
   }
@@ -197,7 +255,7 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
                     ),
                   ),
                 ),
-                if (_geofenceResult != null && !hasArrived) ...[
+                if (!hasArrived) ...[
                   const SizedBox(height: 12),
                   _WorkflowStep(
                     number: 2,
@@ -226,27 +284,39 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
                     ),
                   ),
                 ],
-                if (hasArrived && _geofenceResult != null) ...[
+                if (job.startOverride != null) ...[
+                  const SizedBox(height: 12),
+                  AppMessage(
+                    message:
+                        'Start override: ${job.startOverride!.status}'
+                        '${job.startOverride!.status == 'approved' && !job.startOverride!.isUsable ? ' (expired)' : ''}'
+                        '${job.startOverride!.note == null ? '' : '\n${job.startOverride!.note}'}',
+                    type: job.usableOverrideId != null
+                        ? AppMessageType.info
+                        : AppMessageType.warning,
+                  ),
+                ],
+                if (hasArrived) ...[
                   const SizedBox(height: 12),
                   _WorkflowStep(
                     number: 2,
                     title: 'Inspect the tractor',
-                    complete: _inspectionRecorded,
+                    complete: _hasInspection,
                     child: OutlinedButton.icon(
-                      onPressed: _submittingInspection || _inspectionRecorded
+                      onPressed: _submittingInspection
                           ? null
                           : _recordInspection,
                       icon: const Icon(Icons.fact_check_outlined),
                       label: Text(
-                        _inspectionRecorded
-                            ? 'Inspection Recorded'
+                        _hasInspection
+                            ? "Update Today's Inspection"
                             : _submittingInspection
                             ? 'Recording inspection...'
                             : 'Record Inspection',
                       ),
                     ),
                   ),
-                  if (_inspectionRecorded) ...[
+                  if (_readyForChecks) ...[
                     const SizedBox(height: 12),
                     _WorkflowStep(
                       number: 3,
@@ -269,7 +339,9 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
                       ),
                     ),
                   ],
-                  if (_startCheck?.canStart ?? false) ...[
+                  if ((_startCheck?.canStart ?? false) ||
+                      (job.usableOverrideId != null &&
+                          (_startCheck?.overrideAllowed ?? false))) ...[
                     const SizedBox(height: 12),
                     _WorkflowStep(
                       number: 4,
@@ -290,7 +362,7 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
                           if (implementNames.isEmpty)
                             const AppMessage(
                               message:
-                                  'No implements are configured for this tractor. Ask the union officer to update the tractor before starting.',
+                                  'No implement is configured. The server will validate the service requirements when you start.',
                               type: AppMessageType.warning,
                             )
                           else
@@ -313,17 +385,12 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
                             ),
                           const SizedBox(height: 10),
                           FilledButton.icon(
-                            onPressed:
-                                _submittingStart ||
-                                    implementNames.isEmpty ||
-                                    _selectedImplement == null
-                                ? null
-                                : _startJob,
+                            onPressed: _submittingStart ? null : _startJob,
                             icon: const Icon(Icons.play_arrow),
                             label: Text(
                               _submittingStart
                                   ? 'Starting...'
-                                  : 'Start Ploughing',
+                                  : 'Start Service',
                             ),
                           ),
                         ],
@@ -444,7 +511,6 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
 
   Future<void> _startJob() async {
     final navigator = Navigator.of(context);
-    final location = _geofenceResult?.location;
     final hourMeter = num.tryParse(_hourMeterController.text.trim());
     final implement = _selectedImplement;
     final confirmed = await showAppConfirmationDialog(
@@ -456,14 +522,36 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
     );
     if (!confirmed || !mounted) return;
     setState(() => _submittingStart = true);
+    final location = await widget.repository.captureFieldLocation();
+    if (!mounted) return;
+    if (location == null &&
+        widget.repository.requiresPhoneLocation &&
+        widget.repository.maybeJobById(widget.jobId)?.usableOverrideId ==
+            null) {
+      setState(() => _submittingStart = false);
+      showAppSnackBar(
+        context,
+        message:
+            widget.repository.lastActionError ??
+            'Refresh phone GPS before starting.',
+        type: AppSnackType.error,
+      );
+      return;
+    }
     final started = await widget.repository.startJob(
       widget.jobId,
       phone: location,
       hourMeter: hourMeter,
       implement: implement,
+      overrideId: widget.repository
+          .maybeJobById(widget.jobId)
+          ?.usableOverrideId,
     );
     if (!mounted) return;
-    setState(() => _submittingStart = false);
+    setState(() {
+      _submittingStart = false;
+      _startCheck = widget.repository.startCheckFor(widget.jobId);
+    });
     if (!started) {
       showAppSnackBar(
         context,
@@ -486,9 +574,11 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
 
   Future<void> _runStartCheck() async {
     setState(() => _runningStartCheck = true);
+    final phone = await widget.repository.captureFieldLocation();
+    if (!mounted) return;
     final result = await widget.repository.runStartCheck(
       jobId: widget.jobId,
-      phone: _geofenceResult?.location,
+      phone: phone,
     );
     if (!mounted) return;
     setState(() {
@@ -557,7 +647,7 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
     showAppSnackBar(
       context,
       message: ok
-          ? 'Override request sent. Wait for the union decision, then run the start check again.'
+          ? 'Override requested. This screen will update when the union decides.'
           : widget.repository.lastActionError ?? 'Could not request override.',
       type: ok ? AppSnackType.success : AppSnackType.error,
     );
@@ -568,7 +658,8 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
     if (job == null) return;
     final inspection = await showDialog<_InspectionPayload>(
       context: context,
-      builder: (_) => const _InspectionDialog(),
+      builder: (_) =>
+          _InspectionDialog(checklist: widget.repository.inspectionChecklist),
     );
     if (inspection == null) return;
     if (!mounted) return;
@@ -685,7 +776,9 @@ class _InspectionPayload {
 }
 
 class _InspectionDialog extends StatefulWidget {
-  const _InspectionDialog();
+  const _InspectionDialog({required this.checklist});
+
+  final Map<String, String> checklist;
 
   @override
   State<_InspectionDialog> createState() => _InspectionDialogState();
@@ -696,18 +789,29 @@ class _InspectionDialogState extends State<_InspectionDialog> {
   final _hourMeterController = TextEditingController();
   final _defectsController = TextEditingController();
   bool _showChecklistError = false;
-  final Map<String, bool?> _checks = {
-    'engine_oil': null,
-    'coolant': null,
-    'fuel': null,
-    'tyres': null,
-    'brakes': null,
-    'lights': null,
-    'hydraulics': null,
-    'implement': null,
-    'leaks': null,
-    'tracker': null,
+  late final Map<String, bool?> _checks;
+
+  static const _fallbackChecklist = <String, String>{
+    'engine_oil': 'Engine oil',
+    'coolant': 'Coolant',
+    'fuel': 'Fuel',
+    'tyres': 'Tyres',
+    'brakes': 'Brakes',
+    'lights': 'Lights',
+    'hydraulics': 'Hydraulics',
+    'implement': 'Implement attached',
+    'leaks': 'No leaks',
+    'tracker': 'Tracker',
   };
+
+  Map<String, String> get _checklist =>
+      widget.checklist.isEmpty ? _fallbackChecklist : widget.checklist;
+
+  @override
+  void initState() {
+    super.initState();
+    _checks = {for (final key in _checklist.keys) key: null};
+  }
 
   @override
   void dispose() {
@@ -746,7 +850,7 @@ class _InspectionDialogState extends State<_InspectionDialog> {
               const SizedBox(height: 12),
               ..._checks.keys.map(
                 (key) => _InspectionCheckRow(
-                  label: _checkLabel(key),
+                  label: _checklist[key] ?? key,
                   value: _checks[key],
                   onChanged: (value) {
                     setState(() {
@@ -859,22 +963,6 @@ class _InspectionDialogState extends State<_InspectionDialog> {
   }
 
   bool get _isFit => _checks.values.every((value) => value == true);
-
-  String _checkLabel(String key) {
-    return switch (key) {
-      'engine_oil' => 'Engine oil',
-      'coolant' => 'Coolant',
-      'fuel' => 'Fuel',
-      'tyres' => 'Tyres',
-      'brakes' => 'Brakes',
-      'lights' => 'Lights',
-      'hydraulics' => 'Hydraulics',
-      'implement' => 'Implement attached',
-      'leaks' => 'No leaks',
-      'tracker' => 'Tracker',
-      _ => key,
-    };
-  }
 }
 
 class _InspectionCheckRow extends StatelessWidget {

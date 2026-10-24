@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../../components/components.dart';
@@ -49,7 +51,8 @@ class OperationsShell extends StatefulWidget {
   State<OperationsShell> createState() => _OperationsShellState();
 }
 
-class _OperationsShellState extends State<OperationsShell> {
+class _OperationsShellState extends State<OperationsShell>
+    with WidgetsBindingObserver {
   static const _primarySections = <OperationsSection>[
     OperationsSection.dashboard,
     OperationsSection.requests,
@@ -69,6 +72,36 @@ class _OperationsShellState extends State<OperationsShell> {
 
   OperationsSection _section = OperationsSection.dashboard;
   int _lastPrimaryIndex = 0;
+
+  Timer? _refreshTimer;
+  bool _foreground = true;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted &&
+          _foreground &&
+          (ModalRoute.of(context)?.isCurrent ?? false)) {
+        unawaited(widget.repository.refreshMechanizationData());
+      }
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+    if (_foreground && (ModalRoute.of(context)?.isCurrent ?? false)) {
+      unawaited(widget.repository.refreshMechanizationData());
+    }
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -138,11 +171,9 @@ class _OperationsShellState extends State<OperationsShell> {
                       ),
                       switchInCurve: Curves.easeOutCubic,
                       switchOutCurve: Curves.easeInCubic,
-                      transitionBuilder: (child, animation) => FadeTransition(
-                        opacity: animation,
-                        child: child,
-                      ),
-                      child: widget.repository.isSyncingMechanization
+                      transitionBuilder: (child, animation) =>
+                          FadeTransition(opacity: animation, child: child),
+                      child: widget.repository.isInitialMechanizationLoad
                           ? const AppScreenSkeleton(key: ValueKey('loading'))
                           : RefreshIndicator(
                               key: ValueKey(_section),
@@ -161,7 +192,25 @@ class _OperationsShellState extends State<OperationsShell> {
                                     constraints: const BoxConstraints(
                                       maxWidth: 1180,
                                     ),
-                                    child: _currentView(),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        if (widget
+                                                .repository
+                                                .mechanizationSyncError !=
+                                            null) ...[
+                                          AppMessage(
+                                            message: widget
+                                                .repository
+                                                .mechanizationSyncError!,
+                                            type: AppMessageType.warning,
+                                          ),
+                                          const SizedBox(height: 12),
+                                        ],
+                                        _currentView(),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),

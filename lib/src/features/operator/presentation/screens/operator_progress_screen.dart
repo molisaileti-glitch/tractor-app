@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../../components/components.dart';
@@ -7,7 +9,7 @@ import '../../domain/entities/operator_job.dart';
 import '../widgets/operator_widgets.dart';
 import 'operator_complete_job_screen.dart';
 
-class OperatorProgressScreen extends StatelessWidget {
+class OperatorProgressScreen extends StatefulWidget {
   const OperatorProgressScreen({
     super.key,
     required this.repository,
@@ -18,11 +20,82 @@ class OperatorProgressScreen extends StatelessWidget {
   final String jobId;
 
   @override
+  State<OperatorProgressScreen> createState() => _OperatorProgressScreenState();
+}
+
+class _OperatorProgressScreenState extends State<OperatorProgressScreen>
+    with WidgetsBindingObserver {
+  OperatorLocalRepository get repository => widget.repository;
+  String get jobId => widget.jobId;
+  Timer? _clock;
+  Timer? _refresh;
+  bool _refreshing = false;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    repository.addListener(_changed);
+    _startTimers();
+  }
+
+  void _changed() {
+    if (mounted) setState(() {});
+  }
+
+  void _startTimers() {
+    _clock ??= Timer.periodic(const Duration(seconds: 1), (_) => _changed());
+    _refresh ??= Timer.periodic(
+      const Duration(seconds: 12),
+      (_) => unawaited(_refreshWork()),
+    );
+    unawaited(_refreshWork());
+  }
+
+  Future<void> _refreshWork() async {
+    if (_refreshing || _busy) return;
+    _refreshing = true;
+    try {
+      await repository.refreshWorkProgress(jobId);
+    } finally {
+      _refreshing = false;
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startTimers();
+    } else {
+      _clock?.cancel();
+      _refresh?.cancel();
+      _clock = null;
+      _refresh = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    repository.removeListener(_changed);
+    _clock?.cancel();
+    _refresh?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final job = repository.jobById(jobId);
-    final duration = job.startedAt == null
-        ? null
-        : (job.finishedAt ?? DateTime.now()).difference(job.startedAt!);
+    final job = repository.maybeJobById(jobId);
+    if (job == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Job unavailable')),
+        body: const Center(
+          child: Text('This assignment is no longer available.'),
+        ),
+      );
+    }
+    final duration = job.workDuration;
     return Scaffold(
       appBar: AppBar(title: Text(job.serviceType.label.toUpperCase())),
       body: SingleChildScrollView(
@@ -62,28 +135,38 @@ class OperatorProgressScreen extends StatelessWidget {
                 const SizedBox(height: 14),
                 OperatorMapCard(job: job, showTrack: true, label: 'WORK TRACK'),
                 const SizedBox(height: 14),
-                const OperatorCard(
+                OperatorCard(
                   child: Row(
                     children: [
-                      Icon(Icons.gps_fixed),
-                      SizedBox(width: 12),
-                      Expanded(child: Text('Current location verified')),
+                      const Icon(Icons.gps_fixed),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          job.geofenceVerified
+                              ? 'Start location verified'
+                              : 'Start location was not geofence verified',
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 14),
-                OutlinedButton.icon(
-                  onPressed: () => _pause(context, job),
-                  icon: const Icon(Icons.pause_circle_outline),
-                  label: const Text('Pause'),
-                ),
-                const SizedBox(height: 10),
-                OutlinedButton.icon(
-                  onPressed: () => _resume(context, job),
-                  icon: const Icon(Icons.play_circle_outline),
-                  label: const Text('Resume'),
-                ),
-                const SizedBox(height: 10),
+                if (job.status == OperatorJobStatus.inProgress) ...[
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : () => _pause(context, job),
+                    icon: const Icon(Icons.pause_circle_outline),
+                    label: const Text('Pause'),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+                if (job.status == OperatorJobStatus.paused) ...[
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : () => _resume(context, job),
+                    icon: const Icon(Icons.play_circle_outline),
+                    label: const Text('Resume'),
+                  ),
+                  const SizedBox(height: 10),
+                ],
                 OutlinedButton.icon(
                   onPressed: () => _showProblemDialog(context, job),
                   icon: const Icon(Icons.report_problem_outlined),
@@ -91,14 +174,19 @@ class OperatorProgressScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 FilledButton.icon(
-                  onPressed: () => Navigator.of(context).push(
-                    appPageRoute(
-                      builder: (_) => OperatorCompleteJobScreen(
-                        repository: repository,
-                        jobId: job.id,
-                      ),
-                    ),
-                  ),
+                  onPressed:
+                      _busy ||
+                          (job.status != OperatorJobStatus.inProgress &&
+                              job.status != OperatorJobStatus.paused)
+                      ? null
+                      : () => Navigator.of(context).push(
+                          appPageRoute(
+                            builder: (_) => OperatorCompleteJobScreen(
+                              repository: repository,
+                              jobId: job.id,
+                            ),
+                          ),
+                        ),
                   icon: const Icon(Icons.stop_circle_outlined),
                   label: const Text('End Job'),
                 ),
@@ -125,7 +213,14 @@ class OperatorProgressScreen extends StatelessWidget {
       confirmLabel: 'Pause',
     );
     if (!confirmed || !context.mounted) return;
-    final ok = await repository.pauseJob(jobId: job.id, reason: 'Paused');
+    setState(() => _busy = true);
+    final phone = await repository.captureFieldLocation();
+    final ok = await repository.pauseJob(
+      jobId: job.id,
+      reason: 'Paused',
+      phone: phone,
+    );
+    if (mounted) setState(() => _busy = false);
     if (!context.mounted) return;
     showAppSnackBar(
       context,
@@ -144,7 +239,10 @@ class OperatorProgressScreen extends StatelessWidget {
       confirmLabel: 'Resume',
     );
     if (!confirmed || !context.mounted) return;
-    final ok = await repository.resumeJob(job.id);
+    setState(() => _busy = true);
+    final phone = await repository.captureFieldLocation();
+    final ok = await repository.resumeJob(job.id, phone: phone);
+    if (mounted) setState(() => _busy = false);
     if (!context.mounted) return;
     showAppSnackBar(
       context,

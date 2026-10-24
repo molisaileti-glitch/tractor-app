@@ -23,7 +23,15 @@ class OperatorJobDetailScreen extends StatelessWidget {
     return AnimatedBuilder(
       animation: repository,
       builder: (context, _) {
-        final job = repository.jobById(jobId);
+        final job = repository.maybeJobById(jobId);
+        if (job == null) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Job unavailable')),
+            body: const Center(
+              child: Text('This assignment is no longer available.'),
+            ),
+          );
+        }
         return Scaffold(
           body: Stack(
             children: [
@@ -90,7 +98,8 @@ class OperatorJobDetailScreen extends StatelessWidget {
       _acceptAssignment(context, job);
       return;
     }
-    if (job.status == OperatorJobStatus.inProgress) {
+    if (job.status == OperatorJobStatus.inProgress ||
+        job.status == OperatorJobStatus.paused) {
       Navigator.of(context).push(
         appPageRoute(
           builder: (_) =>
@@ -109,7 +118,19 @@ class OperatorJobDetailScreen extends StatelessWidget {
       );
       return;
     }
-    _startJourney(context, job);
+    if (job.status == OperatorJobStatus.dispatched ||
+        job.status == OperatorJobStatus.assigned) {
+      _startJourney(context, job);
+      return;
+    }
+    if (job.status == OperatorJobStatus.scheduled) {
+      showAppSnackBar(
+        context,
+        message:
+            'This job is scheduled but has not been dispatched. It will become actionable after operations dispatches it.',
+        type: AppSnackType.info,
+      );
+    }
   }
 
   Future<void> _acceptAssignment(BuildContext context, OperatorJob job) async {
@@ -121,7 +142,8 @@ class OperatorJobDetailScreen extends StatelessWidget {
       confirmLabel: 'Accept',
     );
     if (!confirmed || !context.mounted) return;
-    final ok = await repository.acceptAssignment(job.id);
+    final phone = await repository.captureFieldLocation();
+    final ok = await repository.acceptAssignment(job.id, phone: phone);
     if (!context.mounted) return;
     showAppSnackBar(
       context,
@@ -142,7 +164,8 @@ class OperatorJobDetailScreen extends StatelessWidget {
     );
     if (!confirmed || !context.mounted) return;
     final navigator = Navigator.of(context);
-    final ok = await repository.startJourney(job.id);
+    final phone = await repository.captureFieldLocation();
+    final ok = await repository.startJourney(job.id, phone: phone);
     if (!context.mounted) return;
     if (!ok) {
       showAppSnackBar(
@@ -319,8 +342,13 @@ class _JobActionSheet extends StatelessWidget {
       OperatorJobStatus.enRoute => 'Record Arrival',
       OperatorJobStatus.arrived => 'Start Work',
       OperatorJobStatus.inProgress => 'Continue Work',
-      OperatorJobStatus.scheduled => 'Open Job',
-      OperatorJobStatus.completedPendingConfirmation => 'View Job',
+      OperatorJobStatus.paused => 'Resume Work',
+      OperatorJobStatus.scheduled => 'Awaiting Dispatch',
+      OperatorJobStatus.completedPendingConfirmation ||
+      OperatorJobStatus.verified ||
+      OperatorJobStatus.closed ||
+      OperatorJobStatus.cancelled ||
+      OperatorJobStatus.flagged => 'View Job',
     };
   }
 }

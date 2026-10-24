@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'core/network/kwanza_track_mobile_api_client.dart';
 import 'components/components.dart';
@@ -65,6 +67,11 @@ class _TractorAppState extends State<TractorApp> {
     if (KwanzaTrackMobileApiClient.onUnauthorized == _handleSessionExpired) {
       KwanzaTrackMobileApiClient.onUnauthorized = null;
     }
+    operationsRepository.dispose();
+    operatorRepository.dispose();
+    authRepository.dispose();
+    farmerRepository.dispose();
+    technicianRepository.dispose();
     preferences.dispose();
     super.dispose();
   }
@@ -167,6 +174,8 @@ class _TractorAppState extends State<TractorApp> {
   }
 
   Future<void> _logout() async {
+    _navigatorKey.currentState?.popUntil((route) => route.isFirst);
+    setState(() => _workspace = _Workspace.login);
     operationsRepository.setMechanizationAccessToken(null);
     operatorRepository.setMechanizationAccessToken(null);
     await authRepository.signOut();
@@ -182,9 +191,15 @@ class _TractorAppState extends State<TractorApp> {
     );
   }
 
-  Future<void> _handleSessionExpired() async {
-    if (!mounted || _sessionExpiryInProgress) return;
+  Future<void> _handleSessionExpired(String token) async {
+    if (!mounted ||
+        _sessionExpiryInProgress ||
+        authRepository.currentSession.accessToken != token) {
+      return;
+    }
     _sessionExpiryInProgress = true;
+    _navigatorKey.currentState?.popUntil((route) => route.isFirst);
+    setState(() => _workspace = _Workspace.login);
     operationsRepository.setMechanizationAccessToken(null);
     operatorRepository.setMechanizationAccessToken(null);
     await authRepository.signOut();
@@ -203,6 +218,7 @@ class _TractorAppState extends State<TractorApp> {
   void _openOperations() {
     operationsRepository.setMechanizationAccessToken(
       authRepository.currentSession.accessToken,
+      permissions: authRepository.currentSession.permissions,
     );
     setState(() => _workspace = _Workspace.operations);
   }
@@ -210,6 +226,7 @@ class _TractorAppState extends State<TractorApp> {
   void _openOperator() {
     operatorRepository.setMechanizationAccessToken(
       authRepository.currentSession.accessToken,
+      permissions: authRepository.currentSession.permissions,
     );
     setState(() => _workspace = _Workspace.operator);
   }
@@ -268,10 +285,25 @@ class _TractorAppState extends State<TractorApp> {
       _openTechnician();
       return;
     }
-    if (role.contains('farmer')) {
-      setState(() => _workspace = _Workspace.farmer);
+    if (permissions.contains('mech.view')) {
+      _openOperations();
       return;
     }
-    _openOperations();
+    unawaited(_rejectUnsupportedSession());
+  }
+
+  Future<void> _rejectUnsupportedSession() async {
+    operationsRepository.setMechanizationAccessToken(null);
+    operatorRepository.setMechanizationAccessToken(null);
+    await authRepository.signOut();
+    if (!mounted) return;
+    setState(() => _workspace = _Workspace.login);
+    _messengerKey.currentState?.showSnackBar(
+      const SnackBar(
+        content: Text(
+          'This account does not have access to a supported mobile workspace.',
+        ),
+      ),
+    );
   }
 }

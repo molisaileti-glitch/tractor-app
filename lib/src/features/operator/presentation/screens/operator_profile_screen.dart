@@ -26,8 +26,10 @@ class OperatorProfileScreen extends StatelessWidget {
     final strings = AppLocalizations.of(context)!;
     final name = repository.operatorName ?? strings.operator;
     final role = repository.operatorRole ?? strings.operator;
-    final activeJobs = repository.jobs.where((job) => !job.isComplete).length;
-    final completedJobs = repository.history.length;
+    final activeJobs = repository.dashboardJobs
+        .where((job) => !job.isComplete)
+        .length;
+    final completedJobs = repository.completedJobs.length;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),

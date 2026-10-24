@@ -30,6 +30,8 @@ class AuthRemoteException implements Exception {
 class AuthRemoteDataSource {
   const AuthRemoteDataSource({this.baseUrl = KwanzaTrackEndpoints.baseUrl});
 
+  static int _requestSequence = 0;
+
   final String baseUrl;
 
   Future<AuthChallengeModel> login({
@@ -44,7 +46,11 @@ class AuthRemoteDataSource {
       'device_name': deviceName,
     };
     if (tenantId != null) body['tenant_id'] = tenantId;
-    final json = await _post('/api/app/login', body);
+    final json = await _post(
+      '/api/app/login',
+      body,
+      operation: 'request login OTP',
+    );
     final data = _data(json);
     if (data['tenant_choice_required'] == true ||
         json['tenant_choice_required'] == true) {
@@ -61,40 +67,60 @@ class AuthRemoteDataSource {
     required String code,
     required String deviceName,
   }) async {
-    final json = await _post('/api/app/verify-otp', {
-      'challenge_id': challengeId,
-      'code': code,
-      'device_name': deviceName,
-    });
+    final json = await _post(
+      '/api/app/verify-otp',
+      {
+        'challenge_id': challengeId,
+        'code': code,
+        'device_name': deviceName,
+      },
+      operation: 'verify login OTP',
+    );
     return AuthVerifiedSessionModel.fromJson(_data(json));
   }
 
   Future<AuthChallengeModel> resendOtp({required String challengeId}) async {
-    final json = await _post('/api/app/resend-otp', {
-      'challenge_id': challengeId,
-    });
+    final json = await _post(
+      '/api/app/resend-otp',
+      {'challenge_id': challengeId},
+      operation: 'resend login OTP',
+    );
     return AuthChallengeModel.fromJson(_data(json));
   }
 
   Future<AuthVerifiedSessionModel> me({required String token}) async {
-    final json = await _get('/api/app/me', token: token);
+    final json = await _get(
+      '/api/app/me',
+      token: token,
+      operation: 'load authenticated user',
+    );
     return AuthVerifiedSessionModel.fromJson(_data(json), accessToken: token);
   }
 
   Future<void> logout({required String token}) async {
-    await _post('/api/app/logout', const {}, token: token);
+    await _post(
+      '/api/app/logout',
+      const {},
+      token: token,
+      operation: 'logout',
+    );
   }
 
-  Future<Map<String, Object?>> _get(String path, {String? token}) async {
-    return _send('GET', path, null, token: token);
+  Future<Map<String, Object?>> _get(
+    String path, {
+    String? token,
+    String? operation,
+  }) async {
+    return _send('GET', path, null, token: token, operation: operation);
   }
 
   Future<Map<String, Object?>> _post(
     String path,
     Map<String, Object?> body, {
     String? token,
+    String? operation,
   }) {
-    return _send('POST', path, body, token: token);
+    return _send('POST', path, body, token: token, operation: operation);
   }
 
   Future<Map<String, Object?>> _send(
@@ -102,12 +128,16 @@ class AuthRemoteDataSource {
     String path,
     Map<String, Object?>? body, {
     String? token,
+    String? operation,
   }) async {
+    final requestId = ++_requestSequence;
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 10);
     try {
       final uri = Uri.parse('$baseUrl$path');
       _logRequest(
+        requestId: requestId,
+        operation: operation,
         method: method,
         uri: uri,
         body: body,
@@ -136,6 +166,7 @@ class AuthRemoteDataSource {
             : _map(jsonDecode(responseBody));
       } on FormatException {
         _logRawResponse(
+          requestId: requestId,
           method: method,
           uri: uri,
           statusCode: response.statusCode,
@@ -144,6 +175,7 @@ class AuthRemoteDataSource {
         rethrow;
       }
       _logResponse(
+        requestId: requestId,
         method: method,
         uri: uri,
         statusCode: response.statusCode,
@@ -153,6 +185,7 @@ class AuthRemoteDataSource {
           response.statusCode >= 300 ||
           decoded['success'] == false) {
         _logRawResponse(
+          requestId: requestId,
           method: method,
           uri: uri,
           statusCode: response.statusCode,
@@ -176,13 +209,28 @@ class AuthRemoteDataSource {
       }
       return decoded;
     } on TimeoutException {
-      _logError(method: method, path: path, message: 'request timed out');
+      _logError(
+        requestId: requestId,
+        method: method,
+        path: path,
+        message: 'request timed out',
+      );
       throw const AuthRemoteException('Authentication request timed out.');
     } on SocketException {
-      _logError(method: method, path: path, message: 'server unreachable');
+      _logError(
+        requestId: requestId,
+        method: method,
+        path: path,
+        message: 'server unreachable',
+      );
       throw const AuthRemoteException('Authentication server is unreachable.');
     } on FormatException {
-      _logError(method: method, path: path, message: 'invalid JSON response');
+      _logError(
+        requestId: requestId,
+        method: method,
+        path: path,
+        message: 'invalid JSON response',
+      );
       throw const AuthRemoteException(
         'Authentication server returned invalid JSON.',
       );
@@ -205,48 +253,82 @@ class AuthRemoteDataSource {
   }
 
   void _logRequest({
+    required int requestId,
+    required String? operation,
     required String method,
     required Uri uri,
     required Map<String, Object?>? body,
     required bool hasToken,
   }) {
     if (!kDebugMode) return;
-    debugPrint('[Auth API] $method $uri');
-    debugPrint('[Auth API] auth header: ${hasToken ? 'Bearer ***' : 'none'}');
+    if (operation != null) {
+      debugPrint('[Auth API #$requestId] operation: $operation');
+    }
+    debugPrint('[Auth API #$requestId] --> $method $uri');
+    debugPrint(
+      '[Auth API #$requestId] auth header: '
+      '${hasToken ? 'Bearer ***' : 'none'}',
+    );
     if (body != null) {
-      debugPrint('[Auth API] request: ${jsonEncode(_redact(body))}');
+      _logJson(requestId, 'request body', _redact(body));
     }
   }
 
   void _logResponse({
+    required int requestId,
     required String method,
     required Uri uri,
     required int statusCode,
     required Map<String, Object?> body,
   }) {
     if (!kDebugMode) return;
-    debugPrint('[Auth API] response: $method $uri -> HTTP $statusCode');
-    debugPrint('[Auth API] body: ${jsonEncode(_redact(body))}');
+    debugPrint('[Auth API #$requestId] <-- HTTP $statusCode $method $uri');
+    _logJson(requestId, 'response body', _redact(body));
   }
 
   void _logRawResponse({
+    required int requestId,
     required String method,
     required Uri uri,
     required int statusCode,
     required String rawBody,
   }) {
     if (!kDebugMode) return;
-    debugPrint('[Auth API] raw response: $method $uri -> HTTP $statusCode');
-    debugPrint('[Auth API] raw body: ${_redactRawBody(rawBody)}');
+    debugPrint(
+      '[Auth API #$requestId] raw response: '
+      '$method $uri -> HTTP $statusCode',
+    );
+    _logText(requestId, 'raw body', _redactRawBody(rawBody));
   }
 
   void _logError({
+    required int requestId,
     required String method,
     required String path,
     required String message,
   }) {
     if (!kDebugMode) return;
-    debugPrint('[Auth API] error: $method $baseUrl$path -> $message');
+    debugPrint(
+      '[Auth API #$requestId] error: $method $baseUrl$path -> $message',
+    );
+  }
+
+  void _logJson(int requestId, String label, Object? value) {
+    _logText(requestId, label, jsonEncode(value));
+  }
+
+  void _logText(int requestId, String label, String value) {
+    if (!kDebugMode) return;
+    const chunkSize = 900;
+    final total = value.isEmpty ? 1 : (value.length / chunkSize).ceil();
+    for (var index = 0; index < total; index++) {
+      final start = index * chunkSize;
+      final end = (start + chunkSize).clamp(0, value.length);
+      debugPrint(
+        '[Auth API #$requestId] $label [${index + 1}/$total] '
+        '${value.substring(start, end)}',
+      );
+    }
   }
 
   Object? _redact(Object? value) {
