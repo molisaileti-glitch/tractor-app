@@ -1,10 +1,98 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tractor/src/core/network/kwanza_track_mobile_api_client.dart';
 
 void main() {
+  test(
+    'photo upload sends real multipart fields and unmodified image bytes',
+    () async {
+      final png = base64Decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',
+      );
+      final api = await _server((request) async {
+        expect(request.method, 'POST');
+        expect(request.uri.path, '/api/v1/mech/jobs/job-1/photos');
+        expect(request.headers.value('authorization'), 'Bearer photo-token');
+        expect(request.headers.contentType!.mimeType, 'multipart/form-data');
+        final boundary = request.headers.contentType!.parameters['boundary']!;
+        final bytes = await request.fold<List<int>>(
+          [],
+          (all, chunk) => all..addAll(chunk),
+        );
+        final wire = latin1.decode(bytes);
+        expect(wire, contains('name="kind"\r\n\r\nbefore'));
+        expect(wire, contains('name="caption"\r\n\r\nBefore work'));
+        expect(wire, contains('name="file"; filename="field.png"'));
+        expect(wire, contains('Content-Type: image/png'));
+        expect(wire, contains(latin1.decode(png)));
+        expect(wire.endsWith('--$boundary--\r\n'), isTrue);
+        await _reply(request, {
+          'data': {'id': 'photo-1', 'kind': 'before', 'url': '/photos/1.png'},
+        }, status: 201);
+      });
+      await api.uploadJobPhoto(
+        token: 'photo-token',
+        jobId: 'job-1',
+        bytes: png,
+        fileName: 'field.png',
+        kind: 'before',
+        caption: 'Before work',
+      );
+    },
+  );
+
+  test(
+    'photo validation rejects unsupported and oversized files before sending',
+    () {
+      const api = KwanzaTrackMobileApiClient();
+      expect(
+        () => api.uploadJobPhoto(
+          token: 'token',
+          jobId: 'job',
+          bytes: Uint8List.fromList([1, 2]),
+          fileName: 'bad.jpg',
+          kind: 'before',
+        ),
+        throwsA(isA<KwanzaTrackApiException>()),
+      );
+      expect(
+        () => api.uploadJobPhoto(
+          token: 'token',
+          jobId: 'job',
+          bytes: Uint8List(8 * 1024 * 1024 + 1),
+          fileName: 'large.jpg',
+          kind: 'before',
+        ),
+        throwsA(isA<KwanzaTrackApiException>()),
+      );
+    },
+  );
+
+  test(
+    'PIN confirmation uses the documented JSON contract with a leading zero',
+    () async {
+      final api = await _server((request) async {
+        expect(request.method, 'POST');
+        expect(request.uri.path, '/api/v1/mech/jobs/job-1/farmer-confirm');
+        final body = jsonDecode(await utf8.decoder.bind(request).join()) as Map;
+        expect(body, {'method': 'pin', 'pin': '0123', 'rating': 4});
+        await _reply(request, {
+          'data': {
+            'id': 'job-1',
+            'farmer_confirmed_at': '2026-10-25T10:00:00Z',
+          },
+        });
+      });
+      await api.farmerConfirm(
+        token: 'operator',
+        jobId: 'job-1',
+        body: {'method': 'pin', 'pin': '0123', 'rating': 4},
+      );
+    },
+  );
   test(
     'start sends documented method, bearer token, phone and override ID',
     () async {

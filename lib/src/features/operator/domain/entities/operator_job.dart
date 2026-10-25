@@ -43,6 +43,7 @@ class TractorTrackerPosition {
     this.course,
     this.fixTime,
     this.ageSeconds,
+    this.receivedAt,
   });
 
   final String tractorId;
@@ -54,8 +55,21 @@ class TractorTrackerPosition {
   final bool online;
   final DateTime? fixTime;
   final int? ageSeconds;
+  final DateTime? receivedAt;
 
-  bool get isLive => online;
+  int? get currentAgeSeconds {
+    if (fixTime != null) return DateTime.now().difference(fixTime!).inSeconds;
+    if (ageSeconds == null) return null;
+    return ageSeconds! +
+        (receivedAt == null
+            ? 0
+            : DateTime.now().difference(receivedAt!).inSeconds);
+  }
+
+  bool get isLive {
+    final age = currentAgeSeconds;
+    return online && age != null && age >= -30 && age <= 180;
+  }
 }
 
 class OperatorProblemReport {
@@ -103,6 +117,7 @@ class OperatorJob {
     this.startOverride,
     this.trackPoints = const [],
     this.problemReports = const [],
+    this.photos = const [],
   });
 
   final String id;
@@ -130,6 +145,7 @@ class OperatorJob {
   final DateTime? workTimeReceivedAt;
   final DateTime? farmerConfirmedAt;
   final bool farmerHasPin;
+  final List<OperatorJobPhoto> photos;
   final bool geofenceVerified;
   final OperatorStartOverride? startOverride;
 
@@ -211,8 +227,22 @@ class OperatorJob {
       startOverride: startOverride,
       trackPoints: trackPoints ?? this.trackPoints,
       problemReports: problemReports ?? this.problemReports,
+      photos: photos,
     );
   }
+}
+
+class OperatorJobPhoto {
+  const OperatorJobPhoto({
+    required this.id,
+    required this.kind,
+    required this.url,
+    this.caption,
+  });
+  final String id;
+  final String kind;
+  final String url;
+  final String? caption;
 }
 
 class OperatorStartCheckResult {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
@@ -7,6 +9,20 @@ import '../../../farmer/domain/entities/farm_plot.dart';
 import '../../../farmer/domain/entities/service_request.dart';
 import '../remote/service_orders_remote_data_source.dart';
 import '../../domain/entities/operations_models.dart';
+
+enum UnionDataScreen {
+  dashboard,
+  requests,
+  schedule,
+  jobs,
+  oversight,
+  tractors,
+  operators,
+  farmers,
+  maintenance,
+  reports,
+  settings,
+}
 
 class UnionOperationsRepository extends ChangeNotifier {
   UnionOperationsRepository.seeded({
@@ -27,7 +43,6 @@ class UnionOperationsRepository extends ChangeNotifier {
   Set<String>? _permissions;
   Map<String, Object?> _policy = {};
   int _dataVersion = 0;
-  bool _hasLoadedMechanization = false;
   bool _disposed = false;
   int _sessionVersion = 0;
   final List<OperationsServiceRequest> _requests;
@@ -39,18 +54,187 @@ class UnionOperationsRepository extends ChangeNotifier {
   final List<MechanizationOverride> _overrides = [];
   final List<MechanizationException> _exceptions = [];
   String? _accessToken;
-  bool _isSyncingMechanization = false;
-  bool _isRefreshingTractors = false;
-  bool _isRefreshingOperators = false;
-  bool _isRefreshingFarmers = false;
   String? _mechanizationSyncError;
   String? _mechanizationActionError;
   String? _mechanizationUserName;
   String? _mechanizationUserEmail;
   String? _mechanizationUserRole;
   Map<String, Object?> _dashboardData = const {};
-  int? _remoteBacklogCount;
-  int _syncGeneration = 0;
+  final Map<UnionDataScreen, Future<void>> _screenLoads = {};
+  final Set<UnionDataScreen> _loadedScreens = {};
+  final Map<UnionDataScreen, String> _screenErrors = {};
+
+  bool isRefreshingScreen(UnionDataScreen screen) =>
+      _screenLoads.containsKey(screen);
+  bool isInitialScreenLoad(UnionDataScreen screen) =>
+      isRefreshingScreen(screen) && !_loadedScreens.contains(screen);
+  String? screenError(UnionDataScreen screen) => _screenErrors[screen];
+  Future<void> ensureScreenLoaded(UnionDataScreen screen) =>
+      _loadedScreens.contains(screen) ? Future.value() : refreshScreen(screen);
+
+  Future<void> refreshScreen(UnionDataScreen screen) {
+    final pending = _screenLoads[screen];
+    if (pending != null) return pending;
+    final token = _accessToken;
+    if (token == null || token.isEmpty) return Future.value();
+    final session = _sessionVersion;
+    final completion = Completer<void>();
+    _screenLoads[screen] = completion.future;
+    _screenErrors.remove(screen);
+    notifyListeners();
+    unawaited(
+      _loadScreen(screen, token, session).whenComplete(() {
+        if (_currentSession(token, session)) {
+          _screenLoads.remove(screen);
+          _loadedScreens.add(screen);
+          notifyListeners();
+        }
+        completion.complete();
+      }),
+    );
+    return completion.future;
+  }
+
+  Future<void> _loadScreen(
+    UnionDataScreen screen,
+    String token,
+    int session,
+  ) async {
+    final version = _dataVersion;
+    bool current() =>
+        _currentSession(token, session) && version == _dataVersion;
+    try {
+      final today = DateTime.now();
+      final tasks = <String, Future<Map<String, Object?>>>{};
+      if ([
+        UnionDataScreen.dashboard,
+        UnionDataScreen.settings,
+      ].contains(screen)) {
+        tasks['me'] = mobileApiClient.me(token: token);
+      }
+      if (screen == UnionDataScreen.dashboard) {
+        tasks['dashboard'] = _loadModule(
+          () => mobileApiClient.dashboard(token: token, days: 30),
+        );
+      }
+      if ([
+        UnionDataScreen.dashboard,
+        UnionDataScreen.jobs,
+        UnionDataScreen.reports,
+      ].contains(screen)) {
+        tasks['jobs'] = _loadModule(
+          () => allApiPages(
+            (page) => mobileApiClient.jobs(
+              token: token,
+              mine: false,
+              perPage: 50,
+              page: page,
+            ),
+            isCurrent: current,
+          ),
+        );
+      }
+      if (screen == UnionDataScreen.schedule) {
+        tasks['calendar'] = _loadModule(
+          () => mobileApiClient.calendar(
+            token: token,
+            mine: false,
+            from: _dateOnly(today.subtract(const Duration(days: 365))),
+            to: _dateOnly(today.add(const Duration(days: 365))),
+            status:
+                'scheduled,dispatched,en_route,arrived,in_progress,paused,completed,verified,flagged,closed,cancelled',
+          ),
+        );
+      }
+      if ([
+        UnionDataScreen.requests,
+        UnionDataScreen.reports,
+      ].contains(screen)) {
+        tasks['requests'] = _loadModule(() => _loadAllRequests(token));
+      }
+      if ([
+        UnionDataScreen.tractors,
+        UnionDataScreen.maintenance,
+        UnionDataScreen.reports,
+      ].contains(screen)) {
+        tasks['tractors'] = _loadModule(
+          () => mobileApiClient.tractors(token: token, mine: false),
+        );
+      }
+      if (screen == UnionDataScreen.tractors) {
+        tasks['live'] = _loadModule(
+          () => mobileApiClient.tractors(token: token, mine: true, live: true),
+        );
+      }
+      if ([
+        UnionDataScreen.operators,
+        UnionDataScreen.reports,
+      ].contains(screen)) {
+        tasks['operators'] = _loadModule(
+          () => mobileApiClient.operators(token: token),
+        );
+      }
+      if (screen == UnionDataScreen.farmers) {
+        tasks['farmers'] = _loadModule(
+          () => allApiPages(
+            (page) => mobileApiClient.farmers(token: token, page: page),
+            isCurrent: current,
+          ),
+        );
+      }
+      if ([
+        UnionDataScreen.dashboard,
+        UnionDataScreen.oversight,
+      ].contains(screen)) {
+        tasks['overrides'] = _loadModule(
+          () => mobileApiClient.overrides(token: token),
+        );
+        tasks['exceptions'] = _loadModule(
+          () => mobileApiClient.exceptions(token: token),
+        );
+      }
+      final entries = await Future.wait(
+        tasks.entries.map(
+          (entry) async => MapEntry(entry.key, await entry.value),
+        ),
+      );
+      if (!current()) return;
+      final responses = Map.fromEntries(entries);
+      bool has(String key) =>
+          responses.containsKey(key) &&
+          !responses[key]!.containsKey('_load_error');
+      if (has('me')) _applyMeResponse(responses['me']!);
+      if (has('dashboard')) _dashboardData = _dataMap(responses['dashboard']!);
+      if (has('jobs')) _applyJobsResponse(responses['jobs']!);
+      if (has('calendar')) _applyCalendarResponse(responses['calendar']!);
+      if (has('requests')) {
+        _applyRequestsResponse(responses['requests']!, replace: true);
+      }
+      if (has('tractors')) {
+        _applyTractorsResponse(
+          responses['tractors']!,
+          replace: true,
+          source: 'all',
+        );
+      }
+      if (has('live')) _applyTractorsResponse(responses['live']!);
+      if (has('operators')) _applyOperatorsResponse(responses['operators']!);
+      if (has('farmers')) _applyFarmersResponse(responses['farmers']!);
+      if (has('overrides')) _applyOverridesResponse(responses['overrides']!);
+      if (has('exceptions')) _applyExceptionsResponse(responses['exceptions']!);
+      final errors = responses.values
+          .map((response) => response['_load_error'])
+          .whereType<String>()
+          .toSet();
+      if (errors.isNotEmpty) _screenErrors[screen] = errors.join('\n');
+    } catch (error) {
+      if (!current()) return;
+      _screenErrors[screen] = error is KwanzaTrackApiException
+          ? error.message
+          : 'Could not refresh this screen: $error';
+    }
+  }
+
   String? _lastScheduledJobId;
 
   bool can(String permission) => _permissions?.contains(permission) ?? true;
@@ -81,11 +265,12 @@ class UnionOperationsRepository extends ChangeNotifier {
   List<MechanizationOverride> get overrides => List.unmodifiable(_overrides);
   List<MechanizationException> get exceptions => List.unmodifiable(_exceptions);
   bool get isInitialMechanizationLoad =>
-      _isSyncingMechanization && !_hasLoadedMechanization;
-  bool get isSyncingMechanization => _isSyncingMechanization;
-  bool get isRefreshingTractors => _isRefreshingTractors;
-  bool get isRefreshingOperators => _isRefreshingOperators;
-  bool get isRefreshingFarmers => _isRefreshingFarmers;
+      isInitialScreenLoad(UnionDataScreen.dashboard);
+  bool get isSyncingMechanization => _screenLoads.isNotEmpty;
+  bool get isRefreshingTractors => isRefreshingScreen(UnionDataScreen.tractors);
+  bool get isRefreshingOperators =>
+      isRefreshingScreen(UnionDataScreen.operators);
+  bool get isRefreshingFarmers => isRefreshingScreen(UnionDataScreen.farmers);
 
   OperationsJob? jobForRequest(String requestId) {
     for (final job in _jobs) {
@@ -94,7 +279,8 @@ class UnionOperationsRepository extends ChangeNotifier {
     return null;
   }
 
-  String? get mechanizationSyncError => _mechanizationSyncError;
+  String? get mechanizationSyncError =>
+      _mechanizationSyncError ?? _screenErrors[UnionDataScreen.dashboard];
   String? get mechanizationActionError => _mechanizationActionError;
   String? get mechanizationUserName => _mechanizationUserName;
   String? get mechanizationUserEmail => _mechanizationUserEmail;
@@ -112,19 +298,15 @@ class UnionOperationsRepository extends ChangeNotifier {
     if (permissions != null) _permissions = permissions.toSet();
     if (_accessToken == normalized) return;
     _sessionVersion++;
-    _syncGeneration++;
-    _isSyncingMechanization = false;
-    _hasLoadedMechanization = false;
-    _isRefreshingTractors = false;
-    _isRefreshingOperators = false;
-    _isRefreshingFarmers = false;
     _mechanizationActionError = null;
     _jobPayloads.clear();
+    _screenLoads.clear();
+    _loadedScreens.clear();
+    _screenErrors.clear();
     _dataVersion++;
     _requestPayloads.clear();
     _policy = {};
     _dashboardData = {};
-    _remoteBacklogCount = null;
     _accessToken = normalized?.isEmpty == true ? null : normalized;
     _mechanizationSyncError = null;
     _requests.clear();
@@ -141,226 +323,19 @@ class UnionOperationsRepository extends ChangeNotifier {
       _mechanizationUserEmail = null;
       _mechanizationUserRole = null;
       _dashboardData = const {};
-      _remoteBacklogCount = null;
       notifyListeners();
       return;
     }
-    refreshMechanizationData();
+    unawaited(refreshScreen(UnionDataScreen.dashboard));
   }
 
-  Future<void> refreshMechanizationData() async {
-    final token = _accessToken;
-    final session = _sessionVersion;
-    if (token == null || token.isEmpty || _isSyncingMechanization) return;
+  // Compatibility entry point: refresh only the union dashboard.
+  Future<void> refreshMechanizationData() =>
+      refreshScreen(UnionDataScreen.dashboard);
 
-    final dataVersion = _dataVersion;
-    final generation = ++_syncGeneration;
-    _isSyncingMechanization = true;
-    _mechanizationSyncError = null;
-    _mechanizationActionError = null;
-    notifyListeners();
-
-    try {
-      final today = DateTime.now();
-      final from = _dateOnly(today.subtract(const Duration(days: 365)));
-      final to = _dateOnly(today.add(const Duration(days: 365)));
-      final responses = await Future.wait<Map<String, Object?>>([
-        mobileApiClient.me(token: token),
-        _loadModule(() => mobileApiClient.dashboard(token: token, days: 30)),
-        _loadModule(
-          () => allApiPages(
-            (page) => mobileApiClient.jobs(
-              token: token,
-              mine: false,
-              perPage: 50,
-              page: page,
-            ),
-            isCurrent: () => _currentSession(token, session),
-          ),
-        ),
-        _loadModule(
-          () => mobileApiClient.calendar(
-            token: token,
-            from: from,
-            to: to,
-            mine: false,
-            status:
-                'scheduled,dispatched,en_route,arrived,in_progress,paused,completed,verified,flagged,closed,cancelled',
-          ),
-        ),
-        _loadModule(
-          () => mobileApiClient.calendarBacklog(token: token),
-          permission: 'mech.jobs.manage',
-        ),
-        _loadModule(() => _loadAllRequests(token)),
-        _loadModule(
-          () => mobileApiClient.tractors(token: token, mine: true, live: true),
-        ),
-        _loadModule(() => mobileApiClient.tractors(token: token, mine: false)),
-        _loadModule(() => mobileApiClient.operators(token: token)),
-        _loadModule(() => mobileApiClient.overrides(token: token)),
-        _loadModule(() => mobileApiClient.exceptions(token: token)),
-        _loadModule(
-          () => allApiPages(
-            (page) => mobileApiClient.farmers(token: token, page: page),
-            isCurrent: () => _currentSession(token, session),
-          ),
-        ),
-      ]);
-      if (!_currentSession(token, session) || dataVersion != _dataVersion) {
-        return;
-      }
-      if (generation != _syncGeneration) return;
-
-      _applyMeResponse(responses[0]);
-      if (!responses[1].containsKey('_load_error')) {
-        _dashboardData = _dataMap(responses[1]);
-      }
-      _applyJobsResponse(responses[2]);
-      if (!responses[4].containsKey('_load_error')) {
-        _remoteBacklogCount =
-            _metaCount(responses[4]) ?? _dataList(responses[4]).length;
-      }
-      _applyRequestsResponse(responses[5], replace: true);
-      // Request list above already includes every status and page;
-      await _enrichRequestBoundaries(token);
-      if (!_currentSession(token, session) || dataVersion != _dataVersion) {
-        return;
-      }
-      _applyTractorsResponse(responses[7], replace: true, source: 'all');
-      _applyTractorsResponse(responses[6]);
-      _applyOperatorsResponse(responses[8]);
-      _applyCalendarResponse(responses[3]);
-      _applyOverridesResponse(responses[9]);
-      _applyExceptionsResponse(responses[10]);
-      _applyFarmersResponse(responses[11]);
-      final moduleErrors = responses
-          .map((item) => item['_load_error'])
-          .whereType<String>()
-          .toSet();
-      _mechanizationSyncError = moduleErrors.isEmpty
-          ? null
-          : moduleErrors.join('\n');
-    } on KwanzaTrackApiException catch (error) {
-      if (!_currentSession(token, session) || dataVersion != _dataVersion) {
-        return;
-      }
-      if (generation == _syncGeneration) {
-        _mechanizationSyncError = error.message;
-      }
-    } catch (error) {
-      if (!_currentSession(token, session) || dataVersion != _dataVersion) {
-        return;
-      }
-      if (generation == _syncGeneration) {
-        _mechanizationSyncError =
-            'Could not refresh mechanization data: $error';
-      }
-    } finally {
-      if (generation == _syncGeneration) {
-        _hasLoadedMechanization = true;
-        _isSyncingMechanization = false;
-        notifyListeners();
-      }
-    }
-  }
-
-  Future<void> refreshTractors() async {
-    final token = _accessToken;
-    final session = _sessionVersion;
-    if (token == null ||
-        token.isEmpty ||
-        _isSyncingMechanization ||
-        _isRefreshingTractors) {
-      return;
-    }
-    _isRefreshingTractors = true;
-    _mechanizationSyncError = null;
-    notifyListeners();
-    try {
-      final responses = await Future.wait<Map<String, Object?>>([
-        mobileApiClient.tractors(token: token, mine: false),
-        mobileApiClient.tractors(token: token, mine: true, live: true),
-      ]);
-      if (!_currentSession(token, session)) return;
-      _applyTractorsResponse(responses[0], replace: true, source: 'all');
-      _applyTractorsResponse(responses[1]);
-    } on KwanzaTrackApiException catch (error) {
-      if (!_currentSession(token, session)) return;
-      _mechanizationSyncError = error.message;
-    } catch (error) {
-      if (!_currentSession(token, session)) return;
-      _mechanizationSyncError = 'Could not refresh tractors: $error';
-    } finally {
-      if (_currentSession(token, session)) {
-        _isRefreshingTractors = false;
-        notifyListeners();
-      }
-    }
-  }
-
-  Future<void> refreshOperators() async {
-    final token = _accessToken;
-    final session = _sessionVersion;
-    if (token == null ||
-        token.isEmpty ||
-        _isSyncingMechanization ||
-        _isRefreshingOperators) {
-      return;
-    }
-    _isRefreshingOperators = true;
-    _mechanizationSyncError = null;
-    notifyListeners();
-    try {
-      final response = await mobileApiClient.operators(token: token);
-      if (!_currentSession(token, session)) return;
-      _applyOperatorsResponse(response);
-    } on KwanzaTrackApiException catch (error) {
-      if (!_currentSession(token, session)) return;
-      _mechanizationSyncError = error.message;
-    } catch (error) {
-      if (!_currentSession(token, session)) return;
-      _mechanizationSyncError = 'Could not refresh operators: $error';
-    } finally {
-      if (_currentSession(token, session)) {
-        _isRefreshingOperators = false;
-        notifyListeners();
-      }
-    }
-  }
-
-  Future<void> refreshFarmers() async {
-    final token = _accessToken;
-    final session = _sessionVersion;
-    if (token == null ||
-        token.isEmpty ||
-        _isSyncingMechanization ||
-        _isRefreshingFarmers) {
-      return;
-    }
-    _isRefreshingFarmers = true;
-    _mechanizationSyncError = null;
-    notifyListeners();
-    try {
-      final response = await allApiPages(
-        (page) => mobileApiClient.farmers(token: token, page: page),
-        isCurrent: () => _currentSession(token, session),
-      );
-      if (!_currentSession(token, session)) return;
-      _applyFarmersResponse(response);
-    } on KwanzaTrackApiException catch (error) {
-      if (!_currentSession(token, session)) return;
-      _mechanizationSyncError = error.message;
-    } catch (error) {
-      if (!_currentSession(token, session)) return;
-      _mechanizationSyncError = 'Could not refresh farmers: $error';
-    } finally {
-      if (_currentSession(token, session)) {
-        _isRefreshingFarmers = false;
-        notifyListeners();
-      }
-    }
-  }
+  Future<void> refreshTractors() => refreshScreen(UnionDataScreen.tractors);
+  Future<void> refreshOperators() => refreshScreen(UnionDataScreen.operators);
+  Future<void> refreshFarmers() => refreshScreen(UnionDataScreen.farmers);
 
   Future<void> refreshTractorDetails(String tractorId) async {
     final token = _accessToken;
@@ -450,8 +425,6 @@ class UnionOperationsRepository extends ChangeNotifier {
     final loadedPending = _requests
         .where((request) => request.status == OperationsRequestStatus.pending)
         .length;
-    if (_requests.isNotEmpty) return loadedPending;
-
     final dashboardValue = _dashboardInt(const [
       'pending_requests',
       'pending_request_count',
@@ -459,7 +432,6 @@ class UnionOperationsRepository extends ChangeNotifier {
       'pending',
     ]);
     if (dashboardValue != null) return dashboardValue;
-    if (_remoteBacklogCount != null) return _remoteBacklogCount!;
     return loadedPending;
   }
 
@@ -1078,19 +1050,7 @@ class UnionOperationsRepository extends ChangeNotifier {
       ),
     )) {
       if (_mechanizationActionError == null && _accessToken != null) {
-        final token = _accessToken!;
-        final session = _sessionVersion;
         if (job.requestId != job.id) await refreshRequestDetail(job.requestId);
-        if (!_currentSession(token, session)) return;
-        try {
-          final backlog = await mobileApiClient.calendarBacklog(token: token);
-          if (!_currentSession(token, session)) return;
-          _remoteBacklogCount =
-              _metaCount(backlog) ?? _dataList(backlog).length;
-          notifyListeners();
-        } on KwanzaTrackApiException {
-          /* Job cancellation remains successful. */
-        }
       }
       return;
     }
@@ -1826,6 +1786,7 @@ class UnionOperationsRepository extends ChangeNotifier {
 
     return OperationsJob(
       id: id,
+      reference: _text(event, const ['reference']),
       requestId: _text(event, const ['request_id', 'reference']) ?? id,
       farmerName: _text(event, const ['farmer', 'farmer_name']) ?? 'Farmer',
       serviceType: _serviceType(
@@ -1977,7 +1938,9 @@ class UnionOperationsRepository extends ChangeNotifier {
     return OperationsJob(
       id: id,
       requestId:
+          // Preserve the job reference separately from its request reference.
           _text(requestJson, const ['id', 'reference', 'external_ref']) ?? id,
+      reference: _text(json, const ['reference']),
       farmerName:
           _text(farmerJson, const ['name']) ??
           _text(json, const ['farmer_name']) ??
@@ -2309,16 +2272,19 @@ class UnionOperationsRepository extends ChangeNotifier {
     return const [];
   }
 
-  int? _metaCount(Map<String, Object?> response) {
-    return _asInt(_map(response['meta'])['count']);
-  }
-
   Map<String, Object?> _map(Object? value) {
     if (value is Map) return _stringKeyedMap(value);
     return const {};
   }
 
   List<BoundaryPoint> _plotBoundaryPoints(Map<String, Object?> plot) {
+    bool valid(num? latitude, num? longitude) =>
+        latitude != null &&
+        longitude != null &&
+        latitude.isFinite &&
+        longitude.isFinite &&
+        latitude.abs() <= 90 &&
+        longitude.abs() <= 180;
     final boundary = plot['boundary'];
     if (boundary is List) {
       final points = boundary.indexed
@@ -2326,11 +2292,11 @@ class UnionOperationsRepository extends ChangeNotifier {
             final point = _map(entry.$2);
             final latitude = _number(point, const ['latitude', 'lat']);
             final longitude = _number(point, const ['longitude', 'lng', 'lon']);
-            if (latitude == null || longitude == null) return null;
+            if (!valid(latitude, longitude)) return null;
             return BoundaryPoint(
               label: 'Boundary ${entry.$1 + 1}',
-              latitude: latitude.toDouble(),
-              longitude: longitude.toDouble(),
+              latitude: latitude!.toDouble(),
+              longitude: longitude!.toDouble(),
             );
           })
           .whereType<BoundaryPoint>()
@@ -2341,12 +2307,12 @@ class UnionOperationsRepository extends ChangeNotifier {
     final centroid = _map(plot['centroid']);
     final latitude = _number(centroid, const ['latitude', 'lat']);
     final longitude = _number(centroid, const ['longitude', 'lng', 'lon']);
-    if (latitude == null || longitude == null) return const [];
+    if (!valid(latitude, longitude)) return const [];
     return [
       BoundaryPoint(
         label: 'Plot center',
-        latitude: latitude.toDouble(),
-        longitude: longitude.toDouble(),
+        latitude: latitude!.toDouble(),
+        longitude: longitude!.toDouble(),
       ),
     ];
   }
@@ -2702,7 +2668,6 @@ class UnionOperationsRepository extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _sessionVersion++;
-    _syncGeneration++;
     super.dispose();
   }
 

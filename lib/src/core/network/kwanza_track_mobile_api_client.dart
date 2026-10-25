@@ -1,10 +1,19 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data' show BytesBuilder;
 
 import 'package:flutter/foundation.dart';
 
 import '../constants/kwanza_track_endpoints.dart';
+
+class _PhotoUpload {
+  const _PhotoUpload(this.bytes, this.name, this.mime, this.fields);
+  final Uint8List bytes;
+  final String name;
+  final String mime;
+  final Map<String, String> fields;
+}
 
 class KwanzaTrackApiException implements Exception {
   const KwanzaTrackApiException(
@@ -283,6 +292,61 @@ class KwanzaTrackMobileApiClient {
     required String jobId,
   }) {
     return _post('/jobs/$jobId/farmer-otp', token: token);
+  }
+
+  Future<Map<String, Object?>> uploadJobPhoto({
+    required String token,
+    required String jobId,
+    required Uint8List bytes,
+    required String fileName,
+    required String kind,
+    String? caption,
+  }) {
+    if (!const {
+      'before',
+      'during',
+      'after',
+      'signature',
+      'issue',
+      'other',
+    }.contains(kind)) {
+      throw const KwanzaTrackApiException('Choose a valid photo type.');
+    }
+    if (bytes.isEmpty || bytes.length > 8 * 1024 * 1024) {
+      throw const KwanzaTrackApiException('Choose a photo smaller than 8 MB.');
+    }
+    final mime =
+        bytes.length >= 3 &&
+            bytes[0] == 255 &&
+            bytes[1] == 216 &&
+            bytes[2] == 255
+        ? 'image/jpeg'
+        : bytes.length >= 8 &&
+              listEquals(bytes.sublist(0, 8), [137, 80, 78, 71, 13, 10, 26, 10])
+        ? 'image/png'
+        : bytes.length >= 12 &&
+              ascii.decode(bytes.sublist(0, 4), allowInvalid: true) == 'RIFF' &&
+              ascii.decode(bytes.sublist(8, 12), allowInvalid: true) == 'WEBP'
+        ? 'image/webp'
+        : null;
+    if (mime == null) {
+      throw const KwanzaTrackApiException('Choose a JPG, PNG or WebP photo.');
+    }
+    final safeName = fileName
+        .split(RegExp(r'[/\\]'))
+        .last
+        .replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+    return _send(
+      'POST',
+      '/jobs/$jobId/photos',
+      token: token,
+      upload:
+          _PhotoUpload(bytes, safeName.isEmpty ? 'photo.jpg' : safeName, mime, {
+            'kind': kind,
+            if (caption != null && caption.trim().isNotEmpty)
+              'caption': caption.trim(),
+          }),
+    );
   }
 
   Future<Map<String, Object?>> farmerConfirm({
@@ -809,6 +873,7 @@ class KwanzaTrackMobileApiClient {
     Map<String, Object?>? body,
     Map<String, Object?>? query,
     String? operation,
+    _PhotoUpload? upload,
   }) async {
     final retryAt = _retryNotBefore[token];
     if (retryAt != null && retryAt.isAfter(DateTime.now())) {
@@ -841,12 +906,44 @@ class KwanzaTrackMobileApiClient {
         _ => await client.postUrl(uri).timeout(const Duration(seconds: 10)),
       };
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-      if (body != null) request.write(jsonEncode(_cleanBody(body)));
+      if (upload != null) {
+        final boundary =
+            'kwanza-${DateTime.now().microsecondsSinceEpoch}-$requestId';
+        request.headers.contentType = ContentType(
+          'multipart',
+          'form-data',
+          parameters: {'boundary': boundary},
+        );
+        final payload = BytesBuilder(copy: false);
+        for (final field in upload.fields.entries) {
+          payload.add(
+            utf8.encode(
+              '--$boundary\r\nContent-Disposition: form-data; name="${field.key}"\r\n\r\n${field.value}\r\n',
+            ),
+          );
+        }
+        payload.add(
+          utf8.encode(
+            '--$boundary\r\nContent-Disposition: form-data; name="file"; filename="${upload.name}"\r\nContent-Type: ${upload.mime}\r\n\r\n',
+          ),
+        );
+        payload.add(upload.bytes);
+        payload.add(utf8.encode('\r\n--$boundary--\r\n'));
+        final encoded = payload.takeBytes();
+        request.contentLength = encoded.length;
+        request.add(encoded);
+        _logJson(requestId, 'multipart fields', {
+          ...upload.fields,
+          'file': {'type': upload.mime, 'bytes': upload.bytes.length},
+        });
+      } else {
+        request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
+        if (body != null) request.write(jsonEncode(_cleanBody(body)));
+      }
 
       final response = await request.close().timeout(
-        const Duration(seconds: 15),
+        Duration(seconds: upload == null ? 15 : 60),
       );
       if (response.statusCode == 401 || response.statusCode == 419) {
         await onUnauthorized?.call(token);

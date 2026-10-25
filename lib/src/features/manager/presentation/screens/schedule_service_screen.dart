@@ -32,6 +32,8 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
   bool _checkingAvailability = false;
   bool _submitting = false;
   RequestAvailabilityResult? _availability;
+  bool _loadingResources = true;
+  String? _resourceError;
 
   @override
   void initState() {
@@ -43,10 +45,63 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
     _date = preferred.isBefore(DateTime(today.year, today.month, today.day))
         ? today
         : preferred;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadResources();
+    });
+  }
+
+  Future<void> _loadResources() async {
+    setState(() {
+      _loadingResources = true;
+      _resourceError = null;
+    });
+    await Future.wait([
+      widget.repository.ensureScreenLoaded(UnionDataScreen.tractors),
+      widget.repository.ensureScreenLoaded(UnionDataScreen.operators),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _loadingResources = false;
+      _resourceError =
+          widget.repository.screenError(UnionDataScreen.tractors) ??
+          widget.repository.screenError(UnionDataScreen.operators);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_loadingResources || _resourceError != null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Schedule Service')),
+        body: Center(
+          child: _loadingResources
+              ? const CircularProgressIndicator()
+              : Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(_resourceError!),
+                      TextButton(
+                        onPressed: () async {
+                          await Future.wait([
+                            widget.repository.refreshScreen(
+                              UnionDataScreen.tractors,
+                            ),
+                            widget.repository.refreshScreen(
+                              UnionDataScreen.operators,
+                            ),
+                          ]);
+                          if (mounted) _loadResources();
+                        },
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                ),
+        ),
+      );
+    }
     final request = widget.repository.maybeRequestById(widget.requestId);
     if (request == null) {
       return Scaffold(

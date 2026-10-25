@@ -331,6 +331,7 @@ class OperationsJob {
     required this.scheduledAt,
     required this.estimatedHours,
     required this.status,
+    this.reference,
     this.scheduledEndAt,
     this.startedAt,
     this.completedAt,
@@ -347,6 +348,7 @@ class OperationsJob {
 
   final String id;
   final String requestId;
+  final String? reference;
   final String farmerName;
   final ServiceType serviceType;
   final FarmPlot plot;
@@ -380,6 +382,7 @@ class OperationsJob {
   }) {
     return OperationsJob(
       id: id,
+      reference: reference,
       requestId: requestId,
       farmerName: farmerName,
       serviceType: serviceType,

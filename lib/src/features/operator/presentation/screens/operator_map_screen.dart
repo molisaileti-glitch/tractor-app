@@ -62,6 +62,7 @@ class OperatorMapScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Icon(Icons.agriculture),
                             const SizedBox(width: 10),
@@ -72,7 +73,18 @@ class OperatorMapScreen extends StatelessWidget {
                                     ?.copyWith(fontWeight: FontWeight.w900),
                               ),
                             ),
-                            OperatorStatusPill(status: job.status),
+                            const SizedBox(width: 12),
+                            Flexible(
+                              child: Align(
+                                alignment: Alignment.topRight,
+                                child: OperatorStatusPill(
+                                  key: ValueKey(
+                                    'operator-job-status-${job.id}',
+                                  ),
+                                  status: job.status,
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 8),

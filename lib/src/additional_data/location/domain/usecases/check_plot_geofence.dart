@@ -22,7 +22,19 @@ class CheckPlotGeofence {
     required FarmPlot plot,
     required DeviceLocation location,
   }) {
-    if (plot.boundaryPoints.length < 3) {
+    bool valid(double latitude, double longitude) =>
+        latitude.isFinite &&
+        longitude.isFinite &&
+        latitude.abs() <= 90 &&
+        longitude.abs() <= 180;
+    final age = DateTime.now().difference(location.recordedAt).inSeconds;
+    if (plot.boundaryPoints.length < 3 ||
+        !valid(location.latitude, location.longitude) ||
+        age < -30 ||
+        age > 180 ||
+        plot.boundaryPoints.any(
+          (point) => !valid(point.latitude, point.longitude),
+        )) {
       return PlotGeofenceResult(
         isInside: false,
         distanceFromPlotMeters: double.infinity,
@@ -30,12 +42,14 @@ class CheckPlotGeofence {
       );
     }
 
-    final isInside = _containsPoint(plot.boundaryPoints, location);
+    final distance = _nearestBoundaryDistance(plot.boundaryPoints, location);
+    // Points on an edge belong to the farm. The small numerical epsilon here
+    // is not the backend's configured geofence tolerance.
+    final isInside =
+        distance <= 0.05 || _containsPoint(plot.boundaryPoints, location);
     return PlotGeofenceResult(
       isInside: isInside,
-      distanceFromPlotMeters: isInside
-          ? 0
-          : _nearestBoundaryDistance(plot.boundaryPoints, location),
+      distanceFromPlotMeters: isInside ? 0 : distance,
       location: location,
     );
   }
@@ -71,37 +85,28 @@ class CheckPlotGeofence {
     List<BoundaryPoint> boundary,
     DeviceLocation location,
   ) {
-    return boundary
-        .map(
-          (point) => _distanceMeters(
-            location.latitude,
-            location.longitude,
-            point.latitude,
-            point.longitude,
-          ),
-        )
-        .reduce(math.min);
-  }
-
-  double _distanceMeters(
-    double startLatitude,
-    double startLongitude,
-    double endLatitude,
-    double endLongitude,
-  ) {
     const earthRadiusMeters = 6371000.0;
-    final startLatRadians = _toRadians(startLatitude);
-    final endLatRadians = _toRadians(endLatitude);
-    final deltaLatRadians = _toRadians(endLatitude - startLatitude);
-    final deltaLongRadians = _toRadians(endLongitude - startLongitude);
-    final a =
-        math.sin(deltaLatRadians / 2) * math.sin(deltaLatRadians / 2) +
-        math.cos(startLatRadians) *
-            math.cos(endLatRadians) *
-            math.sin(deltaLongRadians / 2) *
-            math.sin(deltaLongRadians / 2);
-    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
-    return earthRadiusMeters * c;
+    final longitudeScale = math.cos(_toRadians(location.latitude));
+    double x(BoundaryPoint point) =>
+        earthRadiusMeters *
+        _toRadians(point.longitude - location.longitude) *
+        longitudeScale;
+    double y(BoundaryPoint point) =>
+        earthRadiusMeters * _toRadians(point.latitude - location.latitude);
+    var nearest = double.infinity;
+    for (var index = 0; index < boundary.length; index++) {
+      final start = boundary[index];
+      final end = boundary[(index + 1) % boundary.length];
+      final ax = x(start), ay = y(start);
+      final dx = x(end) - ax, dy = y(end) - ay;
+      final lengthSquared = dx * dx + dy * dy;
+      final fraction = lengthSquared == 0
+          ? 0.0
+          : (-(ax * dx + ay * dy) / lengthSquared).clamp(0.0, 1.0);
+      final px = ax + fraction * dx, py = ay + fraction * dy;
+      nearest = math.min(nearest, math.sqrt(px * px + py * py));
+    }
+    return nearest;
   }
 
   double _toRadians(double value) {

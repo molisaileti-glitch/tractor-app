@@ -12,6 +12,7 @@ void main() {
 
       repository.setMechanizationAccessToken('test-token');
       await _waitForSync(repository);
+      await repository.refreshScreen(UnionDataScreen.schedule);
 
       expect(repository.jobs, hasLength(1));
       expect(repository.jobs.single.id, 'active-job');

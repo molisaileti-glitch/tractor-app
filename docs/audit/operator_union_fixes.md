@@ -1,5 +1,9 @@
 # Operator and union manager flow repairs
 
+Later additions: [operator photo upload and farmer PIN/OTP confirmation](operator_photos_farmer_confirmation.md). These extend the earlier scope below with the documented operator-assisted confirmation flow.
+
+Latest update: [screen-specific refresh and farm boundary checks](screen_refresh_and_geofence.md).
+
 Implemented against the supplied **KwanzaTrack Mechanization API v1, September 2026** and Postman collection. This is the implementation update following the [baseline audit](project_audit.md); the baseline's connection labels and defect probes describe the earlier source snapshot.
 
 ## Scope and farmer-app boundary

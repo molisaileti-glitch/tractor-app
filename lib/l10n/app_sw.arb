@@ -115,5 +115,22 @@
   "verificationCodeSent": "Tumetuma nambari ya uthibitisho kwa {destination}.",
   "verifying": "Inathibitisha...",
   "sending": "Inatuma...",
-  "resendCode": "Tuma nambari tena"
+  "resendCode": "Tuma nambari tena",
+  "calendarStatusLegendTitle": "Rangi za hali ya kazi",
+  "calendarStatusLegendHint": "Linganisha rangi na lebo ya hali kwenye kila kazi.",
+  "calendarStatusInProgress": "Inaendelea",
+  "calendarStatusCompleted": "Imekamilika",
+  "calendarStatusCompleted": "Imekamilika",
+  "calendarStatusPaused": "Imesitishwa kwa muda",
+  "calendarStatusVerified": "Imehakikiwa",
+  "calendarStatusClosed": "Imefungwa",
+  "calendarStatusCancelled": "Imeghairiwa",
+  "calendarStatusFlagged": "Inahitaji ukaguzi",
+  "optionalBeforeServicePhotos": "Picha kabla ya kazi (hiari)",
+  "optionalAfterServicePhotos": "Picha baada ya kazi (hiari)",
+  "optionalWorkPhotos": "Picha za kazi (hiari)",
+  "optionalJobPhotosHint": "Picha ni za hiari. Unaweza kuanza au kukamilisha kazi bila kupakia picha.",
+  "inspectionBeforePhotos": "Kamilisha ukaguzi wa trekta ili kuongeza picha za hiari kabla ya kazi.",
+  "optionalBeforePhotosHint": "Ongeza picha kabla ya kazi ukihitaji, au endelea na uhakiki wa kuanza kazi.",
+  "optionalAfterPhotosHint": "Ongeza picha baada ya kazi ukihitaji, au maliza kazi bila picha."
 }

@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tractor/src/l10n/generated/app_localizations.dart';
 import 'package:tractor/src/features/operator/presentation/screens/operator_jobs_screen.dart';
+import 'package:tractor/src/features/operator/presentation/screens/operator_shell.dart';
+import 'package:tractor/src/shared/application/app_preferences_controller.dart';
 import 'package:tractor/src/core/network/kwanza_track_mobile_api_client.dart';
 import 'package:tractor/src/features/manager/data/repositories/union_operations_repository.dart';
 import 'package:tractor/src/features/manager/domain/entities/operations_models.dart';
@@ -12,6 +14,99 @@ import 'package:tractor/src/features/operator/data/repositories/operator_local_r
 import 'package:tractor/src/features/operator/domain/entities/operator_job.dart';
 
 void main() {
+  testWidgets('operator dashboard refreshes without switching tabs', (
+    tester,
+  ) async {
+    var reference = 'BEFORE-REFRESH';
+    final api = _Api(
+      handlers: {
+        #jobs: (_) async => {
+          'data': [
+            {..._Api._job('dispatched'), 'reference': reference},
+          ],
+        },
+        #job: (_) async => {
+          'data': {..._Api._job('dispatched'), 'reference': reference},
+        },
+      },
+    );
+    final repository = (await tester.runAsync(() => _operator(api)))!;
+    final preferences = AppPreferencesController();
+    addTearDown(repository.dispose);
+    addTearDown(preferences.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: OperatorShell(
+          repository: repository,
+          preferences: preferences,
+          onLogout: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('BEFORE-REFRESH'), findsOneWidget);
+    reference = 'AFTER-REFRESH';
+    await tester.runAsync(repository.refreshMechanizationData);
+    await tester.pumpAndSettle();
+    expect(find.text('AFTER-REFRESH'), findsOneWidget);
+    expect(find.text('BEFORE-REFRESH'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  test(
+    'tractor fixes merge across endpoints by capture time and tractor ID',
+    () async {
+      final now = DateTime.now().toUtc();
+      Map<String, Object?> live(
+        DateTime time,
+        double latitude, {
+        bool online = true,
+      }) => {
+        'online': online,
+        'position': {
+          'latitude': latitude,
+          'longitude': 35.8,
+          'fix_time': time.toIso8601String(),
+        },
+      };
+      Object? listLive = live(now.subtract(const Duration(minutes: 10)), -6.1);
+      final api = _Api(
+        handlers: {
+          #job: (_) async => {
+            'data': {
+              ..._Api._job('dispatched'),
+              'tractor_live': live(now, -6.2),
+            },
+          },
+          #tractors: (_) async => {
+            'data': [
+              {'id': 'audit-tractor', 'live': listLive},
+              {'id': 'another-tractor', 'live': live(now, -7.3)},
+            ],
+          },
+        },
+      );
+      final repository = await _operator(api);
+      addTearDown(repository.dispose);
+      await repository.refreshJobDetail('audit-job');
+      await repository.refreshTrackerPositions();
+      expect(repository.trackerPositionFor('audit-tractor')!.latitude, -6.2);
+      expect(repository.trackerPositionFor('another-tractor')!.latitude, -7.3);
+      listLive = null;
+      await repository.refreshTrackerPositions();
+      expect(repository.trackerPositionFor('audit-tractor')!.latitude, -6.2);
+      listLive = live(now, -6.2, online: false);
+      await repository.refreshTrackerPositions();
+      expect(repository.trackerPositionFor('audit-tractor')!.isLive, isFalse);
+      listLive = live(now.add(const Duration(seconds: 1)), -6.25);
+      await repository.refreshTrackerPositions();
+      expect(repository.trackerPositionFor('audit-tractor')!.latitude, -6.25);
+    },
+  );
+
   test(
     'today assignment survives a conflicting detail 404 until removed by me',
     () async {
@@ -95,6 +190,30 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('JOB-OLD'), findsOneWidget);
       expect(find.text('JOB-NEW'), findsOneWidget);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      tester.view.devicePixelRatio = 1;
+      for (final width in [320.0, 1000.0]) {
+        tester.view.physicalSize = Size(width, 1000);
+        await tester.pumpAndSettle();
+        for (final entry in {'old': 'JOB-OLD', 'new': 'JOB-NEW'}.entries) {
+          final status = find.byKey(
+            ValueKey('operator-job-status-${entry.key}'),
+          );
+          final header = find
+              .ancestor(of: find.text(entry.value), matching: find.byType(Row))
+              .first;
+          expect(
+            tester.getRect(status).right,
+            closeTo(tester.getRect(header).right, .1),
+          );
+          expect(
+            tester.getRect(status).top,
+            closeTo(tester.getRect(header).top, .1),
+          );
+        }
+        expect(tester.takeException(), isNull);
+      }
       expect(tester.takeException(), isNull);
     },
   );
@@ -102,6 +221,7 @@ void main() {
   test('parses the documented data.path trail', () async {
     final repository = await _operator(_Api());
     addTearDown(repository.dispose);
+    await repository.refreshWorkProgress('audit-job');
     expect(repository.jobs.single.trackPoints, hasLength(2));
   });
 
@@ -166,6 +286,7 @@ void main() {
     repository.setMechanizationAccessToken('audit-token');
     await _wait(() => repository.isSyncingMechanization);
     expect(repository.mechanizationSyncError, isNull);
+    await repository.refreshScreen(UnionDataScreen.tractors);
     expect(repository.tractors, hasLength(4));
     expect(repository.tractors.every((t) => !t.status.canSchedule), isTrue);
     // Inputs: working, suspended, unavailable, decommissioned.
@@ -178,6 +299,7 @@ void main() {
     addTearDown(repository.dispose);
     repository.setMechanizationAccessToken('audit-token');
     await _wait(() => repository.isSyncingMechanization);
+    await repository.refreshScreen(UnionDataScreen.requests);
     expect(repository.requests, hasLength(2));
     expect(repository.requests.map((r) => r.status).toSet(), {
       OperationsRequestStatus.completed,

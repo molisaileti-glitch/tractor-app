@@ -23,7 +23,7 @@ class OperationsDashboardView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final jobs = repository.scheduleJobs
+    final jobs = repository.jobs
         .where(
           (job) =>
               job.scheduledAt.year == now.year &&
@@ -42,13 +42,14 @@ class OperationsDashboardView extends StatelessWidget {
           title: "Today's Overview",
           subtitle: 'Requests, resources and field activity',
         ),
-        if (repository.isSyncingMechanization) ...[
+        if (repository.isRefreshingScreen(UnionDataScreen.dashboard)) ...[
           const LinearProgressIndicator(minHeight: 3),
           const SizedBox(height: 14),
-        ] else if (repository.mechanizationSyncError != null) ...[
+        ] else if (repository.screenError(UnionDataScreen.dashboard) !=
+            null) ...[
           _SyncNotice(
-            message: repository.mechanizationSyncError!,
-            onRetry: repository.refreshMechanizationData,
+            message: repository.screenError(UnionDataScreen.dashboard)!,
+            onRetry: () => repository.refreshScreen(UnionDataScreen.dashboard),
           ),
           const SizedBox(height: 14),
         ],
@@ -403,7 +404,16 @@ class _TodayJobCard extends StatelessWidget {
                   ],
                 ),
               ),
-              OperationsStatusChip.job(jobStatus: job.status),
+              const SizedBox(width: 12),
+              Flexible(
+                child: Align(
+                  alignment: Alignment.topRight,
+                  child: OperationsStatusChip.job(
+                    key: ValueKey('union-job-status-${job.id}'),
+                    jobStatus: job.status,
+                  ),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),

@@ -28,6 +28,7 @@ void main() {
     await _waitForSync(repository);
 
     expect(repository.dashboardJobs, isEmpty);
+    await repository.refreshScreen(OperatorDataScreen.schedule);
     expect(repository.scheduleJobs, hasLength(1));
     expect(repository.scheduleJobs.single.reference, 'JOB-CALENDAR');
   });

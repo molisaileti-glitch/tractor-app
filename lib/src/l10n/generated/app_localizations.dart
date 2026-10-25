@@ -793,6 +793,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Resend code'**
   String get resendCode;
+
+  /// No description provided for @calendarStatusLegendTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Job status colours'**
+  String get calendarStatusLegendTitle;
+
+  /// No description provided for @calendarStatusLegendHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Match the colour and status label to each job.'**
+  String get calendarStatusLegendHint;
+
+  /// No description provided for @calendarStatusInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get calendarStatusInProgress;
+
+  /// No description provided for @calendarStatusCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get calendarStatusCompleted;
+
+  /// No description provided for @calendarStatusPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get calendarStatusPaused;
+
+  /// No description provided for @calendarStatusVerified.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified'**
+  String get calendarStatusVerified;
+
+  /// No description provided for @calendarStatusClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Closed'**
+  String get calendarStatusClosed;
+
+  /// No description provided for @calendarStatusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get calendarStatusCancelled;
+
+  /// No description provided for @calendarStatusFlagged.
+  ///
+  /// In en, this message translates to:
+  /// **'Flagged'**
+  String get calendarStatusFlagged;
+
+  /// No description provided for @optionalBeforeServicePhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Before-service photos (optional)'**
+  String get optionalBeforeServicePhotos;
+
+  /// No description provided for @optionalAfterServicePhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'After-service photos (optional)'**
+  String get optionalAfterServicePhotos;
+
+  /// No description provided for @optionalWorkPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Work photos (optional)'**
+  String get optionalWorkPhotos;
+
+  /// No description provided for @optionalJobPhotosHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos are optional. You can start or complete work without uploading photos.'**
+  String get optionalJobPhotosHint;
+
+  /// No description provided for @inspectionBeforePhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete the tractor inspection to add optional before-service photos.'**
+  String get inspectionBeforePhotos;
+
+  /// No description provided for @optionalBeforePhotosHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add before-service photos if useful, or continue to the start check.'**
+  String get optionalBeforePhotosHint;
+
+  /// No description provided for @optionalAfterPhotosHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add after-service photos if useful, or finish the job without photos.'**
+  String get optionalAfterPhotosHint;
 }
 
 class _AppLocalizationsDelegate

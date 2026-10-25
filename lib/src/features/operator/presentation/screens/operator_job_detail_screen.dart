@@ -5,10 +5,13 @@ import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/operator_local_repository.dart';
 import '../../domain/entities/operator_job.dart';
 import '../widgets/operator_widgets.dart';
+import '../widgets/operator_live_job_map.dart';
 import 'operator_arrival_screen.dart';
 import 'operator_progress_screen.dart';
+import 'operator_job_photos_screen.dart';
+import 'operator_farmer_confirmation_screen.dart';
 
-class OperatorJobDetailScreen extends StatelessWidget {
+class OperatorJobDetailScreen extends StatefulWidget {
   const OperatorJobDetailScreen({
     super.key,
     required this.repository,
@@ -17,6 +20,16 @@ class OperatorJobDetailScreen extends StatelessWidget {
 
   final OperatorLocalRepository repository;
   final String jobId;
+
+  @override
+  State<OperatorJobDetailScreen> createState() =>
+      _OperatorJobDetailScreenState();
+}
+
+class _OperatorJobDetailScreenState extends State<OperatorJobDetailScreen> {
+  OperatorLocalRepository get repository => widget.repository;
+  String get jobId => widget.jobId;
+  final _mapKey = GlobalKey<OperatorLiveJobMapState>();
 
   @override
   Widget build(BuildContext context) {
@@ -36,11 +49,15 @@ class OperatorJobDetailScreen extends StatelessWidget {
           body: Stack(
             children: [
               Positioned.fill(
-                child: OperatorMapCard(
-                  job: job,
-                  tractorPosition: repository.trackerPositionFor(job.tractorId),
-                  label: 'JOB LOCATION',
+                child: OperatorLiveJobMap(
+                  key: _mapKey,
+                  repository: repository,
+                  jobId: job.id,
                   fill: true,
+                  refreshOnOpen: false,
+                  refreshPath:
+                      job.status == OperatorJobStatus.inProgress ||
+                      job.status == OperatorJobStatus.paused,
                 ),
               ),
               SafeArea(
@@ -51,6 +68,11 @@ class OperatorJobDetailScreen extends StatelessWidget {
                       IconButton.filledTonal(
                         onPressed: () => Navigator.of(context).pop(),
                         icon: const Icon(Icons.close),
+                      ),
+                      IconButton.filledTonal(
+                        tooltip: 'Refresh this job',
+                        onPressed: () => _mapKey.currentState?.refresh(),
+                        icon: const Icon(Icons.refresh),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -81,6 +103,25 @@ class OperatorJobDetailScreen extends StatelessWidget {
                     job: job,
                     onStartJourney: () => _advance(context, job),
                     onReportProblem: () => _showProblemDialog(context, job),
+                    onPhotos:
+                        repository.canAddJobPhotos(job) || job.photos.isNotEmpty
+                        ? () => Navigator.of(context).push(
+                            appPageRoute(
+                              builder: (_) => OperatorJobPhotosScreen(
+                                repository: repository,
+                                jobId: job.id,
+                                initialKind: job.isCompletedWork
+                                    ? 'after'
+                                    : (job.status ==
+                                              OperatorJobStatus.inProgress ||
+                                          job.status ==
+                                              OperatorJobStatus.paused)
+                                    ? 'during'
+                                    : 'before',
+                              ),
+                            ),
+                          )
+                        : null,
                   ),
                 ),
               ),
@@ -92,6 +133,18 @@ class OperatorJobDetailScreen extends StatelessWidget {
   }
 
   void _advance(BuildContext context, OperatorJob job) {
+    if (job.status == OperatorJobStatus.completedPendingConfirmation &&
+        job.farmerConfirmedAt == null) {
+      Navigator.of(context).push(
+        appPageRoute(
+          builder: (_) => OperatorFarmerConfirmationScreen(
+            repository: repository,
+            jobId: job.id,
+          ),
+        ),
+      );
+      return;
+    }
     if ((job.status == OperatorJobStatus.dispatched ||
             job.status == OperatorJobStatus.assigned) &&
         !job.acceptedByOperator) {
@@ -251,11 +304,13 @@ class _JobActionSheet extends StatelessWidget {
     required this.job,
     required this.onStartJourney,
     required this.onReportProblem,
+    required this.onPhotos,
   });
 
   final OperatorJob job;
   final VoidCallback onStartJourney;
   final VoidCallback onReportProblem;
+  final VoidCallback? onPhotos;
 
   @override
   Widget build(BuildContext context) {
@@ -273,6 +328,7 @@ class _JobActionSheet extends StatelessWidget {
             children: [
               OperatorCard(
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Icon(Icons.agriculture),
                     const SizedBox(width: 12),
@@ -306,16 +362,43 @@ class _JobActionSheet extends StatelessWidget {
                         ],
                       ),
                     ),
-                    OperatorStatusPill(status: job.status),
+                    const SizedBox(width: 12),
+                    Flexible(
+                      child: Align(
+                        alignment: Alignment.topRight,
+                        child: OperatorStatusPill(
+                          key: ValueKey('operator-job-status-${job.id}'),
+                          status: job.status,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
               const SizedBox(height: 14),
+              if (job.plot.boundaryPoints.isEmpty)
+                const Text(
+                  'Farm coordinates are unavailable. Ask the union to check the plot location.',
+                ),
+              if (onPhotos != null)
+                OutlinedButton.icon(
+                  onPressed: onPhotos,
+                  icon: const Icon(Icons.photo_library_outlined),
+                  label: const Text('Job photos'),
+                ),
+              const SizedBox(height: 8),
+              if (_statusGuidance(job) case final String guidance)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(guidance),
+                ),
               Row(
                 children: [
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: onStartJourney,
+                      onPressed: _statusGuidance(job) == null
+                          ? onStartJourney
+                          : null,
                       icon: const Icon(Icons.route_outlined),
                       label: Text(_primaryActionLabel(job)),
                     ),
@@ -344,11 +427,31 @@ class _JobActionSheet extends StatelessWidget {
       OperatorJobStatus.inProgress => 'Continue Work',
       OperatorJobStatus.paused => 'Resume Work',
       OperatorJobStatus.scheduled => 'Awaiting Dispatch',
-      OperatorJobStatus.completedPendingConfirmation ||
-      OperatorJobStatus.verified ||
-      OperatorJobStatus.closed ||
-      OperatorJobStatus.cancelled ||
-      OperatorJobStatus.flagged => 'View Job',
+      OperatorJobStatus.completedPendingConfirmation =>
+        job.farmerConfirmedAt == null
+            ? 'Farmer confirmation'
+            : 'Awaiting verification',
+      OperatorJobStatus.verified => 'Verified',
+      OperatorJobStatus.closed => 'Closed',
+      OperatorJobStatus.cancelled => 'Cancelled',
+      OperatorJobStatus.flagged => 'Under review',
     };
   }
+
+  String? _statusGuidance(OperatorJob job) => switch (job.status) {
+    OperatorJobStatus.scheduled =>
+      'The union must dispatch this job before you can accept it.',
+    OperatorJobStatus.completedPendingConfirmation
+        when job.farmerConfirmedAt != null =>
+      'Farmer confirmation is recorded. The union will review and verify the work.',
+    OperatorJobStatus.verified =>
+      'The union has verified the work. Awaiting job closure.',
+    OperatorJobStatus.closed =>
+      'This job is closed. You can review its photos.',
+    OperatorJobStatus.cancelled =>
+      'This job was cancelled. Contact the union for another assignment.',
+    OperatorJobStatus.flagged =>
+      'This job needs review. Contact the union before continuing.',
+    _ => null,
+  };
 }

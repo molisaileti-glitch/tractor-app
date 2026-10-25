@@ -3,11 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../../components/components.dart';
+import '../../../../l10n/generated/app_localizations.dart';
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/operator_local_repository.dart';
 import '../../domain/entities/operator_job.dart';
 import '../widgets/operator_widgets.dart';
+import '../widgets/operator_live_job_map.dart';
 import 'operator_complete_job_screen.dart';
+import 'operator_job_photos_screen.dart';
 
 class OperatorProgressScreen extends StatefulWidget {
   const OperatorProgressScreen({
@@ -28,8 +31,7 @@ class _OperatorProgressScreenState extends State<OperatorProgressScreen>
   OperatorLocalRepository get repository => widget.repository;
   String get jobId => widget.jobId;
   Timer? _clock;
-  Timer? _refresh;
-  bool _refreshing = false;
+  final _mapKey = GlobalKey<OperatorLiveJobMapState>();
   bool _busy = false;
 
   @override
@@ -46,21 +48,6 @@ class _OperatorProgressScreenState extends State<OperatorProgressScreen>
 
   void _startTimers() {
     _clock ??= Timer.periodic(const Duration(seconds: 1), (_) => _changed());
-    _refresh ??= Timer.periodic(
-      const Duration(seconds: 12),
-      (_) => unawaited(_refreshWork()),
-    );
-    unawaited(_refreshWork());
-  }
-
-  Future<void> _refreshWork() async {
-    if (_refreshing || _busy) return;
-    _refreshing = true;
-    try {
-      await repository.refreshWorkProgress(jobId);
-    } finally {
-      _refreshing = false;
-    }
   }
 
   @override
@@ -69,9 +56,7 @@ class _OperatorProgressScreenState extends State<OperatorProgressScreen>
       _startTimers();
     } else {
       _clock?.cancel();
-      _refresh?.cancel();
       _clock = null;
-      _refresh = null;
     }
   }
 
@@ -80,7 +65,6 @@ class _OperatorProgressScreenState extends State<OperatorProgressScreen>
     WidgetsBinding.instance.removeObserver(this);
     repository.removeListener(_changed);
     _clock?.cancel();
-    _refresh?.cancel();
     super.dispose();
   }
 
@@ -98,99 +82,129 @@ class _OperatorProgressScreenState extends State<OperatorProgressScreen>
     final duration = job.workDuration;
     return Scaffold(
       appBar: AppBar(title: Text(job.serviceType.label.toUpperCase())),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 620),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                OperatorStatusPill(status: job.status),
-                const SizedBox(height: 16),
-                OperatorCard(
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _Metric(
-                          label: 'Started',
-                          value: job.startedAt == null
-                              ? 'Pending'
-                              : formatTime(job.startedAt!),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _Metric(
-                          label: 'Duration',
-                          value: duration == null
-                              ? 'Pending'
-                              : _formatDuration(duration),
-                        ),
-                      ),
-                    ],
+      body: RefreshIndicator(
+        onRefresh: () =>
+            _mapKey.currentState?.refresh() ?? Future<void>.value(),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 620),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Align(
+                    alignment: Alignment.topRight,
+                    child: OperatorStatusPill(status: job.status),
                   ),
-                ),
-                const SizedBox(height: 14),
-                OperatorMapCard(job: job, showTrack: true, label: 'WORK TRACK'),
-                const SizedBox(height: 14),
-                OperatorCard(
-                  child: Row(
-                    children: [
-                      const Icon(Icons.gps_fixed),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          job.geofenceVerified
-                              ? 'Start location verified'
-                              : 'Start location was not geofence verified',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                if (job.status == OperatorJobStatus.inProgress) ...[
-                  OutlinedButton.icon(
-                    onPressed: _busy ? null : () => _pause(context, job),
-                    icon: const Icon(Icons.pause_circle_outline),
-                    label: const Text('Pause'),
-                  ),
-                  const SizedBox(height: 10),
-                ],
-                if (job.status == OperatorJobStatus.paused) ...[
-                  OutlinedButton.icon(
-                    onPressed: _busy ? null : () => _resume(context, job),
-                    icon: const Icon(Icons.play_circle_outline),
-                    label: const Text('Resume'),
-                  ),
-                  const SizedBox(height: 10),
-                ],
-                OutlinedButton.icon(
-                  onPressed: () => _showProblemDialog(context, job),
-                  icon: const Icon(Icons.report_problem_outlined),
-                  label: const Text('Report Problem'),
-                ),
-                const SizedBox(height: 10),
-                FilledButton.icon(
-                  onPressed:
-                      _busy ||
-                          (job.status != OperatorJobStatus.inProgress &&
-                              job.status != OperatorJobStatus.paused)
-                      ? null
-                      : () => Navigator.of(context).push(
-                          appPageRoute(
-                            builder: (_) => OperatorCompleteJobScreen(
-                              repository: repository,
-                              jobId: job.id,
-                            ),
+                  const SizedBox(height: 16),
+                  OperatorCard(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _Metric(
+                            label: 'Started',
+                            value: job.startedAt == null
+                                ? 'Pending'
+                                : formatTime(job.startedAt!),
                           ),
                         ),
-                  icon: const Icon(Icons.stop_circle_outlined),
-                  label: const Text('End Job'),
-                ),
-              ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _Metric(
+                            label: 'Duration',
+                            value: duration == null
+                                ? 'Pending'
+                                : _formatDuration(duration),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  OperatorLiveJobMap(
+                    key: _mapKey,
+                    repository: repository,
+                    jobId: job.id,
+                    routeEnabled: false,
+                    pollingEnabled: !_busy,
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                      appPageRoute(
+                        builder: (_) => OperatorJobPhotosScreen(
+                          repository: repository,
+                          jobId: job.id,
+                          initialKind: 'during',
+                        ),
+                      ),
+                    ),
+                    icon: const Icon(Icons.add_a_photo_outlined),
+                    label: Text(
+                      AppLocalizations.of(context)!.optionalWorkPhotos,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  OperatorCard(
+                    child: Row(
+                      children: [
+                        const Icon(Icons.gps_fixed),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            job.geofenceVerified
+                                ? 'Start location verified'
+                                : 'Start location was not geofence verified',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  if (job.status == OperatorJobStatus.inProgress) ...[
+                    OutlinedButton.icon(
+                      onPressed: _busy ? null : () => _pause(context, job),
+                      icon: const Icon(Icons.pause_circle_outline),
+                      label: const Text('Pause'),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                  if (job.status == OperatorJobStatus.paused) ...[
+                    OutlinedButton.icon(
+                      onPressed: _busy ? null : () => _resume(context, job),
+                      icon: const Icon(Icons.play_circle_outline),
+                      label: const Text('Resume'),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                  OutlinedButton.icon(
+                    onPressed: () => _showProblemDialog(context, job),
+                    icon: const Icon(Icons.report_problem_outlined),
+                    label: const Text('Report Problem'),
+                  ),
+                  const SizedBox(height: 10),
+                  FilledButton.icon(
+                    onPressed:
+                        _busy ||
+                            (job.status != OperatorJobStatus.inProgress &&
+                                job.status != OperatorJobStatus.paused)
+                        ? null
+                        : () => Navigator.of(context).push(
+                            appPageRoute(
+                              builder: (_) => OperatorCompleteJobScreen(
+                                repository: repository,
+                                jobId: job.id,
+                              ),
+                            ),
+                          ),
+                    icon: const Icon(Icons.stop_circle_outlined),
+                    label: const Text('End Job'),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

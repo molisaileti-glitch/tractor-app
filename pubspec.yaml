@@ -40,10 +40,12 @@ dependencies:
   uuid: ^4.6.0
   flutter_secure_storage: ^11.2.0
   google_maps_flutter: ^2.13.1
+  image_picker: ^1.2.3
   # Material motion transitions. 2.2.x supports the project's Dart SDK.
   animations: ^2.2.0
 
 dev_dependencies:
+  google_maps_flutter_platform_interface: ^2.17.0
   flutter_test:
     sdk: flutter
   flutter_launcher_icons: ^0.14.4

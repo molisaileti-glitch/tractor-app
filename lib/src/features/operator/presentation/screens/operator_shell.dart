@@ -31,72 +31,49 @@ class OperatorShell extends StatefulWidget {
   State<OperatorShell> createState() => _OperatorShellState();
 }
 
-class _OperatorShellState extends State<OperatorShell>
-    with WidgetsBindingObserver {
+class _OperatorShellState extends State<OperatorShell> {
   int _selectedIndex = 0;
+  OperatorDataScreen get _screen => OperatorDataScreen.values[_selectedIndex];
 
-  Timer? _refreshTimer;
-  bool _foreground = true;
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted &&
-          _foreground &&
-          (ModalRoute.of(context)?.isCurrent ?? false)) {
-        unawaited(widget.repository.refreshMechanizationData());
-      }
-    });
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    _foreground = state == AppLifecycleState.resumed;
-    if (_foreground && (ModalRoute.of(context)?.isCurrent ?? false)) {
-      unawaited(widget.repository.refreshMechanizationData());
-    }
-  }
-
-  @override
-  void dispose() {
-    _refreshTimer?.cancel();
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
+  void _selectScreen(int index) {
+    setState(() => _selectedIndex = index);
+    unawaited(widget.repository.ensureScreenLoaded(_screen));
   }
 
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
-    final screens = [
-      OperatorJobsScreen(
-        repository: widget.repository,
-        onOpenSchedule: () => setState(() => _selectedIndex = 1),
-        onRefresh: _refreshData,
-      ),
-      OperatorScheduleScreen(repository: widget.repository),
-      OperatorHistoryScreen(repository: widget.repository),
-      OperatorProfileScreen(
-        repository: widget.repository,
-        preferences: widget.preferences,
-        onLogout: widget.onLogout,
-        onThemeChanged: widget.onThemeChanged,
-      ),
-    ];
-
     return AnimatedBuilder(
       animation: widget.repository,
       builder: (context, _) {
+        // Create the current screens on each repository notification so the
+        // dashboard, history and profile receive refreshed job data.
+        final screens = [
+          OperatorJobsScreen(
+            repository: widget.repository,
+            onOpenSchedule: () => _selectScreen(1),
+            onRefresh: _refreshData,
+          ),
+          OperatorScheduleScreen(repository: widget.repository),
+          OperatorHistoryScreen(repository: widget.repository),
+          OperatorProfileScreen(
+            repository: widget.repository,
+            preferences: widget.preferences,
+            onLogout: widget.onLogout,
+            onThemeChanged: widget.onThemeChanged,
+          ),
+        ];
+
         return Scaffold(
           appBar: AppBar(
             title: Text(_titleForIndex(_selectedIndex, strings)),
             actions: [
               IconButton(
                 tooltip: strings.refresh,
-                onPressed: widget.repository.isSyncingMechanization
+                onPressed: widget.repository.isRefreshingScreen(_screen)
                     ? null
                     : _refreshData,
-                icon: widget.repository.isSyncingMechanization
+                icon: widget.repository.isRefreshingScreen(_screen)
                     ? const SizedBox.square(
                         dimension: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
@@ -120,7 +97,7 @@ class _OperatorShellState extends State<OperatorShell>
                         fillColor: Theme.of(context).scaffoldBackgroundColor,
                         child: child,
                       ),
-              child: widget.repository.isInitialMechanizationLoad
+              child: widget.repository.isInitialScreenLoad(_screen)
                   ? const AppScreenSkeleton(key: ValueKey('loading'))
                   : KeyedSubtree(
                       key: ValueKey(_selectedIndex),
@@ -130,9 +107,7 @@ class _OperatorShellState extends State<OperatorShell>
           ),
           bottomNavigationBar: NavigationBar(
             selectedIndex: _selectedIndex,
-            onDestinationSelected: (index) {
-              setState(() => _selectedIndex = index);
-            },
+            onDestinationSelected: _selectScreen,
             destinations: [
               NavigationDestination(
                 icon: const Icon(Icons.dashboard_outlined),
@@ -171,9 +146,11 @@ class _OperatorShellState extends State<OperatorShell>
   }
 
   Future<void> _refreshData() async {
-    await widget.repository.refreshMechanizationData();
+    final screen = _screen;
+    await widget.repository.refreshScreen(screen);
     if (!mounted) return;
-    final error = widget.repository.mechanizationSyncError;
+    if (screen != _screen) return;
+    final error = widget.repository.screenError(screen);
     showAppSnackBar(
       context,
       message: error ?? AppLocalizations.of(context)!.assignmentsRefreshed,

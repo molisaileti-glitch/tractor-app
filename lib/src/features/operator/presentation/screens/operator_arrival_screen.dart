@@ -7,29 +7,32 @@ import '../../../../additional_data/location/domain/entities/device_location.dar
 import '../../../../additional_data/location/domain/repositories/location_repository.dart';
 import '../../../../additional_data/location/domain/usecases/check_plot_geofence.dart';
 import '../../../../components/components.dart';
+import '../../../../l10n/generated/app_localizations.dart';
 import '../../data/repositories/operator_local_repository.dart';
 import '../../domain/entities/operator_job.dart';
 import '../widgets/operator_widgets.dart';
+import '../widgets/operator_live_job_map.dart';
 import 'operator_progress_screen.dart';
+import 'operator_job_photos_screen.dart';
 
 class OperatorArrivalScreen extends StatefulWidget {
   const OperatorArrivalScreen({
     super.key,
     required this.repository,
     required this.jobId,
+    this.locationRepository = const GeolocatorLocationRepository(),
   });
 
   final OperatorLocalRepository repository;
   final String jobId;
+  final LocationRepository locationRepository;
 
   @override
   State<OperatorArrivalScreen> createState() => _OperatorArrivalScreenState();
 }
 
-class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
-    with WidgetsBindingObserver {
-  final LocationRepository _phoneLocationRepository =
-      const GeolocatorLocationRepository();
+class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
+  LocationRepository get _phoneLocationRepository => widget.locationRepository;
   final CheckPlotGeofence _checkPlotGeofence = const CheckPlotGeofence();
 
   bool _checkingLocation = false;
@@ -37,49 +40,39 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
   bool _submittingInspection = false;
   bool _runningStartCheck = false;
   bool _submittingStart = false;
-  bool _inspectionRecorded = false;
   PlotGeofenceResult? _geofenceResult;
   OperatorStartCheckResult? _startCheck;
   String? _locationError;
   final _hourMeterController = TextEditingController();
   String? _selectedImplement;
-  Timer? _readinessTimer;
+  final _mapKey = GlobalKey<OperatorLiveJobMapState>();
   bool _pollingReadiness = false;
 
-  bool get _hasInspection =>
-      _inspectionRecorded ||
-      widget.repository.inspectedToday(
-        widget.repository.maybeJobById(widget.jobId)?.tractorId ?? '',
-      );
+  bool get _hasInspection => widget.repository.inspectedToday(
+    widget.repository.maybeJobById(widget.jobId)?.tractorId ?? '',
+  );
   bool get _readyForChecks =>
       !widget.repository.requiresInspection || _hasInspection;
 
-  void _startReadinessPolling() {
-    _readinessTimer ??= Timer.periodic(
-      const Duration(seconds: 6),
-      (_) => unawaited(_refreshReadiness()),
-    );
-  }
-
-  Future<void> _refreshReadiness() async {
+  Future<void> _refreshReadiness(DeviceLocation? phone) async {
     if (_pollingReadiness ||
         _submittingStart ||
         _runningStartCheck ||
-        !mounted) {
+        !mounted ||
+        !(ModalRoute.of(context)?.isCurrent ?? true)) {
       return;
     }
     _pollingReadiness = true;
     try {
-      await widget.repository.refreshJobDetail(widget.jobId);
-      if (!mounted) return;
-      if ((_startCheck != null ||
-              _geofenceResult != null ||
-              !widget.repository.requiresPhoneLocation) &&
-          _readyForChecks) {
-        final phone = _geofenceResult == null
-            ? null
-            : await widget.repository.captureFieldLocation();
-        if (!mounted) return;
+      final job = widget.repository.maybeJobById(widget.jobId);
+      if (job != null) {
+        setState(() {
+          _geofenceResult = phone == null
+              ? null
+              : _checkPlotGeofence(plot: job.plot, location: phone);
+        });
+      }
+      if (_startCheck != null && _readyForChecks) {
         final result = await widget.repository.runStartCheck(
           jobId: widget.jobId,
           phone: phone,
@@ -94,36 +87,17 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     widget.repository.addListener(_repositoryChanged);
-    widget.repository.startTrackerPolling();
     final job = widget.repository.maybeJobById(widget.jobId);
     if (job != null) {
       unawaited(widget.repository.refreshInspection(job.tractorId));
-    }
-    _startReadinessPolling();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      widget.repository.startTrackerPolling();
-      _startReadinessPolling();
-    } else if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.detached) {
-      widget.repository.stopTrackerPolling();
-      _readinessTimer?.cancel();
-      _readinessTimer = null;
+      unawaited(widget.repository.refreshTrackerPositions());
     }
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     widget.repository.removeListener(_repositoryChanged);
-    widget.repository.stopTrackerPolling();
-    _readinessTimer?.cancel();
     _hourMeterController.dispose();
     super.dispose();
   }
@@ -134,6 +108,7 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context)!;
     final job = widget.repository.maybeJobById(widget.jobId);
     if (job == null) {
       return Scaffold(
@@ -155,8 +130,6 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
     final hasArrived =
         job.status == OperatorJobStatus.arrived ||
         job.status == OperatorJobStatus.inProgress;
-    final routeLocation = _geofenceResult?.location;
-    final trackerPosition = widget.repository.trackerPositionFor(job.tractorId);
     final implementNames = widget.repository.implementNamesFor(job.tractorId);
     if (_selectedImplement != null &&
         !implementNames.contains(_selectedImplement)) {
@@ -166,239 +139,281 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
       appBar: AppBar(
         title: Text(hasArrived ? 'ARRIVAL & START' : 'JOURNEY TO FARM'),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 620),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                OperatorMapCard(
-                  job: job,
-                  label: hasArrived ? 'FARM LOCATION' : 'ROUTE TO FARM',
-                  routeFromLatitude: routeLocation?.latitude,
-                  routeFromLongitude: routeLocation?.longitude,
-                  tractorPosition: trackerPosition,
-                  routeEnabled: true,
-                ),
-                const SizedBox(height: 16),
-                OperatorStatusPill(status: job.status),
-                const SizedBox(height: 12),
-                OperatorCard(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        isInsideFarm
-                            ? Icons.check_circle_outline
-                            : Icons.warning_amber_outlined,
-                        color: isInsideFarm
-                            ? Theme.of(context).colorScheme.primary
-                            : Theme.of(context).colorScheme.error,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          _statusText(
-                            hasArrived: hasArrived,
-                            isInsideFarm: isInsideFarm,
-                            distanceMeters: distanceMeters,
-                          ),
-                          style: Theme.of(context).textTheme.bodyLarge
-                              ?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                    ],
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await Future.wait([
+            _mapKey.currentState?.refresh() ?? Future<void>.value(),
+            widget.repository.refreshInspection(job.tractorId),
+            widget.repository.refreshTrackerPositions(),
+          ]);
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 620),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  OperatorLiveJobMap(
+                    locationRepository: widget.locationRepository,
+                    key: _mapKey,
+                    repository: widget.repository,
+                    jobId: job.id,
+                    refreshPath: false,
+                    pollingEnabled: !_submittingStart,
+                    onLocationUpdated: _refreshReadiness,
                   ),
-                ),
-                if (_geofenceResult != null) ...[
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.topRight,
+                    child: OperatorStatusPill(status: job.status),
+                  ),
+                  const SizedBox(height: 12),
                   OperatorCard(
-                    child: Column(
+                    child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _LocationFact(
-                          label: 'Latitude',
-                          value: _geofenceResult!.location.latitude
-                              .toStringAsFixed(6),
+                        Icon(
+                          isInsideFarm
+                              ? Icons.check_circle_outline
+                              : Icons.warning_amber_outlined,
+                          color: isInsideFarm
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context).colorScheme.error,
                         ),
-                        _LocationFact(
-                          label: 'Longitude',
-                          value: _geofenceResult!.location.longitude
-                              .toStringAsFixed(6),
-                        ),
-                        _LocationFact(
-                          label: 'Accuracy',
-                          value:
-                              '${_geofenceResult!.location.accuracyMeters.toStringAsFixed(0)} m',
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 16),
-                _WorkflowStep(
-                  number: 1,
-                  title: 'Confirm your location',
-                  complete: _geofenceResult != null,
-                  child: OutlinedButton.icon(
-                    onPressed: _checkingLocation ? null : _refreshLocation,
-                    icon: const Icon(Icons.gps_fixed),
-                    label: Text(
-                      _checkingLocation
-                          ? 'Checking GPS...'
-                          : _geofenceResult == null
-                          ? 'Check Location'
-                          : 'Refresh Location',
-                    ),
-                  ),
-                ),
-                if (!hasArrived) ...[
-                  const SizedBox(height: 12),
-                  _WorkflowStep(
-                    number: 2,
-                    title: 'Travel and record arrival',
-                    complete: false,
-                    child: Column(
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: _checkingLocation
-                              ? null
-                              : _refreshLocation,
-                          icon: const Icon(Icons.route_outlined),
-                          label: const Text('Refresh Route'),
-                        ),
-                        const SizedBox(height: 10),
-                        FilledButton.icon(
-                          onPressed: _submittingArrival ? null : _recordArrival,
-                          icon: const Icon(Icons.flag_outlined),
-                          label: Text(
-                            _submittingArrival
-                                ? 'Recording arrival...'
-                                : 'Record Arrival',
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _statusText(
+                              hasArrived: hasArrived,
+                              isInsideFarm: isInsideFarm,
+                              distanceMeters: distanceMeters,
+                            ),
+                            style: Theme.of(context).textTheme.bodyLarge
+                                ?.copyWith(fontWeight: FontWeight.w700),
                           ),
                         ),
                       ],
                     ),
                   ),
-                ],
-                if (job.startOverride != null) ...[
-                  const SizedBox(height: 12),
-                  AppMessage(
-                    message:
-                        'Start override: ${job.startOverride!.status}'
-                        '${job.startOverride!.status == 'approved' && !job.startOverride!.isUsable ? ' (expired)' : ''}'
-                        '${job.startOverride!.note == null ? '' : '\n${job.startOverride!.note}'}',
-                    type: job.usableOverrideId != null
-                        ? AppMessageType.info
-                        : AppMessageType.warning,
-                  ),
-                ],
-                if (hasArrived) ...[
-                  const SizedBox(height: 12),
-                  _WorkflowStep(
-                    number: 2,
-                    title: 'Inspect the tractor',
-                    complete: _hasInspection,
-                    child: OutlinedButton.icon(
-                      onPressed: _submittingInspection
-                          ? null
-                          : _recordInspection,
-                      icon: const Icon(Icons.fact_check_outlined),
-                      label: Text(
-                        _hasInspection
-                            ? "Update Today's Inspection"
-                            : _submittingInspection
-                            ? 'Recording inspection...'
-                            : 'Record Inspection',
-                      ),
-                    ),
-                  ),
-                  if (_readyForChecks) ...[
-                    const SizedBox(height: 12),
-                    _WorkflowStep(
-                      number: 3,
-                      title: 'Run safety checks',
-                      complete: _startCheck?.canStart ?? false,
+                  if (_geofenceResult != null) ...[
+                    const SizedBox(height: 10),
+                    OperatorCard(
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          FilledButton.tonalIcon(
-                            onPressed: _runningStartCheck
-                                ? null
-                                : _runStartCheck,
-                            icon: const Icon(Icons.rule_folder_outlined),
-                            label: Text(
-                              _runningStartCheck
-                                  ? 'Running start check...'
-                                  : 'Run Start Check',
-                            ),
+                          _LocationFact(
+                            label: 'Latitude',
+                            value: _geofenceResult!.location.latitude
+                                .toStringAsFixed(6),
+                          ),
+                          _LocationFact(
+                            label: 'Longitude',
+                            value: _geofenceResult!.location.longitude
+                                .toStringAsFixed(6),
+                          ),
+                          _LocationFact(
+                            label: 'Accuracy',
+                            value:
+                                '${_geofenceResult!.location.accuracyMeters.toStringAsFixed(0)} m',
                           ),
                         ],
                       ),
                     ),
                   ],
-                  if ((_startCheck?.canStart ?? false) ||
-                      (job.usableOverrideId != null &&
-                          (_startCheck?.overrideAllowed ?? false))) ...[
+                  const SizedBox(height: 16),
+                  _WorkflowStep(
+                    number: 1,
+                    title: 'Confirm your location',
+                    complete: _geofenceResult != null,
+                    child: OutlinedButton.icon(
+                      onPressed: _checkingLocation ? null : _refreshLocation,
+                      icon: const Icon(Icons.gps_fixed),
+                      label: Text(
+                        _checkingLocation
+                            ? 'Checking GPS...'
+                            : _geofenceResult == null
+                            ? 'Check Location'
+                            : 'Refresh Location',
+                      ),
+                    ),
+                  ),
+                  if (!hasArrived) ...[
                     const SizedBox(height: 12),
                     _WorkflowStep(
-                      number: 4,
-                      title: 'Start service',
+                      number: 2,
+                      title: 'Travel and record arrival',
                       complete: false,
                       child: Column(
                         children: [
-                          TextField(
-                            controller: _hourMeterController,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            decoration: const InputDecoration(
-                              labelText: 'Start hour meter',
-                            ),
+                          const Text(
+                            'Both your phone and the assigned tractor must be within the farm boundary. The server checks GPS freshness, farm tolerance and proximity to the tractor.',
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: _checkingLocation
+                                ? null
+                                : _refreshLocation,
+                            icon: const Icon(Icons.route_outlined),
+                            label: const Text('Refresh Route'),
                           ),
                           const SizedBox(height: 10),
-                          if (implementNames.isEmpty)
-                            const AppMessage(
-                              message:
-                                  'No implement is configured. The server will validate the service requirements when you start.',
-                              type: AppMessageType.warning,
-                            )
-                          else
-                            DropdownButtonFormField<String>(
-                              initialValue: _selectedImplement,
-                              decoration: const InputDecoration(
-                                labelText: 'Implement',
-                                prefixIcon: Icon(Icons.handyman_outlined),
-                              ),
-                              hint: const Text('Select an implement'),
-                              items: [
-                                for (final implement in implementNames)
-                                  DropdownMenuItem(
-                                    value: implement,
-                                    child: Text(implement),
-                                  ),
-                              ],
-                              onChanged: (value) =>
-                                  setState(() => _selectedImplement = value),
-                            ),
-                          const SizedBox(height: 10),
                           FilledButton.icon(
-                            onPressed: _submittingStart ? null : _startJob,
-                            icon: const Icon(Icons.play_arrow),
+                            onPressed: _submittingArrival
+                                ? null
+                                : _recordArrival,
+                            icon: const Icon(Icons.flag_outlined),
                             label: Text(
-                              _submittingStart
-                                  ? 'Starting...'
-                                  : 'Start Service',
+                              _submittingArrival
+                                  ? 'Recording arrival...'
+                                  : 'Record Arrival',
                             ),
                           ),
                         ],
                       ),
                     ),
                   ],
+                  if (job.startOverride != null) ...[
+                    const SizedBox(height: 12),
+                    AppMessage(
+                      message:
+                          'Start override: ${job.startOverride!.status}'
+                          '${job.startOverride!.status == 'approved' && !job.startOverride!.isUsable ? ' (expired)' : ''}'
+                          '${job.startOverride!.note == null ? '' : '\n${job.startOverride!.note}'}',
+                      type: job.usableOverrideId != null
+                          ? AppMessageType.info
+                          : AppMessageType.warning,
+                    ),
+                  ],
+                  if (hasArrived) ...[
+                    const SizedBox(height: 12),
+                    _WorkflowStep(
+                      number: 2,
+                      title: 'Inspect the tractor',
+                      complete: _hasInspection,
+                      child: OutlinedButton.icon(
+                        onPressed: _submittingInspection
+                            ? null
+                            : _recordInspection,
+                        icon: const Icon(Icons.fact_check_outlined),
+                        label: Text(
+                          _hasInspection
+                              ? "Update Today's Inspection"
+                              : _submittingInspection
+                              ? 'Recording inspection...'
+                              : 'Record Inspection',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (_hasInspection) ...[
+                      Text(strings.optionalBeforePhotosHint),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        key: const ValueKey('optional-before-service-photos'),
+                        onPressed: _submittingInspection || _submittingStart
+                            ? null
+                            : () => Navigator.of(context).push(
+                                appPageRoute(
+                                  builder: (_) => OperatorJobPhotosScreen(
+                                    repository: widget.repository,
+                                    jobId: job.id,
+                                    initialKind: 'before',
+                                  ),
+                                ),
+                              ),
+                        icon: const Icon(Icons.add_a_photo_outlined),
+                        label: Text(strings.optionalBeforeServicePhotos),
+                      ),
+                    ] else
+                      Text(strings.inspectionBeforePhotos),
+                    if (_readyForChecks) ...[
+                      const SizedBox(height: 12),
+                      _WorkflowStep(
+                        number: 3,
+                        title: 'Run safety checks',
+                        complete: _startCheck?.canStart ?? false,
+                        child: Column(
+                          children: [
+                            FilledButton.tonalIcon(
+                              onPressed: _runningStartCheck
+                                  ? null
+                                  : _runStartCheck,
+                              icon: const Icon(Icons.rule_folder_outlined),
+                              label: Text(
+                                _runningStartCheck
+                                    ? 'Running start check...'
+                                    : 'Run Start Check',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    if ((_startCheck?.canStart ?? false) ||
+                        (job.usableOverrideId != null &&
+                            (_startCheck?.overrideAllowed ?? false))) ...[
+                      const SizedBox(height: 12),
+                      _WorkflowStep(
+                        number: 4,
+                        title: 'Start service',
+                        complete: false,
+                        child: Column(
+                          children: [
+                            TextField(
+                              controller: _hourMeterController,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                              decoration: const InputDecoration(
+                                labelText: 'Start hour meter',
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            if (implementNames.isEmpty)
+                              const AppMessage(
+                                message:
+                                    'No implement is configured. The server will validate the service requirements when you start.',
+                                type: AppMessageType.warning,
+                              )
+                            else
+                              DropdownButtonFormField<String>(
+                                initialValue: _selectedImplement,
+                                decoration: const InputDecoration(
+                                  labelText: 'Implement',
+                                  prefixIcon: Icon(Icons.handyman_outlined),
+                                ),
+                                hint: const Text('Select an implement'),
+                                items: [
+                                  for (final implement in implementNames)
+                                    DropdownMenuItem(
+                                      value: implement,
+                                      child: Text(implement),
+                                    ),
+                                ],
+                                onChanged: (value) =>
+                                    setState(() => _selectedImplement = value),
+                              ),
+                            const SizedBox(height: 10),
+                            FilledButton.icon(
+                              onPressed: _submittingStart ? null : _startJob,
+                              icon: const Icon(Icons.play_arrow),
+                              label: Text(
+                                _submittingStart
+                                    ? 'Starting...'
+                                    : 'Start Service',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
@@ -425,7 +440,7 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
           : 'Check location to show the route to the farm.';
     }
     if (hasArrived) {
-      return 'Phone location captured. Farm proximity will be validated during the start check.';
+      return 'Phone location captured. The start check verifies both phone and tractor against the farm boundary.';
     }
     if (isInsideFarm) {
       return 'You appear to be at the assigned farm. Record arrival before starting service.';
@@ -689,12 +704,13 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
     if (!mounted) return;
     setState(() {
       _submittingInspection = false;
-      if (ok) _inspectionRecorded = true;
     });
     showAppSnackBar(
       context,
       message: ok
-          ? 'Inspection recorded. Run the start check to confirm the job is ready.'
+          ? (_hasInspection
+                ? 'Inspection passed. You can add optional before-service photos, or continue to the start check.'
+                : 'Inspection recorded. Resolve the tractor issues and pass inspection before starting work.')
           : widget.repository.lastActionError ??
                 'Inspection could not be recorded.',
       type: ok ? AppSnackType.success : AppSnackType.error,

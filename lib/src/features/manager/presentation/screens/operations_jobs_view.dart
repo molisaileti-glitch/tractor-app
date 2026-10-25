@@ -61,6 +61,51 @@ class OperationsJobsView extends StatelessWidget {
   }
 }
 
+class OperationsJobDetailScreen extends StatelessWidget {
+  const OperationsJobDetailScreen({
+    super.key,
+    required this.repository,
+    required this.jobId,
+  });
+
+  final UnionOperationsRepository repository;
+  final String jobId;
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: repository,
+    builder: (context, _) {
+      final job = repository.maybeJobById(jobId);
+      return Scaffold(
+        appBar: AppBar(title: Text(job?.reference ?? 'Job details')),
+        body: RefreshIndicator(
+          onRefresh: () => repository.refreshJobDetail(jobId),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (repository.mechanizationActionError != null)
+                  AppMessage(
+                    message: repository.mechanizationActionError!,
+                    type: AppMessageType.error,
+                  ),
+                if (job == null)
+                  const Text(
+                    'This job is no longer available. Refresh the schedule.',
+                  )
+                else
+                  _JobCard(repository: repository, job: job),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
 class _JobFact extends StatelessWidget {
   const _JobFact({
     required this.icon,
@@ -161,13 +206,29 @@ class _JobCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                OperationsStatusChip.job(jobStatus: job.status),
-                if (_canManage)
-                  IconButton(
-                    tooltip: 'Job actions',
-                    onPressed: () => _showActions(context),
-                    icon: const Icon(Icons.more_vert),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Align(
+                    alignment: Alignment.topRight,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        OperationsStatusChip.job(
+                          key: ValueKey('union-job-status-${job.id}'),
+                          jobStatus: job.status,
+                        ),
+                        if (_canManage)
+                          IconButton(
+                            tooltip: 'Job actions',
+                            onPressed: () => _showActions(context),
+                            visualDensity: VisualDensity.compact,
+                            icon: const Icon(Icons.more_vert),
+                          ),
+                      ],
+                    ),
                   ),
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -223,7 +284,7 @@ class _JobCard extends StatelessWidget {
               Text(
                 repository.requiresFarmerConfirmation &&
                         job.farmerConfirmedAt == null
-                    ? 'Awaiting farmer confirmation from Shamba Bora.'
+                    ? 'Awaiting farmer confirmation by PIN/SMS with the operator or through Shamba Bora.'
                     : 'Ready for union verification.',
               ),
             const SizedBox(height: 10),
@@ -653,7 +714,7 @@ class _JobCard extends StatelessWidget {
         context,
         title: 'Farmer confirmation required',
         message:
-            'Wait for the farmer to confirm in Shamba Bora, then refresh this job. An authorised union officer may also record a confirmation received by phone or at the office.',
+            'Ask the operator to record the farmer\'s PIN/SMS confirmation, or wait for confirmation through Shamba Bora, then refresh this job. An authorised union officer may also record a confirmation received by phone or at the office.',
       );
       return;
     }

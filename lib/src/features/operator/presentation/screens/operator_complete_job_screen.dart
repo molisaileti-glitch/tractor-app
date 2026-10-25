@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../../../components/components.dart';
+import '../../../../l10n/generated/app_localizations.dart';
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/operator_local_repository.dart';
 import '../widgets/operator_widgets.dart';
+import 'operator_job_photos_screen.dart';
+import 'operator_farmer_confirmation_screen.dart';
 
 class OperatorCompleteJobScreen extends StatefulWidget {
   const OperatorCompleteJobScreen({
@@ -38,6 +41,7 @@ class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context)!;
     final job = widget.repository.maybeJobById(widget.jobId);
     if (job == null) {
       return Scaffold(
@@ -67,7 +71,11 @@ class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
                             ? 'Pending'
                             : formatTime(job.startedAt!),
                       ),
-                      _Fact(label: 'Status', value: job.status.label),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.topRight,
+                        child: OperatorStatusPill(status: job.status),
+                      ),
                     ],
                   ),
                 ),
@@ -107,6 +115,25 @@ class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
                   decoration: const InputDecoration(labelText: 'Add Notes'),
                 ),
                 const SizedBox(height: 16),
+                Text(strings.optionalAfterPhotosHint),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  key: const ValueKey('optional-after-service-photos'),
+                  onPressed: _submitting
+                      ? null
+                      : () => Navigator.of(context).push(
+                          appPageRoute(
+                            builder: (_) => OperatorJobPhotosScreen(
+                              repository: widget.repository,
+                              jobId: widget.jobId,
+                              initialKind: 'after',
+                            ),
+                          ),
+                        ),
+                  icon: const Icon(Icons.add_a_photo_outlined),
+                  label: Text(strings.optionalAfterServicePhotos),
+                ),
+                const SizedBox(height: 12),
                 AppGlowButton(
                   onPressed: _submitting ? null : _submit,
                   loading: _submitting,
@@ -181,10 +208,19 @@ class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
       context,
       title: 'Work submitted',
       message:
-          'Completed work was sent to the union. The farmer can review and confirm it in Shamba Bora.',
+          'Work was completed. The farmer can now confirm satisfaction using their PIN or SMS code, or confirm later.',
     );
     if (!mounted) return;
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    final navigator = Navigator.of(context);
+    navigator.popUntil((route) => route.isFirst);
+    navigator.push(
+      appPageRoute(
+        builder: (_) => OperatorFarmerConfirmationScreen(
+          repository: widget.repository,
+          jobId: widget.jobId,
+        ),
+      ),
+    );
   }
 }
 

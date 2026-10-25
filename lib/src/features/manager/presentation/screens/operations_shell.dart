@@ -51,8 +51,7 @@ class OperationsShell extends StatefulWidget {
   State<OperationsShell> createState() => _OperationsShellState();
 }
 
-class _OperationsShellState extends State<OperationsShell>
-    with WidgetsBindingObserver {
+class _OperationsShellState extends State<OperationsShell> {
   static const _primarySections = <OperationsSection>[
     OperationsSection.dashboard,
     OperationsSection.requests,
@@ -73,35 +72,7 @@ class _OperationsShellState extends State<OperationsShell>
   OperationsSection _section = OperationsSection.dashboard;
   int _lastPrimaryIndex = 0;
 
-  Timer? _refreshTimer;
-  bool _foreground = true;
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted &&
-          _foreground &&
-          (ModalRoute.of(context)?.isCurrent ?? false)) {
-        unawaited(widget.repository.refreshMechanizationData());
-      }
-    });
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    _foreground = state == AppLifecycleState.resumed;
-    if (_foreground && (ModalRoute.of(context)?.isCurrent ?? false)) {
-      unawaited(widget.repository.refreshMechanizationData());
-    }
-  }
-
-  @override
-  void dispose() {
-    _refreshTimer?.cancel();
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
+  UnionDataScreen get _screen => UnionDataScreen.values.byName(_section.name);
 
   @override
   Widget build(BuildContext context) {
@@ -173,7 +144,7 @@ class _OperationsShellState extends State<OperationsShell>
                       switchOutCurve: Curves.easeInCubic,
                       transitionBuilder: (child, animation) =>
                           FadeTransition(opacity: animation, child: child),
-                      child: widget.repository.isInitialMechanizationLoad
+                      child: widget.repository.isInitialScreenLoad(_screen)
                           ? const AppScreenSkeleton(key: ValueKey('loading'))
                           : RefreshIndicator(
                               key: ValueKey(_section),
@@ -196,14 +167,13 @@ class _OperationsShellState extends State<OperationsShell>
                                       crossAxisAlignment:
                                           CrossAxisAlignment.stretch,
                                       children: [
-                                        if (widget
-                                                .repository
-                                                .mechanizationSyncError !=
+                                        if (widget.repository.screenError(
+                                              _screen,
+                                            ) !=
                                             null) ...[
                                           AppMessage(
-                                            message: widget
-                                                .repository
-                                                .mechanizationSyncError!,
+                                            message: widget.repository
+                                                .screenError(_screen)!,
                                             type: AppMessageType.warning,
                                           ),
                                           const SizedBox(height: 12),
@@ -340,16 +310,11 @@ class _OperationsShellState extends State<OperationsShell>
       final primaryIndex = _primarySections.indexOf(section);
       if (primaryIndex >= 0) _lastPrimaryIndex = primaryIndex;
     });
+    unawaited(widget.repository.ensureScreenLoaded(_screen));
   }
 
   bool get _isRefreshingCurrentSection {
-    if (widget.repository.isSyncingMechanization) return true;
-    return switch (_section) {
-      OperationsSection.tractors => widget.repository.isRefreshingTractors,
-      OperationsSection.operators => widget.repository.isRefreshingOperators,
-      OperationsSection.farmers => widget.repository.isRefreshingFarmers,
-      _ => widget.repository.isSyncingMechanization,
-    };
+    return widget.repository.isRefreshingScreen(_screen);
   }
 
   Future<void> _refreshCurrentSection() async {
@@ -357,18 +322,11 @@ class _OperationsShellState extends State<OperationsShell>
       _section,
       AppLocalizations.of(context)!,
     ).toLowerCase();
-    switch (_section) {
-      case OperationsSection.tractors:
-        await widget.repository.refreshTractors();
-      case OperationsSection.operators:
-        await widget.repository.refreshOperators();
-      case OperationsSection.farmers:
-        await widget.repository.refreshFarmers();
-      default:
-        await widget.repository.refreshMechanizationData();
-    }
+    final screen = _screen;
+    await widget.repository.refreshScreen(screen);
     if (!mounted) return;
-    final error = widget.repository.mechanizationSyncError;
+    if (screen != _screen) return;
+    final error = widget.repository.screenError(screen);
     showAppSnackBar(
       context,
       message: error ?? '${_capitalize(label)} refreshed successfully.',

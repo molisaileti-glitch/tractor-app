@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../additional_data/location/domain/entities/device_location.dart';
+import '../../../../additional_data/location/domain/repositories/location_repository.dart';
 import '../../../../additional_data/location/data/repositories/geolocator_location_repository.dart';
 import '../../../../core/network/kwanza_track_mobile_api_client.dart';
 import '../../../../core/network/mechanization_data.dart';
@@ -11,24 +12,31 @@ import '../../../farmer/domain/entities/farm_plot.dart';
 import '../../../farmer/domain/entities/service_request.dart';
 import '../../domain/entities/operator_job.dart';
 
+enum OperatorDataScreen { dashboard, schedule, history, profile }
+
 class OperatorLocalRepository extends ChangeNotifier {
-  OperatorLocalRepository.seeded({KwanzaTrackMobileApiClient? mobileApiClient})
-    : mobileApiClient = mobileApiClient ?? const KwanzaTrackMobileApiClient(),
-      _jobs = [];
+  OperatorLocalRepository.seeded({
+    KwanzaTrackMobileApiClient? mobileApiClient,
+    LocationRepository? locationRepository,
+  }) : mobileApiClient = mobileApiClient ?? const KwanzaTrackMobileApiClient(),
+       _locationRepository =
+           locationRepository ?? const GeolocatorLocationRepository(),
+       _jobs = [];
 
   final KwanzaTrackMobileApiClient mobileApiClient;
+  final LocationRepository _locationRepository;
   final List<OperatorJob> _jobs;
   final Map<String, Map<String, Object?>> _jobPayloads = {};
   final Map<String, OperatorJob> _historyJobs = {};
   final Map<String, String> _assignmentAccessErrors = {};
   final Map<String, OperatorStartCheckResult> _startChecks = {};
   final Set<String> _inspectedTractors = {};
+  final Map<String, int> _inspectionVersions = {};
   Map<String, Object?> _policy = {};
   final Map<String, String> _eventIds = {};
   final Set<String> _pendingActions = {};
   Set<String>? _permissions;
   int _dataVersion = 0;
-  bool _hasLoadedMechanization = false;
   bool _disposed = false;
   int _sessionVersion = 0;
   final List<OperatorJob> _todayJobs = [];
@@ -38,15 +46,121 @@ class OperatorLocalRepository extends ChangeNotifier {
   final Map<String, TractorTrackerPosition> _trackerPositions = {};
   final Map<String, List<String>> _tractorImplements = {};
   String? _accessToken;
-  bool _isSyncingMechanization = false;
-  String? _mechanizationSyncError;
   String? _lastActionError;
   String? _operatorName;
   String? _operatorEmail;
   String? _operatorRole;
-  int _syncGeneration = 0;
-  Timer? _trackerPollTimer;
   bool _isRefreshingTrackerPositions = false;
+  final Map<OperatorDataScreen, Future<void>> _screenLoads = {};
+  final Set<OperatorDataScreen> _loadedScreens = {};
+  final Map<OperatorDataScreen, String> _screenErrors = {};
+
+  bool isRefreshingScreen(OperatorDataScreen screen) =>
+      _screenLoads.containsKey(screen);
+  bool isInitialScreenLoad(OperatorDataScreen screen) =>
+      isRefreshingScreen(screen) && !_loadedScreens.contains(screen);
+  String? screenError(OperatorDataScreen screen) =>
+      _screenErrors[screen] ??
+      (screen == OperatorDataScreen.dashboard &&
+              _assignmentAccessErrors.isNotEmpty
+          ? _assignmentAccessErrors.values.join('\n')
+          : null);
+  Future<void> ensureScreenLoaded(OperatorDataScreen screen) =>
+      _loadedScreens.contains(screen) ? Future.value() : refreshScreen(screen);
+
+  Future<void> refreshScreen(OperatorDataScreen screen) {
+    final pending = _screenLoads[screen];
+    if (pending != null) return pending;
+    final token = _accessToken;
+    if (token == null || token.isEmpty) return Future.value();
+    final session = _sessionVersion;
+    final completion = Completer<void>();
+    _screenLoads[screen] = completion.future;
+    _screenErrors.remove(screen);
+    notifyListeners();
+    unawaited(
+      _loadScreen(screen, token, session).whenComplete(() {
+        if (_currentSession(token, session)) {
+          _screenLoads.remove(screen);
+          _loadedScreens.add(screen);
+          notifyListeners();
+        }
+        completion.complete();
+      }),
+    );
+    return completion.future;
+  }
+
+  Future<void> _loadScreen(
+    OperatorDataScreen screen,
+    String token,
+    int session,
+  ) async {
+    final version = _dataVersion;
+    bool current() =>
+        _currentSession(token, session) && version == _dataVersion;
+    try {
+      switch (screen) {
+        case OperatorDataScreen.dashboard:
+          final responses = await Future.wait([
+            mobileApiClient.me(token: token),
+            allApiPages(
+              (page) => mobileApiClient.jobs(
+                token: token,
+                status: 'active',
+                mine: true,
+                page: page,
+              ),
+              isCurrent: current,
+            ),
+          ]);
+          if (!current()) return;
+          _applyMeResponse(responses[0]);
+          _applyJobsResponse(responses[1]);
+          await _validateTodayFallbacks(token);
+          if (!current()) return;
+        case OperatorDataScreen.schedule:
+          final today = DateTime.now();
+          final response = await mobileApiClient.calendar(
+            token: token,
+            mine: true,
+            from: _dateOnly(today.subtract(const Duration(days: 90))),
+            to: _dateOnly(today.add(const Duration(days: 365))),
+          );
+          if (!current()) return;
+          _applyCalendarResponse(response);
+        case OperatorDataScreen.history:
+          final response = await allApiPages(
+            (page) => mobileApiClient.jobs(
+              token: token,
+              status: 'completed,verified,closed,cancelled',
+              mine: true,
+              page: page,
+            ),
+            isCurrent: current,
+          );
+          if (!current()) return;
+          final history = <String, OperatorJob>{};
+          for (final item in _dataList(response).whereType<Map>()) {
+            final job = _jobFromApiJson(_stringKeyedMap(item));
+            if (job != null && job.isComplete) history[job.id] = job;
+          }
+          _historyJobs
+            ..clear()
+            ..addAll(history);
+        case OperatorDataScreen.profile:
+          final response = await mobileApiClient.me(token: token);
+          if (!current()) return;
+          _applyMeResponse(response);
+      }
+      _rebuildJobs();
+    } catch (error) {
+      if (!current()) return;
+      _screenErrors[screen] = error is KwanzaTrackApiException
+          ? error.message
+          : 'Could not refresh this screen: $error';
+    }
+  }
 
   bool get canOperate => _permissions?.contains('mech.operate') ?? true;
   bool _requireOperation() {
@@ -63,6 +177,12 @@ class OperatorLocalRepository extends ChangeNotifier {
       _policy['require_farmer_confirmation'] != false;
   bool inspectedToday(String tractorId) =>
       _inspectedTractors.contains(tractorId);
+  bool canAddJobPhotos(OperatorJob job) =>
+      (job.status == OperatorJobStatus.arrived &&
+          inspectedToday(job.tractorId)) ||
+      job.status == OperatorJobStatus.inProgress ||
+      job.status == OperatorJobStatus.paused ||
+      job.isCompletedWork;
   OperatorStartCheckResult? startCheckFor(String jobId) => _startChecks[jobId];
   bool _currentSession(String token, int version) =>
       !_disposed && _accessToken == token && _sessionVersion == version;
@@ -85,10 +205,10 @@ class OperatorLocalRepository extends ChangeNotifier {
   Map<String, TractorTrackerPosition> get trackerPositions =>
       Map.unmodifiable(_trackerPositions);
   bool get isInitialMechanizationLoad =>
-      _isSyncingMechanization && !_hasLoadedMechanization;
-  bool get isSyncingMechanization => _isSyncingMechanization;
+      isInitialScreenLoad(OperatorDataScreen.dashboard);
+  bool get isSyncingMechanization => _screenLoads.isNotEmpty;
   String? get mechanizationSyncError =>
-      _mechanizationSyncError ??
+      _screenErrors[OperatorDataScreen.dashboard] ??
       (_assignmentAccessErrors.isEmpty
           ? null
           : _assignmentAccessErrors.values.join('\n'));
@@ -146,14 +266,9 @@ class OperatorLocalRepository extends ChangeNotifier {
     final normalized = trimmed == null || trimmed.isEmpty ? null : trimmed;
     if (_accessToken == normalized) return;
     _sessionVersion++;
-    _syncGeneration++;
-    stopTrackerPolling();
     _accessToken = normalized;
     if (normalized == null) _permissions = null;
-    _isSyncingMechanization = false;
-    _hasLoadedMechanization = false;
     _isRefreshingTrackerPositions = false;
-    _mechanizationSyncError = null;
     _lastActionError = null;
     _operatorName = null;
     _operatorEmail = null;
@@ -167,127 +282,26 @@ class OperatorLocalRepository extends ChangeNotifier {
     _jobPayloads.clear();
     _eventIds.clear();
     _pendingActions.clear();
+    _screenLoads.clear();
+    _loadedScreens.clear();
+    _screenErrors.clear();
     _dataVersion++;
     _startChecks.clear();
     _inspectedTractors.clear();
+    _inspectionVersions.clear();
     _inspectionChecklist.clear();
     _trackerPositions.clear();
     _tractorImplements.clear();
     _policy = {};
     notifyListeners();
-    if (_accessToken != null) unawaited(refreshMechanizationData());
-  }
-
-  Future<void> refreshMechanizationData() async {
-    final token = _accessToken;
-    final session = _sessionVersion;
-    if (token == null || token.isEmpty || _isSyncingMechanization) return;
-
-    final dataVersion = _dataVersion;
-    final generation = ++_syncGeneration;
-    _isSyncingMechanization = true;
-    _mechanizationSyncError = null;
-    notifyListeners();
-
-    try {
-      final today = DateTime.now();
-      final from = _dateOnly(today.subtract(const Duration(days: 90)));
-      final to = _dateOnly(today.add(const Duration(days: 365)));
-      final responses = await Future.wait<Map<String, Object?>>([
-        mobileApiClient.me(token: token),
-        mobileApiClient.calendar(token: token, from: from, to: to, mine: true),
-        allApiPages(
-          (page) => mobileApiClient.jobs(
-            token: token,
-            status: 'active',
-            mine: true,
-            page: page,
-          ),
-          isCurrent: () => _currentSession(token, session),
-        ),
-        mobileApiClient.tractors(token: token, mine: true, live: true),
-      ]);
-      if (!_currentSession(token, session) || dataVersion != _dataVersion) {
-        return;
-      }
-      if (generation != _syncGeneration) return;
-
-      _applyMeResponse(responses[0]);
-      _applyCalendarResponse(responses[1]);
-      _applyJobsResponse(responses[2]);
-      await _validateTodayFallbacks(token);
-      if (!_currentSession(token, session) || dataVersion != _dataVersion) {
-        return;
-      }
-      _rebuildJobs();
-      _applyTrackerPositionsResponse(responses[3]);
-      final history = await allApiPages(
-        (page) => mobileApiClient.jobs(
-          token: token,
-          status: 'completed,verified,closed,cancelled',
-          mine: true,
-          page: page,
-        ),
-        isCurrent: () => _currentSession(token, session),
-      );
-      if (!_currentSession(token, session) || dataVersion != _dataVersion) {
-        return;
-      }
-      for (final item in _dataList(history).whereType<Map>()) {
-        final status = _jobStatus(item['status']?.toString());
-        if (![
-          OperatorJobStatus.completedPendingConfirmation,
-          OperatorJobStatus.verified,
-          OperatorJobStatus.closed,
-          OperatorJobStatus.cancelled,
-        ].contains(status)) {
-          continue;
-        }
-        final job = _jobFromApiJson(_stringKeyedMap(item));
-        if (job != null) _historyJobs[job.id] = job;
-      }
-      _rebuildJobs();
-      await _refreshJobPaths(token);
-      if (!_currentSession(token, session) || dataVersion != _dataVersion) {
-        return;
-      }
-      _mechanizationSyncError = null;
-    } on KwanzaTrackApiException catch (error) {
-      if (!_currentSession(token, session) || dataVersion != _dataVersion) {
-        return;
-      }
-      if (generation == _syncGeneration) {
-        _mechanizationSyncError = error.message;
-      }
-    } catch (error) {
-      if (!_currentSession(token, session) || dataVersion != _dataVersion) {
-        return;
-      }
-      if (generation == _syncGeneration) {
-        _mechanizationSyncError = 'Could not refresh operator jobs: $error';
-      }
-    } finally {
-      if (generation == _syncGeneration) {
-        _hasLoadedMechanization = true;
-        _isSyncingMechanization = false;
-        notifyListeners();
-      }
+    if (_accessToken != null) {
+      unawaited(refreshScreen(OperatorDataScreen.dashboard));
     }
   }
 
-  void startTrackerPolling() {
-    if (_trackerPollTimer != null || _accessToken == null) return;
-    unawaited(refreshTrackerPositions());
-    _trackerPollTimer = Timer.periodic(
-      const Duration(seconds: 12),
-      (_) => unawaited(refreshTrackerPositions()),
-    );
-  }
-
-  void stopTrackerPolling() {
-    _trackerPollTimer?.cancel();
-    _trackerPollTimer = null;
-  }
+  // Compatibility entry point: refresh only the operator dashboard.
+  Future<void> refreshMechanizationData() =>
+      refreshScreen(OperatorDataScreen.dashboard);
 
   Future<void> refreshTrackerPositions() async {
     final token = _accessToken;
@@ -460,7 +474,7 @@ class OperatorLocalRepository extends ChangeNotifier {
 
     try {
       _lastActionError = null;
-      await mobileApiClient.createInspection(
+      final response = await mobileApiClient.createInspection(
         token: token,
         tractorId: tractorId,
         checklist: checklist,
@@ -472,7 +486,21 @@ class OperatorLocalRepository extends ChangeNotifier {
         phone: _phonePayload(phone),
       );
       if (!_currentSession(token, session)) return false;
-      _inspectedTractors.add(tractorId);
+      final data = _map(response['data']);
+      final inspection = _map(data['inspection']).isNotEmpty
+          ? _map(data['inspection'])
+          : data;
+      final fit =
+          _asBool(inspection['is_fit']) ??
+          isFit ??
+          checklist.values.every((value) => value == true);
+      _inspectionVersions[tractorId] =
+          (_inspectionVersions[tractorId] ?? 0) + 1;
+      if (fit) {
+        _inspectedTractors.add(tractorId);
+      } else {
+        _inspectedTractors.remove(tractorId);
+      }
       notifyListeners();
       return true;
     } on KwanzaTrackApiException catch (error) {
@@ -487,8 +515,7 @@ class OperatorLocalRepository extends ChangeNotifier {
     final token = _accessToken;
     final session = _sessionVersion;
     if (token == null) return null;
-    final result = await const GeolocatorLocationRepository()
-        .getCurrentLocation();
+    final result = await _locationRepository.getCurrentLocation();
     if (!_currentSession(token, session)) return null;
     if (result is LocationSuccess) return result.location;
     if (result is LocationUnavailable) {
@@ -500,13 +527,17 @@ class OperatorLocalRepository extends ChangeNotifier {
   Future<void> refreshInspection(String tractorId) async {
     final token = _accessToken;
     final session = _sessionVersion;
+    final version = _inspectionVersions[tractorId] ?? 0;
     if (token == null) return;
     try {
       final response = await mobileApiClient.inspectionToday(
         token: token,
         tractorId: tractorId,
       );
-      if (!_currentSession(token, session)) return;
+      if (!_currentSession(token, session) ||
+          version != (_inspectionVersions[tractorId] ?? 0)) {
+        return;
+      }
       final inspection = _map(response['data']);
       if (inspection.isNotEmpty && inspection['is_fit'] != false) {
         _inspectedTractors.add(tractorId);
@@ -515,7 +546,10 @@ class OperatorLocalRepository extends ChangeNotifier {
       }
       notifyListeners();
     } on KwanzaTrackApiException catch (error) {
-      if (!_currentSession(token, session)) return;
+      if (!_currentSession(token, session) ||
+          version != (_inspectionVersions[tractorId] ?? 0)) {
+        return;
+      }
       if (error.statusCode == 404) _inspectedTractors.remove(tractorId);
     }
   }
@@ -524,8 +558,8 @@ class OperatorLocalRepository extends ChangeNotifier {
     final token = _accessToken;
     final session = _sessionVersion;
     if (token == null) return;
-    await refreshJobDetail(jobId);
-    if (!_currentSession(token, session)) return;
+    final loaded = await refreshJobDetail(jobId);
+    if (!loaded || !_currentSession(token, session)) return;
     try {
       final response = await mobileApiClient.jobPath(
         token: token,
@@ -534,6 +568,7 @@ class OperatorLocalRepository extends ChangeNotifier {
       if (!_currentSession(token, session)) return;
       final job = maybeJobById(jobId);
       if (job != null) {
+        _applyLivePosition(job.tractorId, _map(response['data'])['live']);
         _replace(
           jobId,
           job.copyWith(trackPoints: _pathPointsFromResponse(response)),
@@ -572,7 +607,8 @@ class OperatorLocalRepository extends ChangeNotifier {
       if (!_currentSession(token, session)) return false;
       final checkData = _map(check['data']);
       _startChecks[jobId] = _startCheckFromJson(checkData);
-      if (checkData['can_start'] == false && overrideId == null) {
+      if (checkData['can_start'] != true &&
+          (overrideId == null || checkData['override_allowed'] != true)) {
         _lastActionError =
             check['message']?.toString() ?? 'The start check did not pass.';
         notifyListeners();
@@ -738,6 +774,165 @@ class OperatorLocalRepository extends ChangeNotifier {
         phone: _phonePayload(phone),
       ),
     );
+  }
+
+  Future<bool> uploadJobPhoto({
+    required String jobId,
+    required Uint8List bytes,
+    required String fileName,
+    required String kind,
+    String? caption,
+  }) async {
+    if (!_requireOperation()) return false;
+    final token = _accessToken;
+    final session = _sessionVersion;
+    if (token == null || maybeJobById(jobId) == null) return false;
+    final key = '$jobId/photo';
+    if (!_pendingActions.add(key)) return false;
+    try {
+      _lastActionError = null;
+      final response = await mobileApiClient.uploadJobPhoto(
+        token: token,
+        jobId: jobId,
+        bytes: bytes,
+        fileName: fileName,
+        kind: kind,
+        caption: caption,
+      );
+      if (!_currentSession(token, session)) return false;
+      // Photo upload returns a photo, not a job. Never merge its ID as a job ID.
+      _dataVersion++;
+      final data = _map(response['data']);
+      final photo = _map(data['photo']).isEmpty ? data : _map(data['photo']);
+      final current = maybeJobById(jobId);
+      if (current != null && photo['id'] != null) {
+        final existing = _jobPayloads[jobId]?['photos'];
+        _applyJobResponse({
+          'data': {
+            'id': jobId,
+            'photos': [
+              if (existing is List)
+                ...existing.where((p) => p is! Map || p['id'] != photo['id']),
+              photo,
+            ],
+          },
+        });
+      }
+      // Keep successful upload status even if this optional read is unavailable.
+      await refreshJobDetail(jobId);
+      if (!_currentSession(token, session)) return false;
+      _lastActionError = null;
+      notifyListeners();
+      return true;
+    } on KwanzaTrackApiException catch (error) {
+      if (!_currentSession(token, session)) return false;
+      _lastActionError = error.message;
+      notifyListeners();
+      return false;
+    } finally {
+      if (_currentSession(token, session)) _pendingActions.remove(key);
+    }
+  }
+
+  Future<bool> sendFarmerOtp(String jobId) async {
+    if (!_requireOperation()) return false;
+    final token = _accessToken;
+    final session = _sessionVersion;
+    if (token == null || !_pendingActions.add('$jobId/farmer-otp')) {
+      return false;
+    }
+    try {
+      _lastActionError = null;
+      final response = await mobileApiClient.farmerOtp(
+        token: token,
+        jobId: jobId,
+      );
+      if (!_currentSession(token, session)) return false;
+      if (_map(response['data'])['sent'] != true) {
+        _lastActionError =
+            'The code was not sent. Ask the union to check the farmer phone number and SMS credits.';
+        return false;
+      }
+      return true;
+    } on KwanzaTrackApiException catch (error) {
+      if (!_currentSession(token, session)) return false;
+      _lastActionError = error.message;
+      return false;
+    } finally {
+      if (_currentSession(token, session)) {
+        _pendingActions.remove('$jobId/farmer-otp');
+        notifyListeners();
+      }
+    }
+  }
+
+  Future<bool> confirmFarmerService({
+    required String jobId,
+    required String method,
+    required String credential,
+    int? rating,
+    bool dispute = false,
+    String? note,
+  }) async {
+    if (!_requireOperation()) return false;
+    final job = maybeJobById(jobId);
+    if (job?.status != OperatorJobStatus.completedPendingConfirmation ||
+        job?.farmerConfirmedAt != null) {
+      _lastActionError =
+          'Only completed work awaiting farmer confirmation can be confirmed.';
+      return false;
+    }
+    if (!(method == 'pin' && RegExp(r'^\d{4}$').hasMatch(credential) ||
+            method == 'otp' && RegExp(r'^\d{6}$').hasMatch(credential)) ||
+        (rating != null && (rating < 1 || rating > 5)) ||
+        (dispute && (note?.trim().isEmpty ?? true))) {
+      _lastActionError =
+          'Enter a valid farmer PIN/code and any required dispute note.';
+      return false;
+    }
+    final token = _accessToken;
+    final session = _sessionVersion;
+    final key = '$jobId/farmer-confirm';
+    if (token == null || !_pendingActions.add(key)) return false;
+    try {
+      _lastActionError = null;
+      final response = await mobileApiClient.farmerConfirm(
+        token: token,
+        jobId: jobId,
+        body: {
+          'method': method,
+          method == 'pin' ? 'pin' : 'code': credential,
+          'rating': ?rating,
+          if (dispute) ...{'dispute': true, 'note': note!.trim()},
+        },
+      );
+      if (!_currentSession(token, session)) return false;
+      _applyJobResponse(response);
+      final updated = maybeJobById(jobId);
+      if (dispute
+          ? updated?.status != OperatorJobStatus.flagged
+          : updated?.farmerConfirmedAt == null) {
+        await refreshJobDetail(jobId);
+      }
+      if (!_currentSession(token, session)) return false;
+      final saved = maybeJobById(jobId);
+      final confirmed = dispute
+          ? saved?.status == OperatorJobStatus.flagged
+          : saved?.farmerConfirmedAt != null;
+      if (!confirmed) {
+        _lastActionError =
+            'The server has not returned the confirmation yet. Refresh before trying again.';
+      }
+      notifyListeners();
+      return confirmed;
+    } on KwanzaTrackApiException catch (error) {
+      if (!_currentSession(token, session)) return false;
+      _lastActionError = error.message;
+      notifyListeners();
+      return false;
+    } finally {
+      if (_currentSession(token, session)) _pendingActions.remove(key);
+    }
   }
 
   Future<bool> reportProblem({
@@ -976,18 +1171,19 @@ class OperatorLocalRepository extends ChangeNotifier {
       final longitude = _asDouble(
         position['longitude'] ?? position['lng'] ?? position['lon'],
       );
-      if (latitude == null || longitude == null) continue;
+      if (!_validCoordinate(latitude, longitude)) continue;
 
       updated[tractorId] = TractorTrackerPosition(
         tractorId: tractorId,
         trackerImei: _text(tractor, const ['tracker_imei']),
-        latitude: latitude,
-        longitude: longitude,
+        latitude: latitude!,
+        longitude: longitude!,
         speedKph: _asDouble(position['speed_kph']),
         course: _asDouble(position['course']),
         online: _asBool(live['online']) ?? _asBool(tractor['online']) ?? false,
         fixTime: _dateTime(position['fix_time']),
         ageSeconds: _asInt(position['age_s']),
+        receivedAt: DateTime.now(),
       );
       if (kDebugMode) {
         final tracker = updated[tractorId]!;
@@ -999,9 +1195,11 @@ class OperatorLocalRepository extends ChangeNotifier {
       }
     }
 
-    _trackerPositions
-      ..clear()
-      ..addAll(updated);
+    // A list response can omit a fix returned by job detail/path. Keep the
+    // last known reading (its age continues to increase) and merge by fix time.
+    for (final position in updated.values) {
+      _mergeTrackerPosition(position);
+    }
     _tractorImplements
       ..clear()
       ..addAll(implementsByTractor);
@@ -1009,34 +1207,6 @@ class OperatorLocalRepository extends ChangeNotifier {
       debugPrint(
         '[Tracker Poll] received ${updated.length} tractor position(s)',
       );
-    }
-  }
-
-  Future<void> _refreshJobPaths(String token) async {
-    final session = _sessionVersion;
-    if (!_currentSession(token, session)) return;
-    // Calendar events are planning data and may cover many months. Only poll
-    // paths for jobs the backend currently exposes as actionable.
-    for (final job in List<OperatorJob>.from(_activeJobs)) {
-      try {
-        final response = await mobileApiClient.jobPath(
-          token: token,
-          jobId: job.id,
-        );
-        if (!_currentSession(token, session)) return;
-        final points = _pathPointsFromResponse(response);
-        if (points.isEmpty) continue;
-        final current = maybeJobById(job.id);
-        if (current != null) {
-          _replace(
-            job.id,
-            current.copyWith(trackPoints: points),
-            notify: false,
-          );
-        }
-      } on KwanzaTrackApiException {
-        // Some jobs have no tracker/path yet; the job list should still load.
-      }
     }
   }
 
@@ -1138,6 +1308,7 @@ class OperatorLocalRepository extends ChangeNotifier {
   }
 
   OperatorJob? _jobFromApiJson(Map<String, Object?> json) {
+    final incomingLive = json['tractor_live'];
     final id = _text(json, const ['id', 'job_id', 'reference']);
     if (id == null || id.isEmpty) return null;
 
@@ -1158,6 +1329,10 @@ class OperatorLocalRepository extends ChangeNotifier {
       _text(_map(json['service_type']), const ['code', 'name']) ??
           _text(json, const ['service_type_code', 'service_type']),
     );
+    final tractorId =
+        _text(_map(json['tractor']), const ['id']) ??
+        _text(json, const ['tractor_id']);
+    if (tractorId != null) _applyLivePosition(tractorId, incomingLive);
     return OperatorJob(
       id: id,
       reference: _text(json, const ['reference']) ?? id,
@@ -1204,6 +1379,16 @@ class OperatorLocalRepository extends ChangeNotifier {
       workTimeReceivedAt: DateTime.now(),
       farmerConfirmedAt: _dateTime(json['farmer_confirmed_at']),
       farmerHasPin: _map(json['farmer'])['has_pin'] == true,
+      photos: [
+        if (json['photos'] is List)
+          for (final raw in (json['photos'] as List).whereType<Map>())
+            OperatorJobPhoto(
+              id: raw['id']?.toString() ?? '',
+              kind: raw['kind']?.toString() ?? 'other',
+              url: raw['url']?.toString() ?? '',
+              caption: raw['caption']?.toString(),
+            ),
+      ],
       geofenceVerified: json['geofence_verified'] == true,
       startOverride: _overrideFromJson(
         _map(json['pending_override']).isNotEmpty
@@ -1242,11 +1427,11 @@ class OperatorLocalRepository extends ChangeNotifier {
             final longitude = _asDouble(
               point['longitude'] ?? point['lng'] ?? point['lon'],
             );
-            if (latitude == null || longitude == null) return null;
+            if (!_validCoordinate(latitude, longitude)) return null;
             return BoundaryPoint(
               label: 'Boundary ${entry.$1 + 1}',
-              latitude: latitude,
-              longitude: longitude,
+              latitude: latitude!,
+              longitude: longitude!,
             );
           })
           .whereType<BoundaryPoint>()
@@ -1259,12 +1444,12 @@ class OperatorLocalRepository extends ChangeNotifier {
     final longitude = _asDouble(
       centroid['longitude'] ?? centroid['lng'] ?? centroid['lon'],
     );
-    if (latitude == null || longitude == null) return const [];
+    if (!_validCoordinate(latitude, longitude)) return const [];
     return [
       BoundaryPoint(
         label: 'Plot center',
-        latitude: latitude,
-        longitude: longitude,
+        latitude: latitude!,
+        longitude: longitude!,
       ),
     ];
   }
@@ -1362,19 +1547,67 @@ class OperatorLocalRepository extends ChangeNotifier {
           final longitude = _asDouble(
             map['longitude'] ?? map['lng'] ?? map['lon'] ?? map['x'],
           );
-          if (latitude == null || longitude == null) return null;
+          if (!_validCoordinate(latitude, longitude)) return null;
           return WorkTrackPoint(
             inside: map['in'] as bool?,
             speedKph: _asDouble(map['speed']),
             label:
                 _text(map, const ['t', 'recorded_at', 'time', 'timestamp']) ??
                 'Fix',
-            latitude: latitude,
-            longitude: longitude,
+            latitude: latitude!,
+            longitude: longitude!,
           );
         })
         .whereType<BoundaryPoint>()
         .toList(growable: false);
+  }
+
+  bool _validCoordinate(double? lat, double? lng) =>
+      lat != null &&
+      lng != null &&
+      lat.isFinite &&
+      lng.isFinite &&
+      lat.abs() <= 90 &&
+      lng.abs() <= 180;
+
+  void _applyLivePosition(String tractorId, Object? raw) {
+    final live = _map(raw);
+    final position = _map(live['position']);
+    final lat = _asDouble(position['latitude']);
+    final lng = _asDouble(position['longitude']);
+    if (!_validCoordinate(lat, lng)) return;
+    _mergeTrackerPosition(
+      TractorTrackerPosition(
+        tractorId: tractorId,
+        latitude: lat!,
+        longitude: lng!,
+        online: _asBool(live['online']) ?? false,
+        speedKph: _asDouble(position['speed_kph']),
+        course: _asDouble(position['course']),
+        fixTime: _dateTime(position['fix_time']),
+        ageSeconds: _asInt(position['age_s']),
+        receivedAt: DateTime.now(),
+      ),
+    );
+  }
+
+  void _mergeTrackerPosition(TractorTrackerPosition incoming) {
+    final previous = _trackerPositions[incoming.tractorId];
+    DateTime? capturedAt(TractorTrackerPosition position) =>
+        position.fixTime ??
+        (position.receivedAt != null && position.ageSeconds != null
+            ? position.receivedAt!.subtract(
+                Duration(seconds: position.ageSeconds!),
+              )
+            : null);
+    if (previous != null) {
+      final oldTime = capturedAt(previous);
+      final newTime = capturedAt(incoming);
+      if (oldTime != null && (newTime == null || newTime.isBefore(oldTime))) {
+        return;
+      }
+    }
+    _trackerPositions[incoming.tractorId] = incoming;
   }
 
   OperatorStartCheckResult _startCheckFromJson(Map<String, Object?> json) {
@@ -1521,6 +1754,14 @@ class OperatorLocalRepository extends ChangeNotifier {
 
   Map<String, Object?>? _phonePayload(DeviceLocation? location) {
     if (location == null) return null;
+    final age = DateTime.now().difference(location.recordedAt).inSeconds;
+    if (!_validCoordinate(location.latitude, location.longitude) ||
+        !location.accuracyMeters.isFinite ||
+        location.accuracyMeters < 0 ||
+        age < -30 ||
+        age > 180) {
+      return null;
+    }
     return {
       'latitude': location.latitude,
       'longitude': location.longitude,
@@ -1532,8 +1773,6 @@ class OperatorLocalRepository extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _sessionVersion++;
-    _syncGeneration++;
-    stopTrackerPolling();
     super.dispose();
   }
 

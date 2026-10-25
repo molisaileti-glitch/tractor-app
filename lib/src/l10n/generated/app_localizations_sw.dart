@@ -386,4 +386,57 @@ class AppLocalizationsSw extends AppLocalizations {
 
   @override
   String get resendCode => 'Tuma nambari tena';
+
+  @override
+  String get calendarStatusLegendTitle => 'Rangi za hali ya kazi';
+
+  @override
+  String get calendarStatusLegendHint =>
+      'Linganisha rangi na lebo ya hali kwenye kila kazi.';
+
+  @override
+  String get calendarStatusInProgress => 'Inaendelea';
+
+  @override
+  String get calendarStatusCompleted => 'Imekamilika';
+
+  @override
+  String get calendarStatusPaused => 'Imesitishwa kwa muda';
+
+  @override
+  String get calendarStatusVerified => 'Imehakikiwa';
+
+  @override
+  String get calendarStatusClosed => 'Imefungwa';
+
+  @override
+  String get calendarStatusCancelled => 'Imeghairiwa';
+
+  @override
+  String get calendarStatusFlagged => 'Inahitaji ukaguzi';
+
+  @override
+  String get optionalBeforeServicePhotos => 'Picha kabla ya kazi (hiari)';
+
+  @override
+  String get optionalAfterServicePhotos => 'Picha baada ya kazi (hiari)';
+
+  @override
+  String get optionalWorkPhotos => 'Picha za kazi (hiari)';
+
+  @override
+  String get optionalJobPhotosHint =>
+      'Picha ni za hiari. Unaweza kuanza au kukamilisha kazi bila kupakia picha.';
+
+  @override
+  String get inspectionBeforePhotos =>
+      'Kamilisha ukaguzi wa trekta ili kuongeza picha za hiari kabla ya kazi.';
+
+  @override
+  String get optionalBeforePhotosHint =>
+      'Ongeza picha kabla ya kazi ukihitaji, au endelea na uhakiki wa kuanza kazi.';
+
+  @override
+  String get optionalAfterPhotosHint =>
+      'Ongeza picha baada ya kazi ukihitaji, au maliza kazi bila picha.';
 }

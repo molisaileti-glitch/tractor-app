@@ -56,11 +56,15 @@ class OperatorJobsScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                if (repository.mechanizationSyncError != null) ...[
+                if (repository.screenError(OperatorDataScreen.dashboard) !=
+                    null) ...[
                   const SizedBox(height: 12),
                   _SyncNotice(
-                    message: repository.mechanizationSyncError!,
-                    onRetry: repository.refreshMechanizationData,
+                    message: repository.screenError(
+                      OperatorDataScreen.dashboard,
+                    )!,
+                    onRetry: () =>
+                        repository.refreshScreen(OperatorDataScreen.dashboard),
                   ),
                 ],
                 const SizedBox(height: 18),
@@ -103,17 +107,24 @@ class OperatorJobsScreen extends StatelessWidget {
                 const SizedBox(height: 22),
                 Row(
                   children: [
-                    Text(
-                      strings.focusJob.toUpperCase(),
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
+                    Expanded(
+                      child: Text(
+                        strings.focusJob.toUpperCase(),
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                    const Spacer(),
-                    TextButton.icon(
-                      onPressed: onOpenSchedule,
-                      icon: const Icon(Icons.calendar_month_outlined),
-                      label: Text(strings.viewSchedule),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed: onOpenSchedule,
+                          icon: const Icon(Icons.calendar_month_outlined),
+                          label: Text(strings.viewSchedule),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -282,12 +293,24 @@ class _DashboardToolGrid extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final spacing = constraints.maxWidth < 380 ? 10.0 : 12.0;
-        final width = (constraints.maxWidth - spacing) / 2;
-        return Wrap(
-          spacing: spacing,
-          runSpacing: spacing,
+        return Column(
           children: [
-            for (final child in children) SizedBox(width: width, child: child),
+            for (var index = 0; index < children.length; index += 2) ...[
+              if (index > 0) SizedBox(height: spacing),
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: children[index]),
+                    SizedBox(width: spacing),
+                    if (index + 1 < children.length)
+                      Expanded(child: children[index + 1])
+                    else
+                      const Spacer(),
+                  ],
+                ),
+              ),
+            ],
           ],
         );
       },
@@ -317,7 +340,7 @@ class _DashboardToolCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      height: 172,
+      constraints: const BoxConstraints(minHeight: 172),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: dark
@@ -415,6 +438,7 @@ class _OperatorJobCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               CircleAvatar(
                 radius: emphasis ? 26 : 22,
@@ -447,7 +471,16 @@ class _OperatorJobCard extends StatelessWidget {
                   ],
                 ),
               ),
-              OperatorStatusPill(status: job.status),
+              const SizedBox(width: 12),
+              Flexible(
+                child: Align(
+                  alignment: Alignment.topRight,
+                  child: OperatorStatusPill(
+                    key: ValueKey('operator-job-status-${job.id}'),
+                    status: job.status,
+                  ),
+                ),
+              ),
             ],
           ),
           SizedBox(height: emphasis ? 18 : 14),

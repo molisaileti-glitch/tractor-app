@@ -390,4 +390,57 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get resendCode => 'Resend code';
+
+  @override
+  String get calendarStatusLegendTitle => 'Job status colours';
+
+  @override
+  String get calendarStatusLegendHint =>
+      'Match the colour and status label to each job.';
+
+  @override
+  String get calendarStatusInProgress => 'In progress';
+
+  @override
+  String get calendarStatusCompleted => 'Completed';
+
+  @override
+  String get calendarStatusPaused => 'Paused';
+
+  @override
+  String get calendarStatusVerified => 'Verified';
+
+  @override
+  String get calendarStatusClosed => 'Closed';
+
+  @override
+  String get calendarStatusCancelled => 'Cancelled';
+
+  @override
+  String get calendarStatusFlagged => 'Flagged';
+
+  @override
+  String get optionalBeforeServicePhotos => 'Before-service photos (optional)';
+
+  @override
+  String get optionalAfterServicePhotos => 'After-service photos (optional)';
+
+  @override
+  String get optionalWorkPhotos => 'Work photos (optional)';
+
+  @override
+  String get optionalJobPhotosHint =>
+      'Photos are optional. You can start or complete work without uploading photos.';
+
+  @override
+  String get inspectionBeforePhotos =>
+      'Complete the tractor inspection to add optional before-service photos.';
+
+  @override
+  String get optionalBeforePhotosHint =>
+      'Add before-service photos if useful, or continue to the start check.';
+
+  @override
+  String get optionalAfterPhotosHint =>
+      'Add after-service photos if useful, or finish the job without photos.';
 }

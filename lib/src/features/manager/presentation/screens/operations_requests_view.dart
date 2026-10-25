@@ -28,7 +28,7 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
   @override
   void initState() {
     super.initState();
-    _loadRemoteRequests();
+    _loadRemoteRequests(initial: true);
   }
 
   @override
@@ -200,12 +200,18 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
     await _loadRemoteRequests();
   }
 
-  Future<void> _loadRemoteRequests() async {
+  Future<void> _loadRemoteRequests({bool initial = false}) async {
     setState(() => _loadingRemoteRequests = true);
-    await widget.repository.refreshServiceRequests();
+    if (initial) {
+      await widget.repository.ensureScreenLoaded(UnionDataScreen.requests);
+    } else {
+      await widget.repository.refreshScreen(UnionDataScreen.requests);
+    }
     if (!mounted) return;
     setState(() {
-      _remoteRequestsError = widget.repository.mechanizationActionError;
+      _remoteRequestsError = widget.repository.screenError(
+        UnionDataScreen.requests,
+      );
       _loadingRemoteRequests = false;
     });
   }
@@ -1553,7 +1559,7 @@ class _RequestPlotMap extends StatelessWidget {
           ),
           infoWindow: InfoWindow(
             title: 'Farm: ${request.plot.name}',
-            snippet: '${request.farmerName} - exact request coordinate',
+            snippet: '${request.farmerName} - plot centre',
           ),
         ),
       },

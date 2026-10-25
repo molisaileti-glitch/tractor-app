@@ -31,65 +31,74 @@ class OperatorProfileScreen extends StatelessWidget {
         .length;
     final completedJobs = repository.completedJobs.length;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 680),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                strings.profile,
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 18),
-              AppSettingsScreen(
-                preferences: preferences,
-                name: name,
-                role: role,
-                email: repository.operatorEmail,
-                showTitle: false,
-                onThemeChanged: onThemeChanged,
-              ),
-              const SizedBox(height: 16),
-              OperatorCard(
-                child: Column(
-                  children: [
-                    _ProfileLine(
-                      icon: Icons.assignment_outlined,
-                      title: strings.assignedJobs,
-                      subtitle: strings.activeAndCompleted(
-                        activeJobs,
-                        completedJobs,
-                      ),
-                    ),
-                    const Divider(height: 28),
-                    _ProfileLine(
-                      icon: Icons.cloud_done_outlined,
-                      title: strings.dataStatus,
-                      subtitle: repository.isSyncingMechanization
-                          ? strings.updatingInformation
-                          : repository.mechanizationSyncError ??
-                                strings.informationUpToDate,
-                    ),
-                  ],
+    return RefreshIndicator(
+      onRefresh: () => repository.refreshScreen(OperatorDataScreen.profile),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 680),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  strings.profile,
+                  style: Theme.of(context).textTheme.headlineSmall,
                 ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: onLogout,
-                  icon: const Icon(Icons.logout_rounded),
-                  label: Text(strings.logout),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.error,
+                const SizedBox(height: 18),
+                AppSettingsScreen(
+                  preferences: preferences,
+                  name: name,
+                  role: role,
+                  email: repository.operatorEmail,
+                  showTitle: false,
+                  onThemeChanged: onThemeChanged,
+                ),
+                const SizedBox(height: 16),
+                OperatorCard(
+                  child: Column(
+                    children: [
+                      _ProfileLine(
+                        icon: Icons.assignment_outlined,
+                        title: 'Loaded assignments',
+                        subtitle: strings.activeAndCompleted(
+                          activeJobs,
+                          completedJobs,
+                        ),
+                      ),
+                      const Divider(height: 28),
+                      _ProfileLine(
+                        icon: Icons.cloud_done_outlined,
+                        title: strings.dataStatus,
+                        subtitle:
+                            repository.isRefreshingScreen(
+                              OperatorDataScreen.profile,
+                            )
+                            ? strings.updatingInformation
+                            : repository.screenError(
+                                    OperatorDataScreen.profile,
+                                  ) ??
+                                  strings.informationUpToDate,
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: onLogout,
+                    icon: const Icon(Icons.logout_rounded),
+                    label: Text(strings.logout),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

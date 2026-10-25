@@ -24,6 +24,11 @@ void main() {
         permissions: _MechanizationServer.staffPermissions,
       );
       await _settle(() => manager.isSyncingMechanization);
+      await Future.wait([
+        manager.refreshScreen(UnionDataScreen.requests),
+        manager.refreshScreen(UnionDataScreen.tractors),
+        manager.refreshScreen(UnionDataScreen.operators),
+      ]);
       expect(manager.requests.single.status, OperationsRequestStatus.pending);
       await manager.approveRequest(
         id: 'request-1',
@@ -138,6 +143,7 @@ void main() {
         permissions: _MechanizationServer.staffPermissions,
       );
       await _settle(() => manager.isSyncingMechanization);
+      await manager.refreshScreen(UnionDataScreen.requests);
       await manager.approveRequest(
         id: 'request-1',
         estimateAmount: 180000,
@@ -160,7 +166,8 @@ void main() {
       expect(manager.jobs.single.status, JobStatus.cancelled);
       expect(manager.requests.single.status, OperationsRequestStatus.approved);
       expect(server.lastCancelRequest, isFalse);
-      expect(server.backlogReads, greaterThan(1));
+      // Cancellation refreshes the affected request, without an unused backlog read.
+      expect(server.backlogReads, 0);
     },
   );
   testWidgets('manager payment selection reaches the close endpoint', (

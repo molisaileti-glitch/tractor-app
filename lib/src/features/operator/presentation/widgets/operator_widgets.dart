@@ -11,6 +11,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../domain/entities/operator_job.dart';
+import 'map_position_grouping.dart';
 
 const _googleRoutesAndroidApiKey = 'AIzaSyAARTXTKRaYC011X_ruaKhK_R4uzgWtt0U';
 const _googleRoutesIosApiKey = 'AIzaSyARbOp7_7i56wwdstWxPxy-lVH2ERjHdQ0';
@@ -74,11 +75,13 @@ class OperatorStatusPill extends StatelessWidget {
         children: [
           Icon(Icons.circle, size: 10, color: color),
           const SizedBox(width: 6),
-          Text(
-            localizedOperatorStatus(context, status),
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w800,
+          Flexible(
+            child: Text(
+              localizedOperatorStatus(context, status),
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],
@@ -115,6 +118,8 @@ class OperatorMapCard extends StatefulWidget {
     this.showTrack = false,
     this.routeFromLatitude,
     this.routeFromLongitude,
+    this.phoneRecordedAt,
+    this.phoneAccuracyMeters,
     this.tractorPosition,
     this.routeEnabled = false,
     this.label = 'ASSIGNED FARM',
@@ -127,6 +132,8 @@ class OperatorMapCard extends StatefulWidget {
   final bool showTrack;
   final double? routeFromLatitude;
   final double? routeFromLongitude;
+  final DateTime? phoneRecordedAt;
+  final double? phoneAccuracyMeters;
   final TractorTrackerPosition? tractorPosition;
   final bool routeEnabled;
   final String label;
@@ -140,6 +147,9 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
   GoogleMapController? _controller;
   BitmapDescriptor? _tractorMarkerIcon;
   BitmapDescriptor? _farmMarkerIcon;
+  BitmapDescriptor? _operatorMarkerIcon;
+  BitmapDescriptor? _combinedMarkerIcon;
+  String? _routeOrigin;
   List<LatLng> _routePoints = const [];
   String? _routeSummary;
   String? _routeKey;
@@ -207,18 +217,28 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
     final routeStart = _routeStart;
     final phonePoint = _phonePoint;
     final tractorPoint = _tractorPoint;
-    final hasRoute = routeStart != null && mappedJobs.isNotEmpty;
-    final routeDestination = hasRoute ? _jobPoint(mappedJobs.first) : null;
+    final hasCoordinates =
+        mappedJobs.isNotEmpty || phonePoint != null || tractorPoint != null;
+    final farms = mappedJobs
+        .where((job) => job.plot.boundaryPoints.isNotEmpty)
+        .toList();
+    final routeDestination = routeStart != null && farms.isNotEmpty
+        ? _jobPoint(farms.first)
+        : null;
+    final hasRoute = routeStart != null && routeDestination != null;
+    final initialTarget = mappedJobs.isNotEmpty
+        ? _jobPoint(mappedJobs.first)
+        : tractorPoint ?? phonePoint;
 
     final map = ClipRRect(
       borderRadius: BorderRadius.circular(widget.fill ? 0 : 8),
-      child: mappedJobs.isEmpty
+      child: !hasCoordinates
           ? _NoMapCoordinates(label: widget.label)
           : GoogleMap(
               initialCameraPosition: CameraPosition(
                 target: hasRoute
-                    ? _midpoint(routeStart, routeDestination!)
-                    : _jobPoint(mappedJobs.first),
+                    ? _midpoint(routeStart, routeDestination)
+                    : initialTarget!,
                 zoom: hasRoute
                     ? 12
                     : mappedJobs.length == 1
@@ -255,6 +275,40 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
       fit: StackFit.expand,
       children: [
         map,
+        if (widget.routeEnabled && farms.isNotEmpty)
+          Positioned(
+            left: 12,
+            right: 12,
+            top: widget.fill ? 94 : 54,
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: Material(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                child: Wrap(
+                  spacing: 6,
+                  children: [
+                    ChoiceChip(
+                      avatar: const Icon(Icons.agriculture, size: 18),
+                      label: const Text('Tractor route'),
+                      selected: _usesTractorRoute,
+                      onSelected: widget.tractorPosition?.isLive == true
+                          ? (_) => _selectRoute('tractor')
+                          : null,
+                    ),
+                    ChoiceChip(
+                      avatar: const Icon(Icons.person, size: 18),
+                      label: const Text('Operator route'),
+                      selected: !_usesTractorRoute && _phonePoint != null,
+                      onSelected: _phonePoint != null
+                          ? (_) => _selectRoute('operator')
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         if (widget.tractorPosition != null)
           Positioned(
             left: 12,
@@ -292,7 +346,7 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      _routeSummary!,
+                      '${_usesTractorRoute ? 'Tractor' : 'Operator'} · $_routeSummary',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,
@@ -337,6 +391,12 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
                         style: Theme.of(context).textTheme.labelMedium
                             ?.copyWith(fontWeight: FontWeight.w800),
                       ),
+                    ),
+                    TextButton(
+                      onPressed: () => _selectRoute(
+                        _usesTractorRoute ? 'tractor' : 'operator',
+                      ),
+                      child: const Text('Retry'),
                     ),
                   ],
                 ),
@@ -414,22 +474,61 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
   }
 
   LatLng? get _routeStart {
-    if (widget.tractorPosition?.isLive == true) return _tractorPoint;
-    return _phonePoint ?? _tractorPoint;
+    if (_routeOrigin == 'tractor') {
+      return widget.tractorPosition?.isLive == true ? _tractorPoint : null;
+    }
+    return _usesTractorRoute ? _tractorPoint : _phonePoint;
+  }
+
+  bool get _usesTractorRoute => _routeOrigin == 'tractor'
+      ? widget.tractorPosition?.isLive == true
+      : _routeOrigin == 'operator'
+      ? false
+      : widget.tractorPosition?.isLive == true;
+
+  void _selectRoute(String origin) {
+    setState(() {
+      _routeOrigin = origin;
+      _routeKey = null;
+      _routePoints = const [];
+      _routeSummary = null;
+      _routeError = null;
+      _loadingRoute = false;
+    });
+    unawaited(_loadRouteIfNeeded());
   }
 
   LatLng? get _phonePoint {
     final latitude = widget.routeFromLatitude;
     final longitude = widget.routeFromLongitude;
-    if (latitude == null || longitude == null) return null;
-    return LatLng(latitude, longitude);
+    if (!_validCoordinate(latitude, longitude)) return null;
+    final recordedAt = widget.phoneRecordedAt;
+    final age = recordedAt == null
+        ? null
+        : DateTime.now().difference(recordedAt).inSeconds;
+    if (age == null || age < -30 || age > 180) {
+      return null;
+    }
+    return LatLng(latitude!, longitude!);
   }
 
   LatLng? get _tractorPoint {
     final position = widget.tractorPosition;
-    if (position == null) return null;
+    if (position == null ||
+        !widget.showTractor ||
+        !_validCoordinate(position.latitude, position.longitude)) {
+      return null;
+    }
     return LatLng(position.latitude, position.longitude);
   }
+
+  bool _validCoordinate(double? lat, double? lng) =>
+      lat != null &&
+      lng != null &&
+      lat.isFinite &&
+      lng.isFinite &&
+      lat.abs() <= 90 &&
+      lng.abs() <= 180;
 
   LatLng _midpoint(LatLng first, LatLng second) {
     return LatLng(
@@ -443,45 +542,118 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
     LatLng? phonePoint,
     LatLng? tractorPoint,
   ) {
+    final groupNearby =
+        phonePoint != null &&
+        tractorPoint != null &&
+        canGroupOperatorAndTractor(
+          phoneLatitude: phonePoint.latitude,
+          phoneLongitude: phonePoint.longitude,
+          tractorLatitude: tractorPoint.latitude,
+          tractorLongitude: tractorPoint.longitude,
+          phoneAccuracyMeters: widget.phoneAccuracyMeters,
+          tractorIsLive: widget.tractorPosition?.isLive == true,
+        );
     return {
-      if (tractorPoint != null)
+      if (groupNearby)
+        Marker(
+          markerId: const MarkerId('operator-and-tractor'),
+          position: tractorPoint,
+          icon:
+              _combinedMarkerIcon ??
+              _tractorMarkerIcon ??
+              BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+          anchor: const Offset(.5, .5),
+          consumeTapEvents: true,
+          infoWindow: const InfoWindow(
+            title: 'Operator + tractor',
+            snippet: 'Locations close together',
+          ),
+          onTap: () => _showNearbyLocations(phonePoint, tractorPoint),
+        ),
+      if (tractorPoint != null && !groupNearby)
         Marker(
           markerId: const MarkerId('tractor-tracker-location'),
           position: tractorPoint,
           icon:
               _tractorMarkerIcon ??
               BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
-          rotation: widget.tractorPosition?.course ?? 0,
-          flat: widget.tractorPosition?.course != null,
           infoWindow: InfoWindow(
             title: widget.tractorPosition?.isLive == true
                 ? 'Tractor location'
                 : 'Tractor last known location',
           ),
         ),
-      if (phonePoint != null)
+      if (phonePoint != null && !groupNearby)
         Marker(
           markerId: const MarkerId('operator-phone-location'),
           position: phonePoint,
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            BitmapDescriptor.hueAzure,
-          ),
-          infoWindow: const InfoWindow(title: 'Your phone location'),
+          icon:
+              _operatorMarkerIcon ??
+              BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
+          anchor: const Offset(0.5, 0.5),
+          infoWindow: const InfoWindow(title: 'Operator · this phone’s GPS'),
         ),
       for (final job in jobs)
-        Marker(
-          markerId: MarkerId('job-${job.id}'),
-          position: _jobPoint(job),
-          icon:
-              _farmMarkerIcon ??
-              BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-          infoWindow: InfoWindow(
-            title: job.plot.name,
-            snippet:
-                '${job.serviceType.label} - ${job.status.label} - ${job.tractorLabel ?? job.tractorId}',
+        if (job.plot.boundaryPoints.isNotEmpty)
+          Marker(
+            markerId: MarkerId('job-${job.id}'),
+            position: _jobPoint(job),
+            icon:
+                _farmMarkerIcon ??
+                BitmapDescriptor.defaultMarkerWithHue(
+                  BitmapDescriptor.hueGreen,
+                ),
+            infoWindow: InfoWindow(
+              title: job.plot.name,
+              snippet:
+                  '${job.serviceType.label} - ${job.status.label} - ${job.tractorLabel ?? job.tractorId}',
+            ),
           ),
-        ),
     };
+  }
+
+  void _showNearbyLocations(LatLng phone, LatLng tractor) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Operator + tractor',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'The reported locations are close together. This does not confirm the operator is on the tractor.',
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.person, color: Color(0xFF7C3AED)),
+              title: const Text('Operator - phone GPS'),
+              subtitle: Text(
+                '${phone.latitude.toStringAsFixed(6)}, ${phone.longitude.toStringAsFixed(6)}\n'
+                'Accuracy: ${widget.phoneAccuracyMeters?.toStringAsFixed(0)} m',
+              ),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.agriculture, color: Color(0xFFF97316)),
+              title: const Text('Tractor - tracker GPS'),
+              subtitle: Text(
+                '${tractor.latitude.toStringAsFixed(6)}, ${tractor.longitude.toStringAsFixed(6)}',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _loadMarkerIcons() async {
@@ -493,16 +665,28 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
       icon: Icons.landscape,
       color: AppColors.fieldGreen,
     );
+    final operatorIcon = await _makeMarkerIcon(
+      icon: Icons.person,
+      color: const Color(0xFF7C3AED),
+    );
+    final combinedIcon = await _makeMarkerIcon(
+      icon: Icons.agriculture,
+      color: const Color(0xFFF97316),
+      badge: Icons.person,
+    );
     if (!mounted) return;
     setState(() {
       _tractorMarkerIcon = tractorIcon;
       _farmMarkerIcon = farmIcon;
+      _operatorMarkerIcon = operatorIcon;
+      _combinedMarkerIcon = combinedIcon;
     });
   }
 
   Future<BitmapDescriptor> _makeMarkerIcon({
     required IconData icon,
     required Color color,
+    IconData? badge,
   }) async {
     const canvasSize = 96.0;
     const circleCenter = Offset(canvasSize / 2, canvasSize / 2);
@@ -541,6 +725,27 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
         (canvasSize - textPainter.height) / 2,
       ),
     );
+    if (badge != null) {
+      const center = Offset(73, 73);
+      canvas.drawCircle(center, 21, Paint()..color = Colors.white);
+      canvas.drawCircle(center, 18, Paint()..color = const Color(0xFF7C3AED));
+      final painter = TextPainter(
+        text: TextSpan(
+          text: String.fromCharCode(badge.codePoint),
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 26,
+            fontFamily: badge.fontFamily,
+            package: badge.fontPackage,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      painter.paint(
+        canvas,
+        center - Offset(painter.width / 2, painter.height / 2),
+      );
+    }
 
     final image = await recorder.endRecording().toImage(
       canvasSize.toInt(),
@@ -634,7 +839,7 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
     LatLng? tractorPoint,
   ) async {
     final controller = _controller;
-    if (controller == null || mappedJobs.isEmpty) return;
+    if (controller == null) return;
     await Future<void>.delayed(const Duration(milliseconds: 250));
     if (!mounted) return;
 
@@ -642,6 +847,9 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
       for (final job in mappedJobs) _jobPoint(job),
       for (final job in mappedJobs)
         for (final point in job.plot.boundaryPoints)
+          LatLng(point.latitude, point.longitude),
+      for (final job in mappedJobs)
+        for (final point in job.trackPoints)
           LatLng(point.latitude, point.longitude),
       ?routeStart,
       ?routeDestination,
@@ -708,7 +916,7 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
     final nextKey =
         '${start.latitude.toStringAsFixed(6)},${start.longitude.toStringAsFixed(6)}:'
         '${destination.latitude.toStringAsFixed(6)},${destination.longitude.toStringAsFixed(6)}';
-    if (_routeKey == nextKey || _loadingRoute) return;
+    if (_routeKey == nextKey) return;
 
     setState(() {
       _routeKey = nextKey;
@@ -962,7 +1170,7 @@ class _TrackerStatusBadge extends StatelessWidget {
 
   String get _label {
     if (position.isLive) return 'Tractor live';
-    final age = position.ageSeconds;
+    final age = position.currentAgeSeconds;
     if (age == null) return 'Tracker offline';
     if (age < 60) return 'Last fix ${age}s ago';
     if (age < 3600) return 'Last fix ${age ~/ 60}m ago';
