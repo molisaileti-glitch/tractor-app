@@ -214,11 +214,23 @@ void main() {
     await tester.ensureVisible(find.text('Close verified job'));
     await tester.tap(find.text('Close verified job'));
     await tester.pumpAndSettle();
+    final cancelButton = find.widgetWithText(OutlinedButton, 'Cancel');
+    final closeButton = find.widgetWithText(FilledButton, 'Close job');
+    expect(cancelButton, findsOneWidget);
+    expect(closeButton, findsOneWidget);
+    expect(
+      tester.getSize(cancelButton).width,
+      closeTo(tester.getSize(closeButton).width, 0.01),
+    );
+    expect(
+      tester.getCenter(cancelButton).dy,
+      closeTo(tester.getCenter(closeButton).dy, 0.01),
+    );
     await tester.tap(find.byType(DropdownButtonFormField<String>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('waived').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Close job'));
+    await tester.tap(closeButton);
     await tester.pumpAndSettle();
     expect(server.jobRecord!['payment_status'], 'waived');
     expect(server.jobRecord!['status'], 'closed');

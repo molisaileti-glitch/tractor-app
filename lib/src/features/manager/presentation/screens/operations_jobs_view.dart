@@ -484,14 +484,12 @@ class _JobCard extends StatelessWidget {
               if (value != null) update(() => payment = value);
             },
           ),
+          actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, payment),
-              child: const Text('Close job'),
+            AppDialogActions(
+              onCancel: () => Navigator.pop(dialogContext),
+              onConfirm: () => Navigator.pop(dialogContext, payment),
+              confirmLabel: 'Close job',
             ),
           ],
         ),

@@ -323,7 +323,16 @@ void main() {
         '0123',
       );
       final confirm = find.text('Farmer: confirm satisfaction');
-      await tester.ensureVisible(confirm);
+      await tester.drag(
+        find.byKey(const ValueKey('farmer-confirmation-list')),
+        const Offset(0, -400),
+      );
+      await tester.pump();
+      await tester.drag(
+        find.byKey(const ValueKey('farmer-confirmation-list')),
+        const Offset(0, -400),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(confirm);
       await tester.pumpAndSettle();
       expect(api.lastConfirmation!['pin'], '0123');
@@ -334,6 +343,73 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'PIN entry stays available and pull refresh discovers a configured PIN',
+    (tester) async {
+      final api = _EvidenceApi();
+      (api.record['farmer'] as Map<String, Object?>)['has_pin'] = false;
+      final repo = (await tester.runAsync(() => _repository(api)))!;
+      addTearDown(repo.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: OperatorFarmerConfirmationScreen(
+            repository: repo,
+            jobId: 'job-1',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('PIN status is still updating'),
+        findsOneWidget,
+      );
+      expect(find.text('Farmer four-digit PIN'), findsOneWidget);
+
+      (api.record['farmer'] as Map<String, Object?>)['has_pin'] = true;
+      await tester.drag(
+        find.byKey(const ValueKey('farmer-confirmation-list')),
+        const Offset(0, 400),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Farmer PIN is now available.'), findsOneWidget);
+      expect(find.text('Farmer four-digit PIN'), findsOneWidget);
+      expect(find.textContaining('PIN status is still updating'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('farmer confirmation sections do not overflow a narrow screen', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(320, 650));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final api = _EvidenceApi();
+    final repo = (await tester.runAsync(() => _repository(api)))!;
+    addTearDown(repo.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(
+            size: Size(320, 650),
+            textScaler: TextScaler.linear(1.2),
+          ),
+          child: OperatorFarmerConfirmationScreen(
+            repository: repo,
+            jobId: 'job-1',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Verify the farmer'), findsOneWidget);
+    expect(find.text('Service feedback'), findsOneWidget);
+    expect(find.text('Confirm the service'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Future<OperatorLocalRepository> _repository(_EvidenceApi api) async {
