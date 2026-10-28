@@ -13,3 +13,13 @@ abstract class VerificationLocationRepository implements LocationRepository {
     bool forceNativeProvider = false,
   });
 }
+
+/// Optional device-settings controls used by screens that require GPS.
+/// Test and web repositories can omit this capability.
+abstract class LocationSettingsController {
+  Future<bool> isLocationServiceEnabled();
+
+  Future<bool> openLocationSettings();
+
+  Future<bool> openAppSettings();
+}

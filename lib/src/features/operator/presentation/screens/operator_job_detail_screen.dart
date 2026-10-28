@@ -39,9 +39,11 @@ class _OperatorJobDetailScreenState extends State<OperatorJobDetailScreen> {
         final job = repository.maybeJobById(jobId);
         if (job == null) {
           return Scaffold(
-            appBar: AppBar(title: const Text('Job unavailable')),
-            body: const Center(
-              child: Text('This assignment is no longer available.'),
+            appBar: AppBar(title: Text(context.appText('Job unavailable'))),
+            body: Center(
+              child: Text(
+                context.appText('This assignment is no longer available.'),
+              ),
             ),
           );
         }
@@ -70,7 +72,7 @@ class _OperatorJobDetailScreenState extends State<OperatorJobDetailScreen> {
                         icon: const Icon(Icons.close),
                       ),
                       IconButton.filledTonal(
-                        tooltip: 'Refresh this job',
+                        tooltip: context.appText('Refresh this job'),
                         onPressed: () => _mapKey.currentState?.refresh(),
                         icon: const Icon(Icons.refresh),
                       ),
@@ -179,8 +181,9 @@ class _OperatorJobDetailScreenState extends State<OperatorJobDetailScreen> {
     if (job.status == OperatorJobStatus.scheduled) {
       showAppSnackBar(
         context,
-        message:
-            'This job is scheduled but has not been dispatched. It will become actionable after operations dispatches it.',
+        message: context.appText(
+          'This job is scheduled but has not been dispatched. It will become actionable after operations dispatches it.',
+        ),
         type: AppSnackType.info,
       );
     }
@@ -189,7 +192,7 @@ class _OperatorJobDetailScreenState extends State<OperatorJobDetailScreen> {
   Future<void> _acceptAssignment(BuildContext context, OperatorJob job) async {
     final confirmed = await showAppConfirmationDialog(
       context,
-      title: 'Accept assignment?',
+      title: context.appText('Accept assignment?'),
       message:
           'Confirm that you are available to operate ${job.tractorLabel ?? 'the assigned tractor'} for this job.',
       confirmLabel: 'Accept',
@@ -210,9 +213,10 @@ class _OperatorJobDetailScreenState extends State<OperatorJobDetailScreen> {
   Future<void> _startJourney(BuildContext context, OperatorJob job) async {
     final confirmed = await showAppConfirmationDialog(
       context,
-      title: 'Start journey?',
-      message:
-          'Your assignment will be marked en route and navigation to the farm will begin.',
+      title: context.appText('Start journey?'),
+      message: context.appText(
+        'Your assignment will be marked en route and navigation to the farm will begin.',
+      ),
       confirmLabel: 'Start Journey',
     );
     if (!confirmed || !context.mounted) return;
@@ -239,33 +243,41 @@ class _OperatorJobDetailScreenState extends State<OperatorJobDetailScreen> {
   void _showProblemDialog(BuildContext context, OperatorJob job) {
     final screenContext = context;
     var reason = OperatorProblemReason.tractorBreakdown;
+    var submitting = false;
     final notesController = TextEditingController();
     showDialog<void>(
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text('Unable to Perform Job'),
+          title: Text(context.appText('Unable to Perform Job')),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<OperatorProblemReason>(
                   initialValue: reason,
-                  decoration: const InputDecoration(labelText: 'Reason'),
+                  decoration: InputDecoration(
+                    labelText: context.appText('Reason'),
+                  ),
                   items: [
                     for (final item in OperatorProblemReason.values)
                       DropdownMenuItem(value: item, child: Text(item.label)),
                   ],
-                  onChanged: (value) {
-                    if (value != null) setState(() => reason = value);
-                  },
+                  onChanged: submitting
+                      ? null
+                      : (value) {
+                          if (value != null) setState(() => reason = value);
+                        },
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: notesController,
+                  enabled: !submitting,
                   minLines: 3,
                   maxLines: 5,
-                  decoration: const InputDecoration(labelText: 'Notes'),
+                  decoration: InputDecoration(
+                    labelText: context.appText('Notes'),
+                  ),
                 ),
               ],
             ),
@@ -275,13 +287,15 @@ class _OperatorJobDetailScreenState extends State<OperatorJobDetailScreen> {
             AppDialogActions(
               onCancel: () => Navigator.of(context).pop(),
               onConfirm: () async {
+                if (submitting) return;
+                setState(() => submitting = true);
                 final ok = await repository.reportProblem(
                   jobId: job.id,
                   reason: reason,
                   notes: notesController.text.trim(),
                 );
-                if (!screenContext.mounted) return;
-                Navigator.of(context).pop();
+                if (!screenContext.mounted || !context.mounted) return;
+                if (ok) Navigator.of(context).pop();
                 showAppSnackBar(
                   screenContext,
                   message: ok
@@ -290,7 +304,12 @@ class _OperatorJobDetailScreenState extends State<OperatorJobDetailScreen> {
                             'Could not report problem.',
                   type: ok ? AppSnackType.success : AppSnackType.error,
                 );
+                if (!ok && context.mounted) {
+                  setState(() => submitting = false);
+                }
               },
+              loading: submitting,
+              confirmLabel: submitting ? 'Sending...' : 'Submit',
             ),
           ],
         ),
@@ -377,14 +396,16 @@ class _JobActionSheet extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               if (job.plot.boundaryPoints.isEmpty)
-                const Text(
-                  'Farm coordinates are unavailable. Ask the union to check the plot location.',
+                Text(
+                  context.appText(
+                    'Farm coordinates are unavailable. Ask the union to check the plot location.',
+                  ),
                 ),
               if (onPhotos != null)
                 OutlinedButton.icon(
                   onPressed: onPhotos,
                   icon: const Icon(Icons.photo_library_outlined),
-                  label: const Text('Job photos'),
+                  label: Text(context.appText('Job photos')),
                 ),
               const SizedBox(height: 8),
               if (_statusGuidance(job) case final String guidance)
@@ -405,7 +426,7 @@ class _JobActionSheet extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   IconButton.filledTonal(
-                    tooltip: 'Report Problem',
+                    tooltip: context.appText('Report Problem'),
                     onPressed: onReportProblem,
                     icon: const Icon(Icons.report_problem_outlined),
                   ),

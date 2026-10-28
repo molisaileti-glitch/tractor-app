@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../../components/components.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/generated/app_localizations.dart';
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/union_operations_repository.dart';
 import '../../domain/entities/operations_models.dart';
@@ -23,6 +25,10 @@ class OperationsDashboardView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
+    final managerFullName = repository.mechanizationUserName?.trim();
+    final managerName = managerFullName == null || managerFullName.isEmpty
+        ? AppLocalizations.of(context)!.unionStaff
+        : managerFullName.split(RegExp(r'\s+')).first;
     final jobs = repository.jobs
         .where(
           (job) =>
@@ -39,8 +45,13 @@ class OperationsDashboardView extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _PageTitle(
-          title: "Today's Overview",
-          subtitle: 'Requests, resources and field activity',
+          title: TimeAwareGreeting(
+            name: managerName,
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
+          ),
+          subtitle: context.appText('Requests, resources and field activity'),
         ),
         if (repository.isRefreshingScreen(UnionDataScreen.dashboard)) ...[
           const LinearProgressIndicator(minHeight: 3),
@@ -57,31 +68,31 @@ class OperationsDashboardView extends StatelessWidget {
           children: [
             _CompactMetricCard(
               value: '${repository.pendingRequestCount}',
-              label: 'Pending',
+              label: context.appText('Pending'),
               icon: Icons.pending_actions,
               color: const Color(0xFFC8872B),
             ),
             _CompactMetricCard(
               value: '${repository.activeJobs.length}',
-              label: 'Active',
+              label: context.appText('Active'),
               icon: Icons.route,
               color: const Color(0xFF277DA1),
             ),
             _CompactMetricCard(
               value: '${repository.completedTodayCount}',
-              label: 'Completed',
+              label: context.appText('Completed'),
               icon: Icons.task_alt,
               color: AppColors.fieldGreen,
             ),
             _CompactMetricCard(
               value: '${repository.pendingOverrideCount}',
-              label: 'Overrides',
+              label: context.appText('Overrides'),
               icon: Icons.rule_folder_outlined,
               color: const Color(0xFFB45309),
             ),
             _CompactMetricCard(
               value: '${repository.openExceptionCount}',
-              label: 'Exceptions',
+              label: context.appText('Exceptions'),
               icon: Icons.report_problem_outlined,
               color: const Color(0xFFE11D48),
             ),
@@ -89,7 +100,7 @@ class OperationsDashboardView extends StatelessWidget {
         ),
         const SizedBox(height: 22),
         _DashboardSectionHeader(
-          title: 'Attention Needed',
+          title: context.appText('Attention Needed'),
           icon: Icons.priority_high_rounded,
         ),
         const SizedBox(height: 10),
@@ -178,7 +189,7 @@ class _SyncNotice extends StatelessWidget {
             ),
           ),
           IconButton(
-            tooltip: 'Retry',
+            tooltip: context.appText('Retry'),
             onPressed: onRetry,
             icon: const Icon(Icons.refresh),
           ),
@@ -425,22 +436,22 @@ class _TodayJobCard extends StatelessWidget {
             children: [
               _JobFact(
                 icon: Icons.person_outline,
-                label: 'Farmer',
+                label: context.appText('Farmer'),
                 value: job.farmerName,
               ),
               _JobFact(
                 icon: Icons.engineering_outlined,
-                label: 'Operator',
+                label: context.appText('Operator'),
                 value: job.operator.name,
               ),
               _JobFact(
                 icon: Icons.agriculture_outlined,
-                label: 'Tractor',
+                label: context.appText('Tractor'),
                 value: tractorLabel,
               ),
               _JobFact(
                 icon: Icons.location_on_outlined,
-                label: 'Plot',
+                label: context.appText('Plot'),
                 value: [
                   job.plot.name,
                   plotArea,
@@ -508,7 +519,7 @@ class _AllClearNotice extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Nothing needs attention right now.',
+              context.appText('Nothing needs attention right now.'),
               style: theme.textTheme.bodyLarge,
             ),
           ],
@@ -521,7 +532,7 @@ class _AllClearNotice extends StatelessWidget {
 class _PageTitle extends StatelessWidget {
   const _PageTitle({required this.title, required this.subtitle});
 
-  final String title;
+  final Widget title;
   final String subtitle;
 
   @override
@@ -530,16 +541,7 @@ class _PageTitle extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 4),
-          Text(subtitle),
-        ],
+        children: [title, const SizedBox(height: 4), Text(subtitle)],
       ),
     );
   }

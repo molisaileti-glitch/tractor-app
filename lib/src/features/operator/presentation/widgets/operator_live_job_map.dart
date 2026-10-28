@@ -7,6 +7,7 @@ import '../../../../additional_data/location/data/repositories/geolocator_locati
 import '../../../../additional_data/location/domain/entities/device_location.dart';
 import '../../../../additional_data/location/domain/repositories/location_repository.dart';
 import '../../../../additional_data/location/domain/usecases/check_plot_geofence.dart';
+import '../../../../components/components.dart';
 import '../../data/repositories/operator_local_repository.dart';
 import '../../domain/entities/operator_job.dart';
 import 'operator_location_evidence_collector.dart';
@@ -57,6 +58,7 @@ class OperatorLiveJobMapState extends State<OperatorLiveJobMap>
   Completer<OperatorEvidenceUpdate>? _verificationCompleter;
   Future<OperatorEvidenceUpdate>? _verificationFuture;
   Future<void>? _refreshing;
+  bool _refreshingFromCard = false;
   bool _foreground = true;
   bool _routeIsCurrent = true;
   final _locationStabilizer = OperatorPhoneLocationStabilizer();
@@ -402,11 +404,13 @@ class OperatorLiveJobMapState extends State<OperatorLiveJobMap>
     final completer = _verificationCompleter;
     if (completer != null && !completer.isCompleted) {
       completer.complete(
-        const OperatorEvidenceUpdate(
+        OperatorEvidenceUpdate(
           decision: OperatorEvidenceDecision.collecting,
           acceptedSamples: 0,
           requiredSamples: 3,
-          message: 'GPS verification stopped because this screen is hidden.',
+          message: context.appText(
+            'GPS verification stopped because this screen is hidden.',
+          ),
         ),
       );
     }
@@ -488,60 +492,315 @@ class OperatorLiveJobMapState extends State<OperatorLiveJobMap>
         phoneRecordedAt: _phone?.recordedAt,
         phoneAccuracyMeters: _phone?.accuracyMeters,
         routeEnabled: widget.routeEnabled,
-        label: 'JOB MAP',
+        label: context.appText('JOB MAP'),
       );
       if (widget.fill) return map;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           map,
-          const SizedBox(height: 8),
-          if (job.plot.boundaryPoints.length >= 3) ...[
-            Text('Operator GPS: ${_geofenceLabel(phoneGeofence)}.'),
-            Text('Tractor GPS: ${_geofenceLabel(tractorGeofence)}.'),
-            const Text(
-              'Boundary estimates are for guidance. Run Start Check for the server result and configured tolerance.',
-            ),
-          ],
-          if (_phoneError != null)
-            Text('Operator location unavailable: $_phoneError'),
-          if (_phoneQualityMessage != null) Text(_phoneQualityMessage!),
-          if (job.plot.boundaryPoints.isEmpty)
-            const Text(
-              'Farm coordinates are unavailable. Ask the union to check the plot location.',
-            ),
-          if (job.plot.boundaryPoints.length == 1)
-            const Text(
-              'Only the farm centre is available. The backend checks whether work can start.',
-            ),
-          if (widget.routeEnabled)
-            const Text(
-              'Directions lead toward the plot centre. A dashed line shows direction only, not a road route.',
-            ),
-          Text(
-            job.trackPoints.isEmpty
-                ? 'No recorded tractor trail yet.'
-                : 'Tractor trail: green inside the plot, red outside, grey unknown.',
+          const SizedBox(height: 10),
+          _LocationReadinessCard(
+            phone: phone,
+            tracker: tracker,
+            phoneGeofence: phoneGeofence,
+            tractorGeofence: tractorGeofence,
+            phoneError: _phoneError,
+            phoneQualityMessage: _phoneQualityMessage,
+            hasBoundary: job.plot.boundaryPoints.length >= 3,
+            hasFarmCentre: job.plot.boundaryPoints.isNotEmpty,
+            routeEnabled: widget.routeEnabled,
+            hasTrack: job.trackPoints.isNotEmpty,
+            refreshing: _refreshingFromCard,
+            onRefresh: _refreshFromCard,
           ),
         ],
       );
     },
   );
 
-  String _geofenceLabel(PlotGeofenceResult? result) {
-    if (result == null) return 'current position unavailable';
-    final distance = result.distanceFromPlotMeters.isFinite
-        ? '${result.distanceFromPlotMeters.toStringAsFixed(0)} m'
-        : 'an unknown distance';
-    return switch (result.state) {
-      PlotGeofenceState.insideBoundary => 'inside the mapped farm boundary',
-      PlotGeofenceState.withinTolerance =>
-        '$distance outside the boundary and within configured tolerance',
-      PlotGeofenceState.uncertain =>
-        'near the boundary; GPS accuracy makes the result uncertain',
-      PlotGeofenceState.outsideAllowedArea =>
-        '$distance outside the allowed farm area',
-      PlotGeofenceState.unavailable => 'boundary result unavailable',
+  Future<void> _refreshFromCard() async {
+    if (_refreshingFromCard) return;
+    setState(() => _refreshingFromCard = true);
+    try {
+      await refresh(reloadJob: true, refreshPhone: true);
+    } finally {
+      if (mounted) setState(() => _refreshingFromCard = false);
+    }
+  }
+}
+
+class _LocationReadinessCard extends StatelessWidget {
+  const _LocationReadinessCard({
+    required this.phone,
+    required this.tracker,
+    required this.phoneGeofence,
+    required this.tractorGeofence,
+    required this.phoneError,
+    required this.phoneQualityMessage,
+    required this.hasBoundary,
+    required this.hasFarmCentre,
+    required this.routeEnabled,
+    required this.hasTrack,
+    required this.refreshing,
+    required this.onRefresh,
+  });
+
+  final DeviceLocation? phone;
+  final TractorTrackerPosition? tracker;
+  final PlotGeofenceResult? phoneGeofence;
+  final PlotGeofenceResult? tractorGeofence;
+  final String? phoneError;
+  final String? phoneQualityMessage;
+  final bool hasBoundary;
+  final bool hasFarmCentre;
+  final bool routeEnabled;
+  final bool hasTrack;
+  final bool refreshing;
+  final VoidCallback onRefresh;
+
+  bool get _operatorReady => phoneGeofence?.isWithinAllowedArea ?? false;
+  bool get _tractorReady => tractorGeofence?.isWithinAllowedArea ?? false;
+
+  @override
+  Widget build(BuildContext context) {
+    final ready = _operatorReady && _tractorReady;
+    final scheme = Theme.of(context).colorScheme;
+    final statusColor = ready ? scheme.primary : scheme.error;
+    return OperatorCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(
+                ready ? Icons.verified_outlined : Icons.warning_amber_rounded,
+                color: statusColor,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  context.appText('Location readiness'),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  child: Text(
+                    context.appText(ready ? 'Ready' : 'Needs attention'),
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: statusColor,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _LocationReadinessRow(
+            icon: Icons.person_pin_circle_outlined,
+            title: context.appText('Operator GPS'),
+            status: _statusTitle(context, phoneGeofence, isTractor: false),
+            detail: _operatorDetail(context),
+            state: _state(phoneGeofence),
+          ),
+          const Divider(height: 24),
+          _LocationReadinessRow(
+            icon: Icons.agriculture_outlined,
+            title: context.appText('Tractor GPS'),
+            status: _statusTitle(context, tractorGeofence, isTractor: true),
+            detail: _tractorDetail(context),
+            state: _state(tractorGeofence),
+          ),
+          const SizedBox(height: 14),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: scheme.primary.withValues(alpha: 0.07),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, size: 20, color: scheme.primary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      context.appText(
+                        hasBoundary
+                            ? 'Start Check will verify both positions using the server farm tolerance.'
+                            : hasFarmCentre
+                            ? 'Only the farm centre is available. Start Check will make the server decision.'
+                            : 'Farm coordinates are unavailable. Ask the union to check the plot location.',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (routeEnabled || hasTrack) ...[
+            const SizedBox(height: 10),
+            Text(
+              context.appText(
+                hasTrack
+                    ? 'The tractor trail uses green inside the farm, red outside and grey when unknown.'
+                    : 'The tractor trail will appear after work begins.',
+              ),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: refreshing ? null : onRefresh,
+            child: AppButtonContent(
+              label: context.appText('Refresh location'),
+              loading: refreshing,
+              loadingLabel: context.appText('Refreshing location...'),
+              icon: Icons.refresh_rounded,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  _ReadinessState _state(PlotGeofenceResult? result) {
+    if (result == null) return _ReadinessState.waiting;
+    return result.isWithinAllowedArea
+        ? _ReadinessState.ready
+        : _ReadinessState.attention;
+  }
+
+  String _statusTitle(
+    BuildContext context,
+    PlotGeofenceResult? result, {
+    required bool isTractor,
+  }) {
+    if (result == null) {
+      return context.appText(
+        isTractor ? 'Waiting for tractor location' : 'Location unavailable',
+      );
+    }
+    return context.appText(switch (result.state) {
+      PlotGeofenceState.insideBoundary => 'Inside the farm boundary',
+      PlotGeofenceState.withinTolerance => 'Within farm tolerance',
+      PlotGeofenceState.uncertain => 'GPS result is uncertain',
+      PlotGeofenceState.outsideAllowedArea => 'Outside the allowed farm area',
+      PlotGeofenceState.unavailable => 'Boundary result unavailable',
+    });
+  }
+
+  String _operatorDetail(BuildContext context) {
+    if (phoneError != null) return context.appText(phoneError!);
+    if (phoneQualityMessage != null) {
+      return context.appText(phoneQualityMessage!);
+    }
+    if (phone == null) return context.appText('No recent phone position.');
+    final distance = phoneGeofence?.distanceFromPlotMeters;
+    final distanceText = distance == null || !distance.isFinite
+        ? null
+        : '${distance.toStringAsFixed(0)} m from boundary';
+    return [
+      'Accuracy: ±${phone!.accuracyMeters.toStringAsFixed(0)} m',
+      ?distanceText,
+    ].join(' • ');
+  }
+
+  String _tractorDetail(BuildContext context) {
+    final position = tracker;
+    if (position == null) {
+      return context.appText('No recent tracker position.');
+    }
+    final age = position.currentAgeSeconds;
+    if (!position.isLive) {
+      return age == null
+          ? context.appText('No recent tracker position.')
+          : 'Last tracker fix ${_ageLabel(age)} ago.';
+    }
+    final distance = tractorGeofence?.distanceFromPlotMeters;
+    return distance == null || !distance.isFinite
+        ? context.appText('Live tracker position received.')
+        : '${distance.toStringAsFixed(0)} m from boundary • live tracker';
+  }
+
+  String _ageLabel(int seconds) {
+    if (seconds < 60) return '$seconds sec';
+    if (seconds < 3600) return '${seconds ~/ 60} min';
+    return '${seconds ~/ 3600} hr';
+  }
+}
+
+enum _ReadinessState { ready, waiting, attention }
+
+class _LocationReadinessRow extends StatelessWidget {
+  const _LocationReadinessRow({
+    required this.icon,
+    required this.title,
+    required this.status,
+    required this.detail,
+    required this.state,
+  });
+
+  final IconData icon;
+  final String title;
+  final String status;
+  final String detail;
+  final _ReadinessState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final color = switch (state) {
+      _ReadinessState.ready => scheme.primary,
+      _ReadinessState.waiting => scheme.tertiary,
+      _ReadinessState.attention => scheme.error,
     };
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(9),
+            child: Icon(icon, color: color, size: 22),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: Theme.of(context).textTheme.labelLarge),
+              const SizedBox(height: 2),
+              Text(
+                status,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(detail, style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }

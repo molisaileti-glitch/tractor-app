@@ -152,8 +152,8 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     }
     await showAppSuccessDialog(
       context,
-      title: 'Verified',
-      message: 'Your OTP was verified successfully.',
+      title: context.appText('Verified'),
+      message: context.appText('Your OTP was verified successfully.'),
       buttonLabel: 'Continue',
     );
     if (!mounted) return;
@@ -175,7 +175,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     if (error == null) {
       showAppSnackBar(
         context,
-        message: 'A new verification code was sent.',
+        message: context.appText('A new verification code was sent.'),
         type: AppSnackType.success,
       );
     }
@@ -230,7 +230,7 @@ class _OtpPanel extends StatelessWidget {
               children: [
                 Center(
                   child: Text(
-                    'OTP',
+                    context.appText('OTP'),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w900,
                     ),
@@ -355,7 +355,7 @@ class _BrandLockup extends StatelessWidget {
         ),
         const SizedBox(width: 10),
         Text(
-          'SB Mechanization',
+          context.appText('SB Mechanization'),
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
             color: Colors.white,
             fontWeight: FontWeight.w900,

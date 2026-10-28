@@ -48,8 +48,8 @@ class OperatorJobsScreen extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        strings.goodMorning(displayName),
+                      child: TimeAwareGreeting(
+                        name: displayName,
                         style: Theme.of(context).textTheme.headlineSmall
                             ?.copyWith(fontWeight: FontWeight.w700),
                       ),

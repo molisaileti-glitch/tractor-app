@@ -60,7 +60,7 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
           children: [
             Expanded(
               child: Text(
-                'Service Requests',
+                context.appText('Service Requests'),
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w900,
                 ),
@@ -76,7 +76,7 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
               ),
               icon: const Icon(Icons.add),
-              label: const Text('Register'),
+              label: Text(context.appText('Register')),
             ),
           ],
         ),
@@ -164,7 +164,7 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
           child: requests.isEmpty
               ? _RequestsEmptyState(
                   key: ValueKey('empty-$_status'),
-                  message: 'No requests found.',
+                  message: context.appText('No requests found.'),
                 )
               : _RequestCardGrid(
                   key: ValueKey('requests-$_status'),
@@ -304,7 +304,7 @@ class _RemoteRequestsBanner extends StatelessWidget {
             ),
           ),
           IconButton(
-            tooltip: 'Refresh',
+            tooltip: context.appText('Refresh'),
             onPressed: isLoading ? null : onRefresh,
             icon: const Icon(Icons.refresh),
           ),
@@ -473,7 +473,7 @@ class _RequestPreviewCard extends StatelessWidget {
           Align(
             alignment: Alignment.centerRight,
             child: Text(
-              'Open request',
+              context.appText('Open request'),
               style: theme.textTheme.labelLarge?.copyWith(
                 color: theme.colorScheme.primary,
                 fontWeight: FontWeight.w900,
@@ -526,9 +526,11 @@ class OperationsRequestDetailScreen extends StatelessWidget {
         final request = repository.maybeRequestById(requestId);
         if (request == null) {
           return Scaffold(
-            appBar: AppBar(title: const Text('Request unavailable')),
-            body: const Center(
-              child: Text('This request is no longer available.'),
+            appBar: AppBar(title: Text(context.appText('Request unavailable'))),
+            body: Center(
+              child: Text(
+                context.appText('This request is no longer available.'),
+              ),
             ),
           );
         }
@@ -558,7 +560,7 @@ class OperationsRequestDetailScreen extends StatelessWidget {
                             borderRadius: BorderRadius.circular(18),
                           ),
                           child: Text(
-                            'Service request',
+                            context.appText('Service request'),
                             style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
                         ),
@@ -623,41 +625,53 @@ class OperationsRequestDetailScreen extends StatelessWidget {
                                 ],
                               ),
                               const SizedBox(height: 14),
-                              _Fact(label: 'Farmer', value: request.farmerName),
                               _Fact(
-                                label: 'Service',
+                                label: context.appText('Farmer'),
+                                value: request.farmerName,
+                              ),
+                              _Fact(
+                                label: context.appText('Service'),
                                 value: request.serviceType.label,
                               ),
                               _Fact(
-                                label: 'Preferred Date',
+                                label: context.appText('Preferred Date'),
                                 value: formatDate(request.preferredDate),
                               ),
-                              _Fact(label: 'Plot', value: request.plot.name),
                               _Fact(
-                                label: 'Area',
+                                label: context.appText('Plot'),
+                                value: request.plot.name,
+                              ),
+                              _Fact(
+                                label: context.appText('Area'),
                                 value:
                                     '${request.plot.areaHectares.toStringAsFixed(1)} hectares',
                               ),
                               _Fact(
-                                label: 'Location',
+                                label: context.appText('Location'),
                                 value: request.plot.location.isEmpty
                                     ? 'Not provided'
                                     : request.plot.location,
                               ),
                               if (requestNotes.amcos != null)
                                 _Fact(
-                                  label: 'AMCOS',
+                                  label: context.appText('AMCOS'),
                                   value: requestNotes.amcos!,
                                 ),
                               if (requestNotes.mcu != null)
-                                _Fact(label: 'MCU', value: requestNotes.mcu!),
+                                _Fact(
+                                  label: context.appText('MCU'),
+                                  value: requestNotes.mcu!,
+                                ),
                               if (requestNotes.season != null)
                                 _Fact(
-                                  label: 'Season',
+                                  label: context.appText('Season'),
                                   value: requestNotes.season!,
                                 ),
                               if (requestNotes.crop != null)
-                                _Fact(label: 'Crop', value: requestNotes.crop!),
+                                _Fact(
+                                  label: context.appText('Crop'),
+                                  value: requestNotes.crop!,
+                                ),
                               const Divider(height: 26),
                               if (requestNotes.other.isNotEmpty) ...[
                                 Text(
@@ -677,7 +691,7 @@ class OperationsRequestDetailScreen extends StatelessWidget {
                                       onPressed: () =>
                                           _showRejectSheet(context, request),
                                       icon: const Icon(Icons.close),
-                                      label: const Text('Reject'),
+                                      label: Text(context.appText('Reject')),
                                     ),
                                     OutlinedButton.icon(
                                       onPressed: () => _returnForCorrection(
@@ -685,13 +699,13 @@ class OperationsRequestDetailScreen extends StatelessWidget {
                                         request,
                                       ),
                                       icon: const Icon(Icons.keyboard_return),
-                                      label: const Text('Return'),
+                                      label: Text(context.appText('Return')),
                                     ),
                                     FilledButton.icon(
                                       onPressed: () =>
                                           _approve(context, request.id),
                                       icon: const Icon(Icons.check),
-                                      label: const Text('Approve'),
+                                      label: Text(context.appText('Approve')),
                                     ),
                                   ],
                                 )
@@ -708,13 +722,15 @@ class OperationsRequestDetailScreen extends StatelessWidget {
                                       icon: const Icon(
                                         Icons.calendar_month_outlined,
                                       ),
-                                      label: const Text('Schedule Service'),
+                                      label: Text(
+                                        context.appText('Schedule Service'),
+                                      ),
                                     ),
                                     OutlinedButton.icon(
                                       onPressed: () =>
                                           _cancelRequest(context, request),
                                       icon: const Icon(Icons.cancel_outlined),
-                                      label: const Text('Cancel'),
+                                      label: Text(context.appText('Cancel')),
                                     ),
                                   ],
                                 )
@@ -725,14 +741,16 @@ class OperationsRequestDetailScreen extends StatelessWidget {
                                   spacing: 10,
                                   runSpacing: 10,
                                   children: [
-                                    const Text(
-                                      'This request has been scheduled.',
+                                    Text(
+                                      context.appText(
+                                        'This request has been scheduled.',
+                                      ),
                                     ),
                                     OutlinedButton.icon(
                                       onPressed: () =>
                                           _cancelRequest(context, request),
                                       icon: const Icon(Icons.cancel_outlined),
-                                      label: const Text('Cancel'),
+                                      label: Text(context.appText('Cancel')),
                                     ),
                                   ],
                                 )
@@ -760,8 +778,9 @@ class OperationsRequestDetailScreen extends StatelessWidget {
     );
   }
 
-  void _approve(BuildContext context, String id) {
-    showModalBottomSheet<void>(
+  Future<void> _approve(BuildContext context, String id) async {
+    var scheduleAfterApproval = false;
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       builder: (_) => _ApproveRequestSheet(
@@ -782,25 +801,27 @@ class OperationsRequestDetailScreen extends StatelessWidget {
               if (error != null) {
                 await showAppErrorDialog(
                   context,
-                  title: 'Request not approved',
+                  title: context.appText('Request not approved'),
                   message: error,
                 );
                 return;
               }
               final scheduleNow = await showAppConfirmationDialog(
                 context,
-                title: 'Request approved',
-                message:
-                    'The request is ready for scheduling. Schedule it now, or find it later under the Approved tab.',
+                title: context.appText('Request approved'),
+                message: context.appText(
+                  'The request is ready for scheduling. Schedule it now, or find it later under the Approved tab.',
+                ),
                 confirmLabel: 'Schedule',
                 cancelLabel: 'Later',
               );
-              if (scheduleNow && context.mounted) {
-                _openSchedule(context, id);
-              }
+              scheduleAfterApproval = scheduleNow;
             },
       ),
     );
+    if (scheduleAfterApproval && context.mounted) {
+      _openSchedule(context, id);
+    }
   }
 
   Future<void> _returnForCorrection(
@@ -809,35 +830,39 @@ class OperationsRequestDetailScreen extends StatelessWidget {
   ) async {
     final reason = await _askForText(
       context,
-      title: 'Return For Correction',
-      label: 'Reason',
+      title: context.appText('Return For Correction'),
+      label: context.appText('Reason'),
     );
     if (reason == null || reason.trim().isEmpty) return;
     if (!context.mounted) return;
-    final confirmed = await showAppConfirmationDialog(
+    final confirmed = await showAppAsyncConfirmationDialog(
       context,
-      title: 'Return request?',
-      message:
-          'The request will be returned for correction with the reason you entered.',
+      title: context.appText('Return request?'),
+      message: context.appText(
+        'The request will be returned for correction with the reason you entered.',
+      ),
+      onConfirm: () =>
+          repository.returnRequest(id: request.id, reason: reason.trim()),
       confirmLabel: 'Return',
+      workingLabel: 'Returning...',
     );
     if (!confirmed) return;
-    await repository.returnRequest(id: request.id, reason: reason.trim());
     if (!context.mounted) return;
     final error = repository.mechanizationActionError;
     if (error != null) {
       await showAppErrorDialog(
         context,
-        title: 'Request not returned',
+        title: context.appText('Request not returned'),
         message: error,
       );
       return;
     }
     await showAppSuccessDialog(
       context,
-      title: 'Returned for correction',
-      message:
-          'The request is now under the Returned tab and can be corrected from the farmer side.',
+      title: context.appText('Returned for correction'),
+      message: context.appText(
+        'The request is now under the Returned tab and can be corrected from the farmer side.',
+      ),
     );
     if (context.mounted) Navigator.of(context).pop();
   }
@@ -848,39 +873,43 @@ class OperationsRequestDetailScreen extends StatelessWidget {
   ) async {
     final reason = await _askForText(
       context,
-      title: 'Cancel Request',
-      label: 'Reason',
+      title: context.appText('Cancel Request'),
+      label: context.appText('Reason'),
     );
     if (reason == null || reason.trim().isEmpty) return;
     if (!context.mounted) return;
-    final confirmed = await showAppConfirmationDialog(
+    final confirmed = await showAppAsyncConfirmationDialog(
       context,
-      title: 'Cancel request?',
-      message:
-          'This request will be cancelled and cannot proceed to scheduling.',
+      title: context.appText('Cancel request?'),
+      message: context.appText(
+        'This request will be cancelled and cannot proceed to scheduling.',
+      ),
+      onConfirm: () => repository.cancelRequest(
+        id: request.id,
+        reason: reason.trim(),
+        notes: '',
+      ),
       confirmLabel: 'Cancel Request',
+      workingLabel: 'Cancelling...',
       danger: true,
     );
     if (!confirmed) return;
-    await repository.cancelRequest(
-      id: request.id,
-      reason: reason.trim(),
-      notes: '',
-    );
     if (!context.mounted) return;
     final error = repository.mechanizationActionError;
     if (error != null) {
       await showAppErrorDialog(
         context,
-        title: 'Request not cancelled',
+        title: context.appText('Request not cancelled'),
         message: error,
       );
       return;
     }
     await showAppSuccessDialog(
       context,
-      title: 'Request cancelled',
-      message: 'The request is now available under the Cancelled tab.',
+      title: context.appText('Request cancelled'),
+      message: context.appText(
+        'The request is now available under the Cancelled tab.',
+      ),
     );
     if (context.mounted) Navigator.of(context).pop();
   }
@@ -978,6 +1007,7 @@ class _ApproveRequestSheetState extends State<_ApproveRequestSheet> {
   final _amountController = TextEditingController();
   final _noteController = TextEditingController();
   String _priority = 'normal';
+  bool _submitting = false;
 
   @override
   void dispose() {
@@ -1000,7 +1030,7 @@ class _ApproveRequestSheetState extends State<_ApproveRequestSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Approve Request',
+            context.appText('Approve Request'),
             style: Theme.of(
               context,
             ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
@@ -1008,41 +1038,65 @@ class _ApproveRequestSheetState extends State<_ApproveRequestSheet> {
           const SizedBox(height: 14),
           TextField(
             controller: _amountController,
+            enabled: !_submitting,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(labelText: 'Estimate amount'),
+            decoration: InputDecoration(
+              labelText: context.appText('Estimate amount'),
+            ),
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             initialValue: _priority,
-            decoration: const InputDecoration(labelText: 'Priority'),
-            items: const [
-              DropdownMenuItem(value: 'normal', child: Text('Normal')),
-              DropdownMenuItem(value: 'high', child: Text('High')),
-              DropdownMenuItem(value: 'urgent', child: Text('Urgent')),
+            decoration: InputDecoration(labelText: context.appText('Priority')),
+            items: [
+              DropdownMenuItem(
+                value: 'normal',
+                child: Text(context.appText('Normal')),
+              ),
+              DropdownMenuItem(
+                value: 'high',
+                child: Text(context.appText('High')),
+              ),
+              DropdownMenuItem(
+                value: 'urgent',
+                child: Text(context.appText('Urgent')),
+              ),
             ],
-            onChanged: (value) =>
-                setState(() => _priority = value ?? _priority),
+            onChanged: _submitting
+                ? null
+                : (value) => setState(() => _priority = value ?? _priority),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _noteController,
+            enabled: !_submitting,
             maxLines: 2,
-            decoration: const InputDecoration(labelText: 'Review note'),
+            decoration: InputDecoration(
+              labelText: context.appText('Review note'),
+            ),
           ),
           const SizedBox(height: 18),
           Row(
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
+                  onPressed: _submitting
+                      ? null
+                      : () => Navigator.of(context).pop(),
+                  child: Text(context.appText('Cancel')),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: FilledButton(
-                  onPressed: _submit,
-                  child: const Text('Approve'),
+                  onPressed: _submitting ? null : _submit,
+                  child: AppButtonContent(
+                    loading: _submitting,
+                    loadingLabel: context.appText('Approving...'),
+                    label: context.appText('Approve'),
+                    icon: Icons.check_circle_outline,
+                    progressColor: Colors.white,
+                  ),
                 ),
               ),
             ],
@@ -1057,20 +1111,20 @@ class _ApproveRequestSheetState extends State<_ApproveRequestSheet> {
     if (amount == null) {
       showAppSnackBar(
         context,
-        message: 'Enter a valid estimate amount.',
+        message: context.appText('Enter a valid estimate amount.'),
         type: AppSnackType.warning,
       );
       return;
     }
     final confirmed = await showAppConfirmationDialog(
       context,
-      title: 'Approve request?',
+      title: context.appText('Approve request?'),
       message:
           'Approve this service request with an estimated amount of $amount?',
       confirmLabel: 'Approve',
     );
     if (!confirmed || !mounted) return;
-    Navigator.of(context).pop();
+    setState(() => _submitting = true);
     await widget.onSubmit(
       amount: amount,
       priority: _priority,
@@ -1078,6 +1132,8 @@ class _ApproveRequestSheetState extends State<_ApproveRequestSheet> {
           ? null
           : _noteController.text.trim(),
     );
+    if (!mounted) return;
+    Navigator.of(context).pop();
   }
 }
 
@@ -1186,7 +1242,7 @@ class _RegisterRequestSheetState extends State<_RegisterRequestSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Register Service Request',
+              context.appText('Register Service Request'),
               style: Theme.of(
                 context,
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
@@ -1200,7 +1256,7 @@ class _RegisterRequestSheetState extends State<_RegisterRequestSheet> {
                   ? null
                   : _farmerIdController.text,
               isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Farmer'),
+              decoration: InputDecoration(labelText: context.appText('Farmer')),
               items: [
                 for (final farmer in widget.repository.farmers)
                   DropdownMenuItem(
@@ -1220,7 +1276,9 @@ class _RegisterRequestSheetState extends State<_RegisterRequestSheet> {
                   ? null
                   : _plotIdController.text,
               isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Mapped plot'),
+              decoration: InputDecoration(
+                labelText: context.appText('Mapped plot'),
+              ),
               items: [
                 for (final plot in _plots)
                   if (plot['mapped'] == true ||
@@ -1245,7 +1303,9 @@ class _RegisterRequestSheetState extends State<_RegisterRequestSheet> {
                   ? null
                   : _serviceTypeIdController.text,
               isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Service'),
+              decoration: InputDecoration(
+                labelText: context.appText('Service'),
+              ),
               items: [
                 for (final service in _serviceTypes)
                   DropdownMenuItem(
@@ -1268,7 +1328,9 @@ class _RegisterRequestSheetState extends State<_RegisterRequestSheet> {
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
-              decoration: const InputDecoration(labelText: 'Requested acres'),
+              decoration: InputDecoration(
+                labelText: context.appText('Requested acres'),
+              ),
             ),
             const SizedBox(height: 10),
             OutlinedButton.icon(
@@ -1279,22 +1341,44 @@ class _RegisterRequestSheetState extends State<_RegisterRequestSheet> {
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
               initialValue: _window,
-              decoration: const InputDecoration(labelText: 'Preferred window'),
-              items: const [
-                DropdownMenuItem(value: 'morning', child: Text('Morning')),
-                DropdownMenuItem(value: 'afternoon', child: Text('Afternoon')),
-                DropdownMenuItem(value: 'full_day', child: Text('Full day')),
+              decoration: InputDecoration(
+                labelText: context.appText('Preferred window'),
+              ),
+              items: [
+                DropdownMenuItem(
+                  value: 'morning',
+                  child: Text(context.appText('Morning')),
+                ),
+                DropdownMenuItem(
+                  value: 'afternoon',
+                  child: Text(context.appText('Afternoon')),
+                ),
+                DropdownMenuItem(
+                  value: 'full_day',
+                  child: Text(context.appText('Full day')),
+                ),
               ],
               onChanged: (value) => setState(() => _window = value ?? _window),
             ),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
               initialValue: _priority,
-              decoration: const InputDecoration(labelText: 'Priority'),
-              items: const [
-                DropdownMenuItem(value: 'normal', child: Text('Normal')),
-                DropdownMenuItem(value: 'high', child: Text('High')),
-                DropdownMenuItem(value: 'urgent', child: Text('Urgent')),
+              decoration: InputDecoration(
+                labelText: context.appText('Priority'),
+              ),
+              items: [
+                DropdownMenuItem(
+                  value: 'normal',
+                  child: Text(context.appText('Normal')),
+                ),
+                DropdownMenuItem(
+                  value: 'high',
+                  child: Text(context.appText('High')),
+                ),
+                DropdownMenuItem(
+                  value: 'urgent',
+                  child: Text(context.appText('Urgent')),
+                ),
               ],
               onChanged: (value) =>
                   setState(() => _priority = value ?? _priority),
@@ -1303,7 +1387,7 @@ class _RegisterRequestSheetState extends State<_RegisterRequestSheet> {
             TextField(
               controller: _notesController,
               maxLines: 2,
-              decoration: const InputDecoration(labelText: 'Notes'),
+              decoration: InputDecoration(labelText: context.appText('Notes')),
             ),
             const SizedBox(height: 18),
             Row(
@@ -1313,7 +1397,7 @@ class _RegisterRequestSheetState extends State<_RegisterRequestSheet> {
                     onPressed: _submitting
                         ? null
                         : () => Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
+                    child: Text(context.appText('Cancel')),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1322,7 +1406,13 @@ class _RegisterRequestSheetState extends State<_RegisterRequestSheet> {
                     onPressed: _submitting || _loadingPickers || _loadingPlots
                         ? null
                         : _submit,
-                    child: Text(_submitting ? 'Registering...' : 'Register'),
+                    child: AppButtonContent(
+                      loading: _submitting,
+                      loadingLabel: context.appText('Registering...'),
+                      label: context.appText('Register'),
+                      icon: Icons.add_task_outlined,
+                      progressColor: Colors.white,
+                    ),
                   ),
                 ),
               ],
@@ -1356,9 +1446,11 @@ class _RegisterRequestSheetState extends State<_RegisterRequestSheet> {
         !acres.isFinite ||
         acres <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'Select a farmer, mapped plot and service, and enter positive acres.',
+            context.appText(
+              'Select a farmer, mapped plot and service, and enter positive acres.',
+            ),
           ),
         ),
       );
@@ -1366,7 +1458,7 @@ class _RegisterRequestSheetState extends State<_RegisterRequestSheet> {
     }
     final confirmed = await showAppConfirmationDialog(
       context,
-      title: 'Register service request?',
+      title: context.appText('Register service request?'),
       message: 'Create a request for $acres acres on ${formatDate(_date)}?',
       confirmLabel: 'Register',
     );
@@ -1409,6 +1501,7 @@ class _RejectRequestSheet extends StatefulWidget {
 
 class _RejectRequestSheetState extends State<_RejectRequestSheet> {
   String _reason = 'No tractor available';
+  bool _submitting = false;
 
   static const _reasons = [
     'No tractor available',
@@ -1432,7 +1525,7 @@ class _RejectRequestSheetState extends State<_RejectRequestSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Reject Request',
+            context.appText('Reject Request'),
             style: Theme.of(
               context,
             ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
@@ -1440,7 +1533,9 @@ class _RejectRequestSheetState extends State<_RejectRequestSheet> {
           const SizedBox(height: 12),
           for (final reason in _reasons)
             InkWell(
-              onTap: () => setState(() => _reason = reason),
+              onTap: _submitting
+                  ? null
+                  : () => setState(() => _reason = reason),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Row(
@@ -1461,49 +1556,23 @@ class _RejectRequestSheetState extends State<_RejectRequestSheet> {
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
+                  onPressed: _submitting
+                      ? null
+                      : () => Navigator.of(context).pop(),
+                  child: Text(context.appText('Cancel')),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: FilledButton(
-                  onPressed: () async {
-                    final navigator = Navigator.of(context);
-                    final confirmed = await showAppConfirmationDialog(
-                      context,
-                      title: 'Reject request?',
-                      message: 'This request will be rejected for: $_reason.',
-                      confirmLabel: 'Reject',
-                      danger: true,
-                    );
-                    if (!confirmed) return;
-                    await widget.repository.rejectRequest(
-                      id: widget.request.id,
-                      reason: _reason,
-                      notes: '',
-                    );
-                    if (!context.mounted) return;
-                    final error = widget.repository.mechanizationActionError;
-                    if (error != null) {
-                      await showAppErrorDialog(
-                        context,
-                        title: 'Request not rejected',
-                        message: error,
-                      );
-                      return;
-                    }
-                    await showAppSuccessDialog(
-                      context,
-                      title: 'Request rejected',
-                      message:
-                          'The request is now available under the Rejected tab.',
-                    );
-                    if (!context.mounted) return;
-                    navigator.pop();
-                    navigator.pop();
-                  },
-                  child: const Text('Reject Request'),
+                  onPressed: _submitting ? null : _submit,
+                  child: AppButtonContent(
+                    loading: _submitting,
+                    loadingLabel: context.appText('Rejecting...'),
+                    label: context.appText('Reject Request'),
+                    icon: Icons.block_outlined,
+                    progressColor: Colors.white,
+                  ),
                 ),
               ),
             ],
@@ -1511,6 +1580,45 @@ class _RejectRequestSheetState extends State<_RejectRequestSheet> {
         ],
       ),
     );
+  }
+
+  Future<void> _submit() async {
+    final confirmed = await showAppConfirmationDialog(
+      context,
+      title: context.appText('Reject request?'),
+      message: 'This request will be rejected for: $_reason.',
+      confirmLabel: 'Reject',
+      danger: true,
+    );
+    if (!confirmed || !mounted) return;
+    setState(() => _submitting = true);
+    await widget.repository.rejectRequest(
+      id: widget.request.id,
+      reason: _reason,
+      notes: '',
+    );
+    if (!mounted) return;
+    final error = widget.repository.mechanizationActionError;
+    if (error != null) {
+      setState(() => _submitting = false);
+      await showAppErrorDialog(
+        context,
+        title: context.appText('Request not rejected'),
+        message: error,
+      );
+      return;
+    }
+    await showAppSuccessDialog(
+      context,
+      title: context.appText('Request rejected'),
+      message: context.appText(
+        'The request is now available under the Rejected tab.',
+      ),
+    );
+    if (!mounted) return;
+    final navigator = Navigator.of(context);
+    navigator.pop();
+    navigator.pop();
   }
 }
 
@@ -1529,8 +1637,8 @@ class _RequestPlotMap extends StatelessWidget {
         color: const Color(0xFF1D3028),
         alignment: Alignment.center,
         padding: const EdgeInsets.all(24),
-        child: const Text(
-          'No plot coordinates returned for this request.',
+        child: Text(
+          context.appText('No plot coordinates returned for this request.'),
           textAlign: TextAlign.center,
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),

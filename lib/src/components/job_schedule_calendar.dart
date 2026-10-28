@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../l10n/generated/app_localizations.dart';
+import 'app_empty_state.dart';
 import 'schedule_assignment.dart';
 
 export 'schedule_assignment.dart';
@@ -152,80 +153,94 @@ class _JobScheduleCalendarState extends State<JobScheduleCalendar> {
       isScrollControlled: true,
       showDragHandle: true,
       useSafeArea: true,
-      builder: (context) => SizedBox(
-        height: MediaQuery.sizeOf(context).height * .78,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-              child: Text(
-                AppLocalizations.of(context)!.assignmentsOn(
-                  ordered.length,
-                  MaterialLocalizations.of(context).formatMediumDate(day),
-                ),
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
+      builder: (context) {
+        final strings = AppLocalizations.of(context)!;
+        final date = MaterialLocalizations.of(context).formatMediumDate(day);
+        if (ordered.isEmpty) {
+          return SizedBox(
+            key: const ValueKey('empty-calendar-day'),
+            height: math.min(
+              420,
+              math.max(280, MediaQuery.sizeOf(context).height * .46),
             ),
-            Expanded(
-              child: ListView.separated(
-                key: const ValueKey('expanded-calendar-jobs'),
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                itemCount: ordered.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  final a = ordered[index];
-                  return Card(
-                    clipBehavior: Clip.antiAlias,
-                    child: InkWell(
-                      key: ValueKey('expanded-assignment-${a.id}'),
-                      onTap: () => Navigator.of(context).pop(a),
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          border: Border(
-                            left: BorderSide(color: a.color, width: 4),
+            child: AppEmptyState(
+              icon: Icons.event_busy_outlined,
+              title: strings.noAssignmentsOn(date),
+            ),
+          );
+        }
+        return SizedBox(
+          height: MediaQuery.sizeOf(context).height * .78,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                child: Text(
+                  strings.assignmentsOn(ordered.length, date),
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+              Expanded(
+                child: ListView.separated(
+                  key: const ValueKey('expanded-calendar-jobs'),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  itemCount: ordered.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final a = ordered[index];
+                    return Card(
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        key: ValueKey('expanded-assignment-${a.id}'),
+                        onTap: () => Navigator.of(context).pop(a),
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            border: Border(
+                              left: BorderSide(color: a.color, width: 4),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 12,
+                                runSpacing: 4,
+                                children: [
+                                  Text(
+                                    a.reference,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleMedium,
+                                  ),
+                                  _CalendarStatusBadge(
+                                    label: _statusLabel(context, a),
+                                    color: a.color,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '${_time(context, a.start)} - ${_time(context, a.effectiveEnd)}',
+                              ),
+                              const SizedBox(height: 8),
+                              Text(a.title),
+                              for (final detail in a.details) Text(detail),
+                              const SizedBox(height: 8),
+                              Text(AppLocalizations.of(context)!.openJob),
+                            ],
                           ),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Wrap(
-                              spacing: 12,
-                              runSpacing: 4,
-                              children: [
-                                Text(
-                                  a.reference,
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.titleMedium,
-                                ),
-                                _CalendarStatusBadge(
-                                  label: _statusLabel(context, a),
-                                  color: a.color,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '${_time(context, a.start)} - ${_time(context, a.effectiveEnd)}',
-                            ),
-                            const SizedBox(height: 8),
-                            Text(a.title),
-                            for (final detail in a.details) Text(detail),
-                            const SizedBox(height: 8),
-                            Text(AppLocalizations.of(context)!.openJob),
-                          ],
-                        ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
-            ),
-          ],
-        ),
-      ),
+            ],
+          ),
+        );
+      },
     );
     if (mounted && chosen != null) chosen.onOpen();
   }
@@ -447,6 +462,9 @@ class _JobScheduleCalendarState extends State<JobScheduleCalendar> {
                                         ? scheme.primary
                                         : scheme.surfaceContainerLow,
                                     child: InkWell(
+                                      key: ValueKey(
+                                        'calendar-day-${day.year}-${day.month}-${day.day}',
+                                      ),
                                       onTap: () => _expand(
                                         day,
                                         widget.assignments

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_theme.dart';
+import '../l10n/localized_copy.dart';
+import 'app_buttons.dart';
 
 void disposeAppDialogController(TextEditingController controller) {
   Future<void>.delayed(const Duration(milliseconds: 350), controller.dispose);
@@ -37,7 +39,7 @@ class AppDialogActions extends StatelessWidget {
                 color: Theme.of(context).colorScheme.outlineVariant,
               ),
             ),
-            child: Text(cancelLabel),
+            child: Text(context.appText(cancelLabel)),
           ),
         ),
         const SizedBox(width: 12),
@@ -47,15 +49,12 @@ class AppDialogActions extends StatelessWidget {
             style: danger
                 ? FilledButton.styleFrom(backgroundColor: AppColors.danger)
                 : null,
-            child: loading
-                ? const SizedBox.square(
-                    dimension: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : Text(confirmLabel),
+            child: AppButtonContent(
+              label: context.appText(confirmLabel),
+              loading: loading,
+              loadingLabel: context.appText(confirmLabel),
+              progressColor: Colors.white,
+            ),
           ),
         ),
       ],

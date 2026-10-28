@@ -98,7 +98,7 @@ class _OperatorShellState extends State<OperatorShell> {
                         child: child,
                       ),
               child: widget.repository.isInitialScreenLoad(_screen)
-                  ? const AppScreenSkeleton(key: ValueKey('loading'))
+                  ? _initialLoading()
                   : KeyedSubtree(
                       key: ValueKey(_selectedIndex),
                       child: screens[_selectedIndex],
@@ -143,6 +143,22 @@ class _OperatorShellState extends State<OperatorShell> {
       2 => strings.jobHistory,
       _ => strings.profile,
     };
+  }
+
+  Widget _initialLoading() {
+    if (_screen == OperatorDataScreen.dashboard) {
+      return const AppScreenSkeleton(key: ValueKey('loading-dashboard'));
+    }
+    final layout = switch (_screen) {
+      OperatorDataScreen.dashboard => AppSectionSkeletonLayout.list,
+      OperatorDataScreen.schedule => AppSectionSkeletonLayout.calendar,
+      OperatorDataScreen.history => AppSectionSkeletonLayout.list,
+      OperatorDataScreen.profile => AppSectionSkeletonLayout.profile,
+    };
+    return AppSectionSkeleton(
+      key: ValueKey('loading-${_screen.name}'),
+      layout: layout,
+    );
   }
 
   Future<void> _refreshData() async {

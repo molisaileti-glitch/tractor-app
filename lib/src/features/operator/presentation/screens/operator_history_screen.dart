@@ -119,7 +119,9 @@ class OperatorHistoryScreen extends StatelessWidget {
                                   ),
                                 ),
                                 icon: const Icon(Icons.verified_user_outlined),
-                                label: const Text('Farmer confirmation'),
+                                label: Text(
+                                  context.appText('Farmer confirmation'),
+                                ),
                               ),
                             if (repository.canAddJobPhotos(job) ||
                                 job.photos.isNotEmpty)
@@ -134,7 +136,7 @@ class OperatorHistoryScreen extends StatelessWidget {
                                   ),
                                 ),
                                 icon: const Icon(Icons.photo_library_outlined),
-                                label: const Text('Job photos'),
+                                label: Text(context.appText('Job photos')),
                               ),
                           ],
                         ),

@@ -375,6 +375,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mechanizationOperations => 'Mechanization operations';
 
   @override
+  String get appLogoSemantics => 'SB Mechanization logo';
+
+  @override
+  String appVersion(String version) {
+    return 'Version $version';
+  }
+
+  @override
   String get enterOtpCode => 'Enter the 6-digit code sent to your phone';
 
   @override

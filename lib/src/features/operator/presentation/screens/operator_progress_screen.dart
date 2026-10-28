@@ -73,9 +73,11 @@ class _OperatorProgressScreenState extends State<OperatorProgressScreen>
     final job = repository.maybeJobById(jobId);
     if (job == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Job unavailable')),
-        body: const Center(
-          child: Text('This assignment is no longer available.'),
+        appBar: AppBar(title: Text(context.appText('Job unavailable'))),
+        body: Center(
+          child: Text(
+            context.appText('This assignment is no longer available.'),
+          ),
         ),
       );
     }
@@ -105,7 +107,7 @@ class _OperatorProgressScreenState extends State<OperatorProgressScreen>
                       children: [
                         Expanded(
                           child: _Metric(
-                            label: 'Started',
+                            label: context.appText('Started'),
                             value: job.startedAt == null
                                 ? 'Pending'
                                 : formatTime(job.startedAt!),
@@ -114,7 +116,7 @@ class _OperatorProgressScreenState extends State<OperatorProgressScreen>
                         const SizedBox(width: 12),
                         Expanded(
                           child: _Metric(
-                            label: 'Duration',
+                            label: context.appText('Duration'),
                             value: duration == null
                                 ? 'Pending'
                                 : _formatDuration(duration),
@@ -165,25 +167,33 @@ class _OperatorProgressScreenState extends State<OperatorProgressScreen>
                   ),
                   const SizedBox(height: 14),
                   if (job.status == OperatorJobStatus.inProgress) ...[
-                    OutlinedButton.icon(
+                    OutlinedButton(
                       onPressed: _busy ? null : () => _pause(context, job),
-                      icon: const Icon(Icons.pause_circle_outline),
-                      label: const Text('Pause'),
+                      child: AppButtonContent(
+                        loading: _busy,
+                        loadingLabel: context.appText('Pausing...'),
+                        label: context.appText('Pause'),
+                        icon: Icons.pause_circle_outline,
+                      ),
                     ),
                     const SizedBox(height: 10),
                   ],
                   if (job.status == OperatorJobStatus.paused) ...[
-                    OutlinedButton.icon(
+                    OutlinedButton(
                       onPressed: _busy ? null : () => _resume(context, job),
-                      icon: const Icon(Icons.play_circle_outline),
-                      label: const Text('Resume'),
+                      child: AppButtonContent(
+                        loading: _busy,
+                        loadingLabel: context.appText('Resuming...'),
+                        label: context.appText('Resume'),
+                        icon: Icons.play_circle_outline,
+                      ),
                     ),
                     const SizedBox(height: 10),
                   ],
                   OutlinedButton.icon(
                     onPressed: () => _showProblemDialog(context, job),
                     icon: const Icon(Icons.report_problem_outlined),
-                    label: const Text('Report Problem'),
+                    label: Text(context.appText('Report Problem')),
                   ),
                   const SizedBox(height: 10),
                   FilledButton.icon(
@@ -201,7 +211,7 @@ class _OperatorProgressScreenState extends State<OperatorProgressScreen>
                             ),
                           ),
                     icon: const Icon(Icons.stop_circle_outlined),
-                    label: const Text('End Job'),
+                    label: Text(context.appText('End Job')),
                   ),
                 ],
               ),
@@ -222,8 +232,10 @@ class _OperatorProgressScreenState extends State<OperatorProgressScreen>
   Future<void> _pause(BuildContext context, OperatorJob job) async {
     final confirmed = await showAppConfirmationDialog(
       context,
-      title: 'Pause work?',
-      message: 'Work time for this job will be paused until you resume.',
+      title: context.appText('Pause work?'),
+      message: context.appText(
+        'Work time for this job will be paused until you resume.',
+      ),
       confirmLabel: 'Pause',
     );
     if (!confirmed || !context.mounted) return;
@@ -248,8 +260,8 @@ class _OperatorProgressScreenState extends State<OperatorProgressScreen>
   Future<void> _resume(BuildContext context, OperatorJob job) async {
     final confirmed = await showAppConfirmationDialog(
       context,
-      title: 'Resume work?',
-      message: 'Work time will continue for this job.',
+      title: context.appText('Resume work?'),
+      message: context.appText('Work time will continue for this job.'),
       confirmLabel: 'Resume',
     );
     if (!confirmed || !context.mounted) return;
@@ -270,33 +282,41 @@ class _OperatorProgressScreenState extends State<OperatorProgressScreen>
   void _showProblemDialog(BuildContext context, OperatorJob job) {
     final screenContext = context;
     var reason = OperatorProblemReason.tractorBreakdown;
+    var submitting = false;
     final notesController = TextEditingController();
     showDialog<void>(
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text('Unable to Perform Job'),
+          title: Text(context.appText('Unable to Perform Job')),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<OperatorProblemReason>(
                   initialValue: reason,
-                  decoration: const InputDecoration(labelText: 'Reason'),
+                  decoration: InputDecoration(
+                    labelText: context.appText('Reason'),
+                  ),
                   items: [
                     for (final item in OperatorProblemReason.values)
                       DropdownMenuItem(value: item, child: Text(item.label)),
                   ],
-                  onChanged: (value) {
-                    if (value != null) setState(() => reason = value);
-                  },
+                  onChanged: submitting
+                      ? null
+                      : (value) {
+                          if (value != null) setState(() => reason = value);
+                        },
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: notesController,
+                  enabled: !submitting,
                   minLines: 3,
                   maxLines: 5,
-                  decoration: const InputDecoration(labelText: 'Notes'),
+                  decoration: InputDecoration(
+                    labelText: context.appText('Notes'),
+                  ),
                 ),
               ],
             ),
@@ -306,13 +326,15 @@ class _OperatorProgressScreenState extends State<OperatorProgressScreen>
             AppDialogActions(
               onCancel: () => Navigator.of(context).pop(),
               onConfirm: () async {
+                if (submitting) return;
+                setState(() => submitting = true);
                 final ok = await repository.reportProblem(
                   jobId: job.id,
                   reason: reason,
                   notes: notesController.text.trim(),
                 );
-                if (!screenContext.mounted) return;
-                Navigator.of(context).pop();
+                if (!screenContext.mounted || !context.mounted) return;
+                if (ok) Navigator.of(context).pop();
                 showAppSnackBar(
                   screenContext,
                   message: ok
@@ -321,7 +343,12 @@ class _OperatorProgressScreenState extends State<OperatorProgressScreen>
                             'Could not report problem.',
                   type: ok ? AppSnackType.success : AppSnackType.error,
                 );
+                if (!ok && context.mounted) {
+                  setState(() => submitting = false);
+                }
               },
+              loading: submitting,
+              confirmLabel: submitting ? 'Sending...' : 'Submit',
             ),
           ],
         ),

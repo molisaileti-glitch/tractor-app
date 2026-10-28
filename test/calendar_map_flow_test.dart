@@ -100,6 +100,34 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('an empty calendar day shows a centred empty state', (
+    tester,
+  ) async {
+    final day = DateTime(2026, 10, 25);
+    await tester.pumpWidget(
+      _app(
+        SingleChildScrollView(
+          child: JobScheduleCalendar(initialDate: day, assignments: const []),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('calendar-day-2026-10-25')));
+    await tester.pumpAndSettle();
+
+    final emptyState = find.byKey(const ValueKey('empty-calendar-day'));
+    expect(emptyState, findsOneWidget);
+    expect(find.byIcon(Icons.event_busy_outlined), findsOneWidget);
+    expect(find.text('No assignments on Sun, Oct 25.'), findsOneWidget);
+    final sheetRect = tester.getRect(emptyState);
+    final messageRect = tester.getRect(
+      find.text('No assignments on Sun, Oct 25.'),
+    );
+    expect(messageRect.center.dy, closeTo(sheetRect.center.dy + 30, 60));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('map shows real phone and tractor fixes without a mapped farm', (
     tester,
   ) async {

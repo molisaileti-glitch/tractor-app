@@ -13,6 +13,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../domain/entities/operator_job.dart';
 import 'map_position_grouping.dart';
+import '../../../../l10n/localized_copy.dart';
 
 const _googleRoutesAndroidApiKey = 'AIzaSyAARTXTKRaYC011X_ruaKhK_R4uzgWtt0U';
 const _googleRoutesIosApiKey = 'AIzaSyARbOp7_7i56wwdstWxPxy-lVH2ERjHdQ0';
@@ -292,7 +293,7 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
                   children: [
                     ChoiceChip(
                       avatar: const Icon(Icons.agriculture, size: 18),
-                      label: const Text('Tractor route'),
+                      label: Text(context.appText('Tractor route')),
                       selected: _usesTractorRoute,
                       onSelected: widget.tractorPosition?.isLive == true
                           ? (_) => _selectRoute('tractor')
@@ -300,7 +301,7 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
                     ),
                     ChoiceChip(
                       avatar: const Icon(Icons.person, size: 18),
-                      label: const Text('Operator route'),
+                      label: Text(context.appText('Operator route')),
                       selected: !_usesTractorRoute && _phonePoint != null,
                       onSelected: _phonePoint != null
                           ? (_) => _selectRoute('operator')
@@ -400,7 +401,7 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
                           : () => _selectRoute(
                               _usesTractorRoute ? 'tractor' : 'operator',
                             ),
-                      child: const Text('Retry'),
+                      child: Text(context.appText('Retry')),
                     ),
                   ],
                 ),
@@ -424,7 +425,7 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
                   ),
                 ],
               ),
-              child: const Padding(
+              child: Padding(
                 padding: EdgeInsets.all(10),
                 child: Row(
                   children: [
@@ -432,7 +433,9 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Allow location access and check GPS to calculate the road route.',
+                        context.appText(
+                          'Allow location access and check GPS to calculate the road route.',
+                        ),
                       ),
                     ),
                   ],
@@ -573,8 +576,8 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
               BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
           anchor: const Offset(.5, .5),
           consumeTapEvents: true,
-          infoWindow: const InfoWindow(
-            title: 'Operator + tractor',
+          infoWindow: InfoWindow(
+            title: context.appText('Operator + tractor'),
             snippet: 'Locations close together',
           ),
           onTap: () => _showNearbyLocations(phonePoint, tractorPoint),
@@ -600,7 +603,9 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
               _operatorMarkerIcon ??
               BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
           anchor: const Offset(0.5, 0.5),
-          infoWindow: const InfoWindow(title: 'Operator · this phone’s GPS'),
+          infoWindow: InfoWindow(
+            title: context.appText('Operator - phone GPS'),
+          ),
         ),
       for (final job in jobs)
         if (job.plot.boundaryPoints.isNotEmpty)
@@ -634,18 +639,20 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Operator + tractor',
+              context.appText('Operator + tractor'),
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 10),
-            const Text(
-              'The reported locations are close together. This does not confirm the operator is on the tractor.',
+            Text(
+              context.appText(
+                'The reported locations are close together. This does not confirm the operator is on the tractor.',
+              ),
             ),
             const SizedBox(height: 16),
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.person, color: Color(0xFF7C3AED)),
-              title: const Text('Operator - phone GPS'),
+              title: Text(context.appText('Operator - phone GPS')),
               subtitle: Text(
                 '${phone.latitude.toStringAsFixed(6)}, ${phone.longitude.toStringAsFixed(6)}\n'
                 'Accuracy: ${widget.phoneAccuracyMeters?.toStringAsFixed(0)} m',
@@ -654,7 +661,7 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.agriculture, color: Color(0xFFF97316)),
-              title: const Text('Tractor - tracker GPS'),
+              title: Text(context.appText('Tractor - tracker GPS')),
               subtitle: Text(
                 '${tractor.latitude.toStringAsFixed(6)}, ${tractor.longitude.toStringAsFixed(6)}',
               ),

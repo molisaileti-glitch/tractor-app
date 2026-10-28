@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../farmer/data/models/farmer_profile_model.dart';
 import '../../../farmer/domain/entities/farmer_profile.dart';
 import '../../data/repositories/auth_local_repository.dart';
+import '../../../../components/components.dart';
 
 class FarmerRegistrationScreen extends StatefulWidget {
   const FarmerRegistrationScreen({
@@ -54,11 +55,11 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          tooltip: 'Back',
+          tooltip: context.appText('Back'),
           onPressed: widget.onBack,
           icon: const Icon(Icons.arrow_back),
         ),
-        title: const Text('Create Farmer Account'),
+        title: Text(context.appText('Create Farmer Account')),
       ),
       body: SafeArea(
         child: Center(
@@ -72,43 +73,47 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      'Farmer Details',
+                      context.appText('Farmer Details'),
                       style: Theme.of(context).textTheme.headlineSmall
                           ?.copyWith(fontWeight: FontWeight.w900),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'Register farmers locally now. Other roles will sign in through backend authentication later.',
+                    Text(
+                      context.appText(
+                        'Register farmers locally now. Other roles will sign in through backend authentication later.',
+                      ),
                     ),
                     const SizedBox(height: 22),
                     _RequiredTextField(
                       controller: _firstNameController,
-                      label: 'First name',
+                      label: context.appText('First name'),
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _middleNameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Middle name (optional)',
+                      decoration: InputDecoration(
+                        labelText: context.appText('Middle name (optional)'),
                       ),
                     ),
                     const SizedBox(height: 12),
                     _RequiredTextField(
                       controller: _lastNameController,
-                      label: 'Last name',
+                      label: context.appText('Last name'),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<FarmerSex>(
                       initialValue: _sex,
-                      decoration: const InputDecoration(labelText: 'Sex'),
-                      items: const [
+                      decoration: InputDecoration(
+                        labelText: context.appText('Sex'),
+                      ),
+                      items: [
                         DropdownMenuItem(
                           value: FarmerSex.female,
-                          child: Text('Female'),
+                          child: Text(context.appText('Female')),
                         ),
                         DropdownMenuItem(
                           value: FarmerSex.male,
-                          child: Text('Male'),
+                          child: Text(context.appText('Male')),
                         ),
                       ],
                       onChanged: (value) {
@@ -118,7 +123,9 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                     const SizedBox(height: 12),
                     DropdownButtonFormField<FarmerIdentityDocumentType>(
                       initialValue: _identityType,
-                      decoration: const InputDecoration(labelText: 'ID type'),
+                      decoration: InputDecoration(
+                        labelText: context.appText('ID type'),
+                      ),
                       items: [
                         for (final type in FarmerIdentityDocumentType.values)
                           DropdownMenuItem(
@@ -135,7 +142,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                     const SizedBox(height: 12),
                     _RequiredTextField(
                       controller: _idNumberController,
-                      label: 'ID number',
+                      label: context.appText('ID number'),
                     ),
                     const SizedBox(height: 12),
                     OutlinedButton.icon(
@@ -148,34 +155,38 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                     const SizedBox(height: 12),
                     _RequiredTextField(
                       controller: _phoneController,
-                      label: 'Phone number',
+                      label: context.appText('Phone number'),
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(
-                        labelText: 'Email (optional)',
+                      decoration: InputDecoration(
+                        labelText: context.appText('Email (optional)'),
                       ),
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _villageController,
-                      decoration: const InputDecoration(
-                        labelText: 'Village (optional)',
+                      decoration: InputDecoration(
+                        labelText: context.appText('Village (optional)'),
                       ),
                     ),
                     const SizedBox(height: 12),
                     _RequiredTextField(
                       controller: _passwordController,
-                      label: 'Password',
+                      label: context.appText('Password'),
                       obscureText: true,
                     ),
                     const SizedBox(height: 20),
                     FilledButton(
                       onPressed: _submitting ? null : _register,
-                      child: Text(
-                        _submitting ? 'Creating Account...' : 'Create Account',
+                      child: AppButtonContent(
+                        loading: _submitting,
+                        loadingLabel: context.appText('Creating Account...'),
+                        label: context.appText('Create Account'),
+                        icon: Icons.person_add_alt_1_outlined,
+                        progressColor: Colors.white,
                       ),
                     ),
                   ],

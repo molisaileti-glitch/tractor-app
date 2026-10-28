@@ -45,14 +45,16 @@ class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
     final job = widget.repository.maybeJobById(widget.jobId);
     if (job == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Job unavailable')),
-        body: const Center(
-          child: Text('This assignment is no longer available.'),
+        appBar: AppBar(title: Text(context.appText('Job unavailable'))),
+        body: Center(
+          child: Text(
+            context.appText('This assignment is no longer available.'),
+          ),
         ),
       );
     }
     return Scaffold(
-      appBar: AppBar(title: const Text('Complete Job')),
+      appBar: AppBar(title: Text(context.appText('Complete Job'))),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
         child: Align(
@@ -66,7 +68,7 @@ class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
                   child: Column(
                     children: [
                       _Fact(
-                        label: 'Started',
+                        label: context.appText('Started'),
                         value: job.startedAt == null
                             ? 'Pending'
                             : formatTime(job.startedAt!),
@@ -85,8 +87,8 @@ class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
-                  decoration: const InputDecoration(
-                    labelText: 'Reported acres',
+                  decoration: InputDecoration(
+                    labelText: context.appText('Reported acres'),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -95,8 +97,8 @@ class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
-                  decoration: const InputDecoration(
-                    labelText: 'End hour meter',
+                  decoration: InputDecoration(
+                    labelText: context.appText('End hour meter'),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -105,14 +107,18 @@ class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
-                  decoration: const InputDecoration(labelText: 'Fuel used (L)'),
+                  decoration: InputDecoration(
+                    labelText: context.appText('Fuel used (L)'),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: _notesController,
                   minLines: 4,
                   maxLines: 6,
-                  decoration: const InputDecoration(labelText: 'Add Notes'),
+                  decoration: InputDecoration(
+                    labelText: context.appText('Add Notes'),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 Text(strings.optionalAfterPhotosHint),
@@ -153,16 +159,19 @@ class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
     if (area == null || !area.isFinite || area <= 0) {
       await showAppErrorDialog(
         context,
-        title: 'Missing acres',
-        message: 'Enter the reported acres completed before submitting.',
+        title: context.appText('Missing acres'),
+        message: context.appText(
+          'Enter the reported acres completed before submitting.',
+        ),
       );
       return;
     }
     final confirmed = await showAppConfirmationDialog(
       context,
-      title: 'Submit completed work?',
-      message:
-          'This will send the job completion details to the union for review.',
+      title: context.appText('Submit completed work?'),
+      message: context.appText(
+        'This will send the job completion details to the union for review.',
+      ),
       confirmLabel: 'Submit',
     );
     if (!confirmed || !mounted) return;
@@ -177,8 +186,10 @@ class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
             (fuelUsed == null || !fuelUsed.isFinite || fuelUsed < 0))) {
       await showAppErrorDialog(
         context,
-        title: 'Invalid readings',
-        message: 'Enter valid non-negative meter and fuel readings.',
+        title: context.appText('Invalid readings'),
+        message: context.appText(
+          'Enter valid non-negative meter and fuel readings.',
+        ),
       );
       return;
     }
@@ -197,7 +208,7 @@ class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
     if (!ok) {
       await showAppErrorDialog(
         context,
-        title: 'Could not submit',
+        title: context.appText('Could not submit'),
         message:
             widget.repository.lastActionError ??
             'Completed work could not be submitted.',
@@ -206,9 +217,10 @@ class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
     }
     await showAppSuccessDialog(
       context,
-      title: 'Work submitted',
-      message:
-          'Work was completed. The farmer can now confirm satisfaction using their PIN or SMS code, or confirm later.',
+      title: context.appText('Work submitted'),
+      message: context.appText(
+        'Work was completed. The farmer can now confirm satisfaction using their PIN or SMS code, or confirm later.',
+      ),
     );
     if (!mounted) return;
     final navigator = Navigator.of(context);

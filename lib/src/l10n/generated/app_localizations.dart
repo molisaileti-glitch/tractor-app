@@ -764,6 +764,18 @@ abstract class AppLocalizations {
   /// **'Mechanization operations'**
   String get mechanizationOperations;
 
+  /// No description provided for @appLogoSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'SB Mechanization logo'**
+  String get appLogoSemantics;
+
+  /// No description provided for @appVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version}'**
+  String appVersion(String version);
+
   /// No description provided for @enterOtpCode.
   ///
   /// In en, this message translates to:

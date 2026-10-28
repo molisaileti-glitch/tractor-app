@@ -2,6 +2,53 @@ import 'package:flutter/material.dart';
 
 import '../core/theme/app_theme.dart';
 
+/// Consistent button feedback for actions that wait on the API.
+///
+/// Keeping the working label visible tells the user which action is running,
+/// while the spinner and disabled parent button prevent accidental repeats.
+class AppButtonContent extends StatelessWidget {
+  const AppButtonContent({
+    super.key,
+    required this.label,
+    this.loading = false,
+    this.loadingLabel,
+    this.icon,
+    this.progressColor,
+  });
+
+  final String label;
+  final bool loading;
+  final String? loadingLabel;
+  final IconData? icon;
+  final Color? progressColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 180),
+      child: Row(
+        key: ValueKey(loading),
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (loading)
+            SizedBox.square(
+              dimension: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: progressColor,
+              ),
+            )
+          else if (icon != null)
+            Icon(icon, size: 20),
+          if (loading || icon != null) const SizedBox(width: 9),
+          Flexible(child: Text(loading ? loadingLabel ?? label : label)),
+        ],
+      ),
+    );
+  }
+}
+
 class AppPrimaryButton extends StatelessWidget {
   const AppPrimaryButton({
     super.key,
@@ -23,12 +70,11 @@ class AppPrimaryButton extends StatelessWidget {
     return FilledButton(
       onPressed: loading ? null : onPressed,
       child: loading
-          ? const SizedBox.square(
-              dimension: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Colors.white,
-              ),
+          ? AppButtonContent(
+              label: label,
+              loading: true,
+              loadingLabel: label,
+              progressColor: Colors.white,
             )
           : Row(
               mainAxisSize: MainAxisSize.min,
@@ -89,12 +135,11 @@ class AppGlowButton extends StatelessWidget {
           foregroundColor: Colors.white,
         ),
         child: loading
-            ? const SizedBox.square(
-                dimension: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
+            ? AppButtonContent(
+                label: label,
+                loading: true,
+                loadingLabel: label,
+                progressColor: Colors.white,
               )
             : Row(
                 mainAxisSize: MainAxisSize.min,

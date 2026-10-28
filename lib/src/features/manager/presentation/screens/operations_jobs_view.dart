@@ -17,7 +17,7 @@ class OperationsJobsView extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Jobs',
+          context.appText('Jobs'),
           style: Theme.of(
             context,
           ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
@@ -44,12 +44,14 @@ class OperationsJobsView extends StatelessWidget {
           const SizedBox(height: 12),
         ],
         if (repository.jobs.isEmpty)
-          const SizedBox(
+          SizedBox(
             height: 420,
             child: AppEmptyState(
               icon: Icons.route_outlined,
-              title: 'No jobs available',
-              message: 'Scheduled and active jobs will appear here.',
+              title: context.appText('No jobs available'),
+              message: context.appText(
+                'Scheduled and active jobs will appear here.',
+              ),
             ),
           ),
         for (final job in repository.jobs) ...[
@@ -92,8 +94,10 @@ class OperationsJobDetailScreen extends StatelessWidget {
                     type: AppMessageType.error,
                   ),
                 if (job == null)
-                  const Text(
-                    'This job is no longer available. Refresh the schedule.',
+                  Text(
+                    context.appText(
+                      'This job is no longer available. Refresh the schedule.',
+                    ),
                   )
                 else
                   _JobCard(repository: repository, job: job),
@@ -220,7 +224,7 @@ class _JobCard extends StatelessWidget {
                         ),
                         if (_canManage)
                           IconButton(
-                            tooltip: 'Job actions',
+                            tooltip: context.appText('Job actions'),
                             onPressed: () => _showActions(context),
                             visualDensity: VisualDensity.compact,
                             icon: const Icon(Icons.more_vert),
@@ -243,22 +247,22 @@ class _JobCard extends StatelessWidget {
               children: [
                 _JobFact(
                   icon: Icons.person_outline,
-                  label: 'Farmer',
+                  label: context.appText('Farmer'),
                   value: job.farmerName,
                 ),
                 _JobFact(
                   icon: Icons.engineering_outlined,
-                  label: 'Operator',
+                  label: context.appText('Operator'),
                   value: job.operator.name,
                 ),
                 _JobFact(
                   icon: Icons.agriculture_outlined,
-                  label: 'Tractor',
+                  label: context.appText('Tractor'),
                   value: tractorLabel,
                 ),
                 _JobFact(
                   icon: Icons.location_on_outlined,
-                  label: 'Plot',
+                  label: context.appText('Plot'),
                   value: job.plot.name,
                 ),
               ],
@@ -291,14 +295,14 @@ class _JobCard extends StatelessWidget {
             OutlinedButton.icon(
               onPressed: () => _showEvidence(context),
               icon: const Icon(Icons.insights_outlined),
-              label: const Text('Review work evidence'),
+              label: Text(context.appText('Review work evidence')),
             ),
             if (_canDispatch) ...[
               const SizedBox(height: 16),
               FilledButton.icon(
                 onPressed: () => _confirmDispatch(context),
                 icon: const Icon(Icons.north_east),
-                label: const Text('Dispatch Job'),
+                label: Text(context.appText('Dispatch Job')),
               ),
             ],
             if (repository.can('mech.jobs.manage') &&
@@ -307,7 +311,7 @@ class _JobCard extends StatelessWidget {
               OutlinedButton.icon(
                 onPressed: () => _showVerifyDialog(context),
                 icon: const Icon(Icons.verified_outlined),
-                label: const Text('Verify completed work'),
+                label: Text(context.appText('Verify completed work')),
               ),
             ],
             if (repository.can('mech.jobs.manage') &&
@@ -316,7 +320,7 @@ class _JobCard extends StatelessWidget {
               FilledButton.icon(
                 onPressed: () => _confirmClose(context),
                 icon: const Icon(Icons.fact_check_outlined),
-                label: const Text('Close verified job'),
+                label: Text(context.appText('Close verified job')),
               ),
             ],
           ],
@@ -340,7 +344,7 @@ class _JobCard extends StatelessWidget {
                   job.status == JobStatus.dispatched)
                 ListTile(
                   leading: const Icon(Icons.event_repeat_outlined),
-                  title: const Text('Reschedule'),
+                  title: Text(context.appText('Reschedule')),
                   onTap: () {
                     Navigator.of(context).pop();
                     Navigator.of(context).push(
@@ -356,7 +360,7 @@ class _JobCard extends StatelessWidget {
               if (job.status == JobStatus.scheduled)
                 ListTile(
                   leading: const Icon(Icons.north_east),
-                  title: const Text('Dispatch'),
+                  title: Text(context.appText('Dispatch')),
                   onTap: () {
                     Navigator.of(context).pop();
                     _confirmDispatch(context);
@@ -366,7 +370,7 @@ class _JobCard extends StatelessWidget {
                   job.status == JobStatus.verified)
                 ListTile(
                   leading: const Icon(Icons.insights_outlined),
-                  title: const Text('Refresh verification'),
+                  title: Text(context.appText('Refresh verification')),
                   onTap: () async {
                     Navigator.of(context).pop();
                     await repository.refreshJobVerification(job.id);
@@ -383,7 +387,7 @@ class _JobCard extends StatelessWidget {
                   job.status == JobStatus.verified)
                 ListTile(
                   leading: const Icon(Icons.phone_in_talk_outlined),
-                  title: const Text('Manual farmer confirm'),
+                  title: Text(context.appText('Manual farmer confirm')),
                   onTap: () {
                     Navigator.of(context).pop();
                     _showConfirmDialog(context);
@@ -406,7 +410,7 @@ class _JobCard extends StatelessWidget {
               if (job.status == JobStatus.verified)
                 ListTile(
                   leading: const Icon(Icons.task_alt_outlined),
-                  title: const Text('Close job'),
+                  title: Text(context.appText('Close job')),
                   onTap: () {
                     Navigator.of(context).pop();
                     _confirmClose(context);
@@ -425,7 +429,7 @@ class _JobCard extends StatelessWidget {
                     color: Theme.of(context).colorScheme.error,
                   ),
                   title: Text(
-                    'Cancel Job',
+                    context.appText('Cancel Job'),
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.error,
                     ),
@@ -443,15 +447,16 @@ class _JobCard extends StatelessWidget {
   }
 
   Future<void> _confirmDispatch(BuildContext context) async {
-    final confirmed = await showAppConfirmationDialog(
+    final confirmed = await showAppAsyncConfirmationDialog(
       context,
-      title: 'Dispatch job?',
+      title: context.appText('Dispatch job?'),
       message:
           'This will send the assignment to ${job.operator.name} using ${job.tractor.assetNo ?? job.tractor.label ?? job.tractor.model}.',
+      onConfirm: () => repository.dispatchJob(job.id),
       confirmLabel: 'Dispatch',
+      workingLabel: 'Dispatching...',
     );
     if (!confirmed) return;
-    await repository.dispatchJob(job.id);
     if (!context.mounted) return;
     await _showActionResult(
       context,
@@ -466,38 +471,50 @@ class _JobCard extends StatelessWidget {
         ['unpaid', 'deposit', 'paid', 'waived'].contains(job.paymentStatus)
         ? job.paymentStatus!
         : 'unpaid';
+    var submitting = false;
     final selected = await showDialog<String>(
       context: context,
+      barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, update) => AlertDialog(
-          title: const Text('Close verified job'),
-          content: DropdownButtonFormField<String>(
-            initialValue: payment,
-            decoration: const InputDecoration(
-              labelText: 'Actual payment status',
+        builder: (dialogContext, update) => PopScope(
+          canPop: !submitting,
+          child: AlertDialog(
+            title: Text(context.appText('Close verified job')),
+            content: DropdownButtonFormField<String>(
+              initialValue: payment,
+              decoration: InputDecoration(
+                labelText: context.appText('Actual payment status'),
+              ),
+              items: [
+                for (final value in ['unpaid', 'deposit', 'paid', 'waived'])
+                  DropdownMenuItem(value: value, child: Text(value)),
+              ],
+              onChanged: submitting
+                  ? null
+                  : (value) {
+                      if (value != null) update(() => payment = value);
+                    },
             ),
-            items: [
-              for (final value in ['unpaid', 'deposit', 'paid', 'waived'])
-                DropdownMenuItem(value: value, child: Text(value)),
+            actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+            actions: [
+              AppDialogActions(
+                onCancel: () => Navigator.pop(dialogContext),
+                onConfirm: () async {
+                  if (submitting) return;
+                  update(() => submitting = true);
+                  await repository.closeJob(job.id, paymentStatus: payment);
+                  if (!dialogContext.mounted) return;
+                  Navigator.pop(dialogContext, payment);
+                },
+                confirmLabel: submitting ? 'Closing job...' : 'Close job',
+                loading: submitting,
+              ),
             ],
-            onChanged: (value) {
-              if (value != null) update(() => payment = value);
-            },
           ),
-          actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
-          actions: [
-            AppDialogActions(
-              onCancel: () => Navigator.pop(dialogContext),
-              onConfirm: () => Navigator.pop(dialogContext, payment),
-              confirmLabel: 'Close job',
-            ),
-          ],
         ),
       ),
     );
     if (selected == null || !context.mounted) return;
-    await repository.closeJob(job.id, paymentStatus: selected);
-    if (!context.mounted) return;
     await _showActionResult(
       context,
       successTitle: 'Job closed',
@@ -506,20 +523,22 @@ class _JobCard extends StatelessWidget {
   }
 
   Future<void> _confirmCancel(BuildContext context) async {
-    final confirmed = await showAppConfirmationDialog(
+    final confirmed = await showAppAsyncConfirmationDialog(
       context,
-      title: 'Cancel this job?',
-      message:
-          'The assignment will be cancelled and the operator will no longer continue this job.',
-      confirmLabel: 'Cancel Job',
-      danger: true,
-    );
-    if (confirmed) {
-      await repository.cancelJob(
+      title: context.appText('Cancel this job?'),
+      message: context.appText(
+        'The assignment will be cancelled and the operator will no longer continue this job.',
+      ),
+      onConfirm: () => repository.cancelJob(
         jobId: job.id,
         reason: JobCancellationReason.other,
         notes: '',
-      );
+      ),
+      confirmLabel: 'Cancel Job',
+      workingLabel: 'Cancelling job...',
+      danger: true,
+    );
+    if (confirmed) {
       if (!context.mounted) return;
       await _showActionResult(
         context,
@@ -535,13 +554,13 @@ class _JobCard extends StatelessWidget {
     final reason = await showDialog<String>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Flag Job'),
+        title: Text(context.appText('Flag Job')),
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Reason',
-            hintText: 'Acreage looks inflated',
+          decoration: InputDecoration(
+            labelText: context.appText('Reason'),
+            hintText: context.appText('Acreage looks inflated'),
           ),
           minLines: 2,
           maxLines: 3,
@@ -560,16 +579,18 @@ class _JobCard extends StatelessWidget {
     disposeAppDialogController(controller);
     if (reason == null || reason.isEmpty) return;
     if (!context.mounted) return;
-    final confirmed = await showAppConfirmationDialog(
+    final confirmed = await showAppAsyncConfirmationDialog(
       context,
-      title: 'Flag this job?',
-      message:
-          'The job will be marked for review and the reason will be visible to operations staff.',
+      title: context.appText('Flag this job?'),
+      message: context.appText(
+        'The job will be marked for review and the reason will be visible to operations staff.',
+      ),
+      onConfirm: () => repository.flagJob(jobId: job.id, reason: reason),
       confirmLabel: 'Flag Job',
+      workingLabel: 'Flagging job...',
       danger: true,
     );
     if (confirmed) {
-      await repository.flagJob(jobId: job.id, reason: reason);
       if (!context.mounted) return;
       await _showActionResult(
         context,
@@ -585,13 +606,13 @@ class _JobCard extends StatelessWidget {
     final note = await showDialog<String>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Clear Flag'),
+        title: Text(context.appText('Clear Flag')),
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Note',
-            hintText: 'Re-measured with the farmer',
+          decoration: InputDecoration(
+            labelText: context.appText('Note'),
+            hintText: context.appText('Re-measured with the farmer'),
           ),
           minLines: 2,
           maxLines: 3,
@@ -609,15 +630,17 @@ class _JobCard extends StatelessWidget {
     disposeAppDialogController(controller);
     if (note == null || note.isEmpty) return;
     if (!context.mounted) return;
-    final confirmed = await showAppConfirmationDialog(
+    final confirmed = await showAppAsyncConfirmationDialog(
       context,
-      title: 'Clear job flag?',
-      message:
-          'Confirm that the flagged concern has been reviewed and resolved.',
+      title: context.appText('Clear job flag?'),
+      message: context.appText(
+        'Confirm that the flagged concern has been reviewed and resolved.',
+      ),
+      onConfirm: () => repository.unflagJob(jobId: job.id, note: note),
       confirmLabel: 'Clear Flag',
+      workingLabel: 'Clearing flag...',
     );
     if (confirmed) {
-      await repository.unflagJob(jobId: job.id, note: note);
       if (!context.mounted) return;
       await _showActionResult(
         context,
@@ -635,7 +658,7 @@ class _JobCard extends StatelessWidget {
     if (repository.mechanizationActionError != null) {
       await showAppErrorDialog(
         context,
-        title: 'Could not load job',
+        title: context.appText('Could not load job'),
         message: repository.mechanizationActionError!,
       );
       return;
@@ -643,7 +666,7 @@ class _JobCard extends StatelessWidget {
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Work evidence'),
+        title: Text(context.appText('Work evidence')),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -659,7 +682,7 @@ class _JobCard extends StatelessWidget {
                 Text('Amount: ${detail.currency ?? ''} ${detail.amount}'),
               const Divider(),
               if (detail.verification.isEmpty)
-                const Text('No tracker analysis is available yet.'),
+                Text(context.appText('No tracker analysis is available yet.')),
               Text(
                 'Tracker estimate: ${detail.verification['est_acres'] ?? 'Not available'} acres',
               ),
@@ -686,7 +709,7 @@ class _JobCard extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Close'),
+            child: Text(context.appText('Close')),
           ),
         ],
       ),
@@ -699,7 +722,7 @@ class _JobCard extends StatelessWidget {
     if (repository.mechanizationActionError != null) {
       await showAppErrorDialog(
         context,
-        title: 'Could not load evidence',
+        title: context.appText('Could not load evidence'),
         message: repository.mechanizationActionError!,
       );
       return;
@@ -710,9 +733,10 @@ class _JobCard extends StatelessWidget {
         detail.farmerConfirmedAt == null) {
       await showAppErrorDialog(
         context,
-        title: 'Farmer confirmation required',
-        message:
-            'Ask the operator to record the farmer\'s PIN/SMS confirmation, or wait for confirmation through Shamba Bora, then refresh this job. An authorised union officer may also record a confirmation received by phone or at the office.',
+        title: context.appText('Farmer confirmation required'),
+        message: context.appText(
+          'Ask the operator to record the farmer\'s PIN/SMS confirmation, or wait for confirmation through Shamba Bora, then refresh this job. An authorised union officer may also record a confirmation received by phone or at the office.',
+        ),
       );
       return;
     }
@@ -727,7 +751,7 @@ class _JobCard extends StatelessWidget {
     final input = await showDialog<_VerifyJobInput>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Verify Job'),
+        title: Text(context.appText('Verify Job')),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -750,17 +774,17 @@ class _JobCard extends StatelessWidget {
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
-                decoration: const InputDecoration(
-                  labelText: 'Verified acres',
-                  hintText: '4.5',
+                decoration: InputDecoration(
+                  labelText: context.appText('Verified acres'),
+                  hintText: context.appText('4.5'),
                 ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: noteController,
-                decoration: const InputDecoration(
-                  labelText: 'Note',
-                  hintText: 'Add verification note',
+                decoration: InputDecoration(
+                  labelText: context.appText('Note'),
+                  hintText: context.appText('Add verification note'),
                 ),
                 minLines: 2,
                 maxLines: 3,
@@ -791,19 +815,20 @@ class _JobCard extends StatelessWidget {
     disposeAppDialogController(noteController);
     if (input == null) return;
     if (!context.mounted) return;
-    final confirmed = await showAppConfirmationDialog(
+    final confirmed = await showAppAsyncConfirmationDialog(
       context,
-      title: 'Verify completed work?',
+      title: context.appText('Verify completed work?'),
       message:
           'Confirm ${input.verifiedAcres} verified acres. This value will be used for the final job record and charge.',
+      onConfirm: () => repository.verifyJob(
+        jobId: job.id,
+        verifiedAcres: input.verifiedAcres,
+        note: input.note.isEmpty ? null : input.note,
+      ),
       confirmLabel: 'Verify',
+      workingLabel: 'Verifying...',
     );
     if (!confirmed) return;
-    await repository.verifyJob(
-      jobId: job.id,
-      verifiedAcres: input.verifiedAcres,
-      note: input.note.isEmpty ? null : input.note,
-    );
     if (!context.mounted) return;
     await _showActionResult(
       context,
@@ -821,13 +846,15 @@ class _JobCard extends StatelessWidget {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text('Manual Farmer Confirm'),
+          title: Text(context.appText('Manual Farmer Confirm')),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<int>(
                 initialValue: rating,
-                decoration: const InputDecoration(labelText: 'Rating'),
+                decoration: InputDecoration(
+                  labelText: context.appText('Rating'),
+                ),
                 items: [1, 2, 3, 4, 5]
                     .map(
                       (value) =>
@@ -842,7 +869,7 @@ class _JobCard extends StatelessWidget {
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 value: dispute,
-                title: const Text('Farmer disputes this job'),
+                title: Text(context.appText('Farmer disputes this job')),
                 onChanged: (value) => setState(() => dispute = value),
               ),
               const SizedBox(height: 12),
@@ -880,22 +907,23 @@ class _JobCard extends StatelessWidget {
     disposeAppDialogController(noteController);
     if (input == null) return;
     if (!context.mounted) return;
-    final confirmed = await showAppConfirmationDialog(
+    final confirmed = await showAppAsyncConfirmationDialog(
       context,
       title: input.dispute ? 'Record farmer dispute?' : 'Confirm for farmer?',
       message: input.dispute
           ? 'This will record that the farmer disputes the completed work.'
           : 'Confirm that the farmer approved the completed work by phone.',
+      onConfirm: () => repository.confirmJob(
+        jobId: job.id,
+        rating: input.rating,
+        note: input.note.isEmpty ? null : input.note,
+        dispute: input.dispute,
+      ),
       confirmLabel: input.dispute ? 'Record Dispute' : 'Confirm',
+      workingLabel: input.dispute ? 'Recording dispute...' : 'Confirming...',
       danger: input.dispute,
     );
     if (!confirmed) return;
-    await repository.confirmJob(
-      jobId: job.id,
-      rating: input.rating,
-      note: input.note.isEmpty ? null : input.note,
-      dispute: input.dispute,
-    );
     if (!context.mounted) return;
     await _showActionResult(
       context,
@@ -917,7 +945,7 @@ class _JobCard extends StatelessWidget {
     if (error != null) {
       await showAppErrorDialog(
         context,
-        title: 'Action not completed',
+        title: context.appText('Action not completed'),
         message: error,
       );
       return;
@@ -980,18 +1008,20 @@ class _RescheduleJobScreenState extends State<RescheduleJobScreen> {
     final job = widget.repository.maybeJobById(widget.jobId);
     if (job == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Job unavailable')),
-        body: const Center(
-          child: Text('This assignment is no longer available.'),
+        appBar: AppBar(title: Text(context.appText('Job unavailable'))),
+        body: Center(
+          child: Text(
+            context.appText('This assignment is no longer available.'),
+          ),
         ),
       );
     }
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Reschedule Job'),
+        title: Text(context.appText('Reschedule Job')),
         actions: [
           IconButton(
-            tooltip: 'Save',
+            tooltip: context.appText('Save'),
             onPressed: () => _save(job),
             icon: const Icon(Icons.check),
           ),
@@ -1004,7 +1034,7 @@ class _RescheduleJobScreenState extends State<RescheduleJobScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Date & Time',
+                context.appText('Date & Time'),
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
@@ -1014,21 +1044,21 @@ class _RescheduleJobScreenState extends State<RescheduleJobScreen> {
                 children: [
                   _SettingRow(
                     icon: Icons.calendar_month_outlined,
-                    title: 'Date',
+                    title: context.appText('Date'),
                     value: formatDate(_selectedAt),
                     onTap: _pickDate,
                   ),
                   const Divider(height: 1),
                   _SettingRow(
                     icon: Icons.schedule,
-                    title: 'Time',
+                    title: context.appText('Time'),
                     value: formatTime(_selectedAt),
                     onTap: _pickTime,
                   ),
                   const Divider(height: 1),
                   _SettingRow(
                     icon: Icons.event_note_outlined,
-                    title: 'Reason for reschedule',
+                    title: context.appText('Reason for reschedule'),
                     value: _reason.label,
                     onTap: _pickReason,
                   ),
@@ -1112,37 +1142,38 @@ class _RescheduleJobScreenState extends State<RescheduleJobScreen> {
   }
 
   Future<void> _save(OperationsJob job) async {
-    final confirmed = await showAppConfirmationDialog(
+    final confirmed = await showAppAsyncConfirmationDialog(
       context,
-      title: 'Reschedule job?',
+      title: context.appText('Reschedule job?'),
       message:
           'Move this job to ${formatDate(_selectedAt)} at ${formatTime(_selectedAt)} for ${_reason.label.toLowerCase()}?',
+      onConfirm: () => widget.repository.rescheduleJob(
+        jobId: job.id,
+        newScheduledAt: _selectedAt,
+        tractorId: job.tractor.id,
+        operatorId: job.operator.id,
+        reason: _reason,
+        notes: '',
+      ),
       confirmLabel: 'Reschedule',
+      workingLabel: 'Rescheduling...',
     );
     if (!confirmed || !mounted) return;
-    await widget.repository.rescheduleJob(
-      jobId: job.id,
-      newScheduledAt: _selectedAt,
-      tractorId: job.tractor.id,
-      operatorId: job.operator.id,
-      reason: _reason,
-      notes: '',
-    );
-    if (!mounted) return;
     final error = widget.repository.mechanizationActionError;
     if (error != null) {
       await showAppErrorDialog(
         context,
-        title: 'Job not rescheduled',
+        title: context.appText('Job not rescheduled'),
         message: error,
       );
       return;
     }
     await showAppSuccessDialog(
       context,
-      title: 'Job rescheduled',
-      message:
-          'The updated date and time are now shown under Jobs and Schedule.',
+      title: context.appText('Job rescheduled'),
+      message: context.appText(
+        'The updated date and time are now shown under Jobs and Schedule.',
+      ),
     );
     if (!mounted) return;
     Navigator.of(context).pop();

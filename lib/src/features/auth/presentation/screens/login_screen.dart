@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../../components/components.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -42,6 +43,13 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _sendingOtp = false;
   String? _loginError;
   String? _challengeId;
+  late final Future<PackageInfo> _packageInfo;
+
+  @override
+  void initState() {
+    super.initState();
+    _packageInfo = PackageInfo.fromPlatform();
+  }
 
   @override
   void dispose() {
@@ -67,7 +75,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   _BackButton(onPressed: widget.onBack),
                   const SizedBox(height: 58),
-                  const _BrandLockup(),
+                  _BrandLockup(packageInfo: _packageInfo),
                   const SizedBox(height: 34),
                   _LoginPanel(
                     identifierController: _identifierController,
@@ -334,7 +342,9 @@ class _LoginPanel extends StatelessWidget {
 }
 
 class _BrandLockup extends StatelessWidget {
-  const _BrandLockup();
+  const _BrandLockup({required this.packageInfo});
+
+  final Future<PackageInfo> packageInfo;
 
   @override
   Widget build(BuildContext context) {
@@ -351,14 +361,14 @@ class _BrandLockup extends StatelessWidget {
               height: 92,
               child: Image.asset(
                 'assets/images/tractor_launcher_icon.png',
-                fit: BoxFit.cover,
-                semanticLabel: 'SB Mechanization logo',
+                fit: BoxFit.contain,
+                semanticLabel: strings.appLogoSemantics,
               ),
             ),
           ),
           const SizedBox(height: 13),
           Text(
-            'SB Mechanization',
+            context.appText('SB Mechanization'),
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               color: Theme.of(context).colorScheme.onSurface,
@@ -374,6 +384,26 @@ class _BrandLockup extends StatelessWidget {
                 context,
               ).colorScheme.onSurfaceVariant.withValues(alpha: 0.82),
             ),
+          ),
+          const SizedBox(height: 8),
+          FutureBuilder<PackageInfo>(
+            future: packageInfo,
+            builder: (context, snapshot) {
+              final info = snapshot.data;
+              if (info == null) return const SizedBox(height: 18);
+              final build = info.buildNumber.trim();
+              final value = build.isEmpty
+                  ? info.version
+                  : '${info.version} ($build)';
+              return Text(
+                strings.appVersion(value),
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              );
+            },
           ),
         ],
       ),

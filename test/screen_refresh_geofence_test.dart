@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platform_interface.dart';
+import 'package:tractor/src/components/app_skeleton.dart';
 import 'package:tractor/src/additional_data/location/domain/entities/device_location.dart';
 import 'package:tractor/src/additional_data/location/domain/repositories/location_repository.dart';
 import 'package:tractor/src/additional_data/location/domain/usecases/check_plot_geofence.dart';
@@ -18,6 +19,23 @@ import 'package:tractor/src/l10n/generated/app_localizations.dart';
 import 'package:tractor/src/shared/application/app_preferences_controller.dart';
 
 void main() {
+  testWidgets('section skeleton layouts fit a narrow screen', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    for (final layout in AppSectionSkeletonLayout.values) {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: AppSectionSkeleton(layout: layout)),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(tester.takeException(), isNull, reason: layout.name);
+    }
+  });
+
   test('operator loads and refreshes only the requested screen', () async {
     final api = _ScreenApi();
     final repo = OperatorLocalRepository.seeded(mobileApiClient: api);
@@ -162,6 +180,67 @@ void main() {
         );
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
+
+  for (final operator in [true, false]) {
+    testWidgets(
+      '${operator ? 'operator' : 'union'} schedule uses its own loading state',
+      (tester) async {
+        final api = _ScreenApi();
+        final operatorRepo = OperatorLocalRepository.seeded(
+          mobileApiClient: api,
+        );
+        final managerRepo = UnionOperationsRepository.seeded(
+          mobileApiClient: api,
+        );
+        final preferences = AppPreferencesController();
+        addTearDown(operatorRepo.dispose);
+        addTearDown(managerRepo.dispose);
+        addTearDown(preferences.dispose);
+        await tester.runAsync(() async {
+          if (operator) {
+            operatorRepo.setMechanizationAccessToken('operator');
+            await _settle(() => operatorRepo.isSyncingMechanization);
+          } else {
+            managerRepo.setMechanizationAccessToken('manager');
+            await _settle(() => managerRepo.isSyncingMechanization);
+          }
+        });
+        api.calendarGate = Completer<Map<String, Object?>>();
+        await tester.pumpWidget(
+          _app(
+            operator
+                ? OperatorShell(
+                    repository: operatorRepo,
+                    preferences: preferences,
+                    onLogout: () {},
+                  )
+                : OperationsShell(
+                    repository: managerRepo,
+                    preferences: preferences,
+                    onLogout: () {},
+                  ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byIcon(Icons.calendar_month_outlined).last);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 500));
+
+        expect(find.byKey(const ValueKey('loading-schedule')), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('calendar-skeleton-layout')),
+          findsOneWidget,
+        );
+        expect(find.byKey(const ValueKey('loading-dashboard')), findsNothing);
+        expect(find.text('Schedule'), findsWidgets);
+        api.calendarGate!.complete({'data': <Object?>[]});
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('loading-schedule')), findsNothing);
+        expect(tester.takeException(), isNull);
       },
     );
   }

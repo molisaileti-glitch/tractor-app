@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../../../../components/components.dart';
 import '../../data/repositories/operator_local_repository.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 
@@ -215,14 +216,14 @@ class _OperatorJobPhotosScreenState extends State<OperatorJobPhotosScreen> {
   Widget build(BuildContext context) => PopScope(
     canPop: !_busy,
     child: Scaffold(
-      appBar: AppBar(title: const Text('Job photos')),
+      appBar: AppBar(title: Text(context.appText('Job photos'))),
       body: AnimatedBuilder(
         animation: widget.repository,
         builder: (context, _) {
           final job = widget.repository.maybeJobById(widget.jobId);
           if (job == null) {
-            return const Center(
-              child: Text('This job is no longer available.'),
+            return Center(
+              child: Text(context.appText('This job is no longer available.')),
             );
           }
           final strings = AppLocalizations.of(context)!;
@@ -239,14 +240,18 @@ class _OperatorJobPhotosScreenState extends State<OperatorJobPhotosScreen> {
               const SizedBox(height: 12),
               if (!canAdd) Text(strings.inspectionBeforePhotos),
               if (canAdd) ...[
-                const Text(
-                  'Take or select a photo, review it, then upload. JPG, PNG or WebP, up to 8 MB.',
+                Text(
+                  context.appText(
+                    'Take or select a photo, review it, then upload. JPG, PNG or WebP, up to 8 MB.',
+                  ),
                 ),
                 const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
                   key: ValueKey('photo-kind-$_kind'),
                   initialValue: _kind,
-                  decoration: const InputDecoration(labelText: 'Photo type'),
+                  decoration: InputDecoration(
+                    labelText: context.appText('Photo type'),
+                  ),
                   items: [
                     for (final value in [
                       'before',
@@ -266,8 +271,8 @@ class _OperatorJobPhotosScreenState extends State<OperatorJobPhotosScreen> {
                   controller: _caption,
                   enabled: !_busy,
                   maxLength: 500,
-                  decoration: const InputDecoration(
-                    labelText: 'Caption (optional)',
+                  decoration: InputDecoration(
+                    labelText: context.appText('Caption (optional)'),
                   ),
                 ),
                 Wrap(
@@ -281,14 +286,14 @@ class _OperatorJobPhotosScreenState extends State<OperatorJobPhotosScreen> {
                             ? null
                             : () => _pick(ImageSource.camera),
                         icon: const Icon(Icons.camera_alt),
-                        label: const Text('Take photo'),
+                        label: Text(context.appText('Take photo')),
                       ),
                     OutlinedButton.icon(
                       onPressed: _busy
                           ? null
                           : () => _pick(ImageSource.gallery),
                       icon: const Icon(Icons.photo_library),
-                      label: const Text('Choose photo'),
+                      label: Text(context.appText('Choose photo')),
                     ),
                   ],
                 ),
@@ -298,15 +303,22 @@ class _OperatorJobPhotosScreenState extends State<OperatorJobPhotosScreen> {
                     _preview!,
                     height: 220,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, _, _) => const Text(
-                      'Image preview unavailable. Choose a JPG, PNG or WebP.',
+                    errorBuilder: (_, _, _) => Text(
+                      context.appText(
+                        'Image preview unavailable. Choose a JPG, PNG or WebP.',
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
-                  FilledButton.icon(
+                  FilledButton(
                     onPressed: _busy ? null : _upload,
-                    icon: const Icon(Icons.cloud_upload),
-                    label: Text(_busy ? 'Uploading...' : 'Upload photo'),
+                    child: AppButtonContent(
+                      loading: _busy,
+                      loadingLabel: context.appText('Uploading...'),
+                      label: context.appText('Upload photo'),
+                      icon: Icons.cloud_upload,
+                      progressColor: Colors.white,
+                    ),
                   ),
                 ],
                 if (_busy)

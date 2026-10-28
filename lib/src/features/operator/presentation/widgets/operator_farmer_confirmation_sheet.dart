@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../components/components.dart';
 import '../../data/repositories/operator_local_repository.dart';
 import '../../domain/entities/operator_job.dart';
 
@@ -163,15 +164,15 @@ class _FarmerConfirmationSheetState extends State<_FarmerConfirmationSheet> {
       children: [
         const _SheetHandle(),
         _SheetHeader(
-          title: 'Farmer confirmation',
-          subtitle: 'Step 1 of 2',
+          title: context.appText('Farmer confirmation'),
+          subtitle: context.appText('Step 1 of 2'),
           onClose: _busy ? null : _close,
         ),
         const SizedBox(height: 8),
         _JobContext(job: widget.job),
         const SizedBox(height: 18),
         Text(
-          'Give the phone to the farmer',
+          context.appText('Give the phone to the farmer'),
           textAlign: TextAlign.center,
           style: theme.textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.w800,
@@ -179,7 +180,9 @@ class _FarmerConfirmationSheetState extends State<_FarmerConfirmationSheet> {
         ),
         const SizedBox(height: 8),
         Text(
-          'The farmer should enter their own PIN or SMS code. The credential is submitted only after the next step.',
+          context.appText(
+            'The farmer should enter their own PIN or SMS code. The credential is submitted only after the next step.',
+          ),
           textAlign: TextAlign.center,
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
@@ -189,16 +192,16 @@ class _FarmerConfirmationSheetState extends State<_FarmerConfirmationSheet> {
         const SizedBox(height: 20),
         SegmentedButton<String>(
           key: ValueKey('confirmation-method-$_method'),
-          segments: const [
+          segments: [
             ButtonSegment(
               value: 'pin',
               icon: Icon(Icons.pin_outlined),
-              label: Text('Farmer PIN'),
+              label: Text(context.appText('Farmer PIN')),
             ),
             ButtonSegment(
               value: 'otp',
               icon: Icon(Icons.sms_outlined),
-              label: Text('SMS code'),
+              label: Text(context.appText('SMS code')),
             ),
           ],
           selected: {_method},
@@ -222,11 +225,15 @@ class _FarmerConfirmationSheetState extends State<_FarmerConfirmationSheet> {
         ],
         if (_method == 'otp') ...[
           const SizedBox(height: 14),
-          OutlinedButton.icon(
+          OutlinedButton(
             key: const ValueKey('send-farmer-otp'),
             onPressed: _busy ? null : _sendOtp,
-            icon: const Icon(Icons.send_outlined),
-            label: const Text('Send code to farmer'),
+            child: AppButtonContent(
+              loading: _busy,
+              loadingLabel: context.appText('Sending code...'),
+              label: context.appText('Send code to farmer'),
+              icon: Icons.send_outlined,
+            ),
           ),
         ],
         const SizedBox(height: 16),
@@ -264,7 +271,7 @@ class _FarmerConfirmationSheetState extends State<_FarmerConfirmationSheet> {
             Expanded(
               child: OutlinedButton(
                 onPressed: _busy ? null : _close,
-                child: const Text('Cancel'),
+                child: Text(context.appText('Cancel')),
               ),
             ),
             const SizedBox(width: 12),
@@ -274,7 +281,7 @@ class _FarmerConfirmationSheetState extends State<_FarmerConfirmationSheet> {
                 onPressed: _busy || !_credentialIsValid
                     ? null
                     : _continueToRating,
-                child: const Text('Continue'),
+                child: Text(context.appText('Continue')),
               ),
             ),
           ],
@@ -291,8 +298,8 @@ class _FarmerConfirmationSheetState extends State<_FarmerConfirmationSheet> {
       children: [
         const _SheetHandle(),
         _SheetHeader(
-          title: 'How was the tractor service?',
-          subtitle: 'Step 2 of 2',
+          title: context.appText('How was the tractor service?'),
+          subtitle: context.appText('Step 2 of 2'),
           onBack: _busy
               ? null
               : () => setState(() {
@@ -303,7 +310,9 @@ class _FarmerConfirmationSheetState extends State<_FarmerConfirmationSheet> {
         ),
         const SizedBox(height: 10),
         Text(
-          'Your feedback helps the union improve mechanization services.',
+          context.appText(
+            'Your feedback helps the union improve mechanization services.',
+          ),
           textAlign: TextAlign.center,
           style: theme.textTheme.bodyLarge?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
@@ -351,8 +360,8 @@ class _FarmerConfirmationSheetState extends State<_FarmerConfirmationSheet> {
             minLines: 3,
             maxLines: 5,
             onChanged: (_) => setState(() => _message = null),
-            decoration: const InputDecoration(
-              labelText: 'Describe the problem',
+            decoration: InputDecoration(
+              labelText: context.appText('Describe the problem'),
               alignLabelWithHint: true,
               prefixIcon: Icon(Icons.report_problem_outlined),
             ),
@@ -451,7 +460,7 @@ class _SheetHeader extends StatelessWidget {
               : IconButton(
                   key: const ValueKey('farmer-confirmation-back'),
                   onPressed: onBack,
-                  tooltip: 'Back',
+                  tooltip: context.appText('Back'),
                   icon: const Icon(Icons.arrow_back),
                 ),
         ),
@@ -480,7 +489,7 @@ class _SheetHeader extends StatelessWidget {
           child: IconButton.filledTonal(
             key: const ValueKey('farmer-confirmation-close'),
             onPressed: onClose,
-            tooltip: 'Close',
+            tooltip: context.appText('Close'),
             icon: const Icon(Icons.close),
           ),
         ),
@@ -628,8 +637,10 @@ class _DisputeChoice extends StatelessWidget {
         enabled: enabled,
         controlAffinity: ListTileControlAffinity.leading,
         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-        title: const Text('Report a service problem'),
-        subtitle: const Text('The union manager will review the issue.'),
+        title: Text(context.appText('Report a service problem')),
+        subtitle: Text(
+          context.appText('The union manager will review the issue.'),
+        ),
         onChanged: enabled ? (value) => onChanged(value ?? false) : null,
       ),
     );

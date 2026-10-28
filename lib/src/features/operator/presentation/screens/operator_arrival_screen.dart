@@ -31,7 +31,8 @@ class OperatorArrivalScreen extends StatefulWidget {
   State<OperatorArrivalScreen> createState() => _OperatorArrivalScreenState();
 }
 
-class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
+class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
+    with WidgetsBindingObserver {
   final CheckPlotGeofence _checkPlotGeofence = const CheckPlotGeofence();
 
   bool _checkingLocation = false;
@@ -46,6 +47,8 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
   String? _selectedImplement;
   final _mapKey = GlobalKey<OperatorLiveJobMapState>();
   bool _pollingReadiness = false;
+  bool _locationPromptShown = false;
+  bool _openingLocationSettings = false;
 
   bool get _hasInspection => widget.repository.inspectedToday(
     widget.repository.maybeJobById(widget.jobId)?.tractorId ?? '',
@@ -79,19 +82,74 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     widget.repository.addListener(_repositoryChanged);
     final job = widget.repository.maybeJobById(widget.jobId);
     if (job != null) {
       unawaited(widget.repository.refreshInspection(job.tractorId));
       unawaited(widget.repository.refreshTrackerPositions());
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_checkLocationService(showPrompt: true));
+    });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     widget.repository.removeListener(_repositoryChanged);
     _hourMeterController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || !_openingLocationSettings) return;
+    _openingLocationSettings = false;
+    unawaited(_checkLocationService(showPrompt: false));
+  }
+
+  Future<void> _checkLocationService({required bool showPrompt}) async {
+    final controller = widget.locationRepository;
+    if (controller is! LocationSettingsController) return;
+    if (!mounted) return;
+    final settingsController = controller as LocationSettingsController;
+    final enabled = await settingsController.isLocationServiceEnabled();
+    if (!mounted) return;
+    if (enabled) {
+      if (!showPrompt) unawaited(_refreshLocation());
+      return;
+    }
+    setState(() {
+      _locationError =
+          'Device location is turned off. Turn it on to verify the farm boundary.';
+    });
+    if (!showPrompt || _locationPromptShown) return;
+    _locationPromptShown = true;
+    final openSettings = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.location_off_outlined, size: 36),
+        title: Text(context.appText('Turn on device location')),
+        content: Text(
+          context.appText(
+            'SB Mechanization needs this tablet location to confirm that the operator and tractor are within the farm boundary.',
+          ),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+        actions: [
+          AppDialogActions(
+            onCancel: () => Navigator.of(dialogContext).pop(false),
+            onConfirm: () => Navigator.of(dialogContext).pop(true),
+            cancelLabel: context.appText('Not now'),
+            confirmLabel: context.appText('Open location settings'),
+          ),
+        ],
+      ),
+    );
+    if (openSettings != true || !mounted) return;
+    _openingLocationSettings = true;
+    await settingsController.openLocationSettings();
   }
 
   void _repositoryChanged() {
@@ -104,12 +162,14 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
     final job = widget.repository.maybeJobById(widget.jobId);
     if (job == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Job unavailable')),
-        body: const Center(
+        appBar: AppBar(title: Text(context.appText('Job unavailable'))),
+        body: Center(
           child: Padding(
             padding: EdgeInsets.all(24),
             child: Text(
-              'This job is no longer available in the operator assignment list.',
+              context.appText(
+                'This job is no longer available in the operator assignment list.',
+              ),
               textAlign: TextAlign.center,
               style: TextStyle(fontWeight: FontWeight.w800),
             ),
@@ -196,22 +256,22 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _LocationFact(
-                            label: 'Latitude',
+                            label: context.appText('Latitude'),
                             value: _geofenceResult!.location.latitude
                                 .toStringAsFixed(6),
                           ),
                           _LocationFact(
-                            label: 'Longitude',
+                            label: context.appText('Longitude'),
                             value: _geofenceResult!.location.longitude
                                 .toStringAsFixed(6),
                           ),
                           _LocationFact(
-                            label: 'Accuracy',
+                            label: context.appText('Accuracy'),
                             value:
                                 '${_geofenceResult!.location.accuracyMeters.toStringAsFixed(0)} m',
                           ),
                           _LocationFact(
-                            label: 'Farm tolerance',
+                            label: context.appText('Farm tolerance'),
                             value:
                                 '${job.plot.toleranceMeters.toStringAsFixed(0)} m',
                           ),
@@ -222,17 +282,19 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
                   const SizedBox(height: 16),
                   _WorkflowStep(
                     number: 1,
-                    title: 'Confirm your location',
+                    title: context.appText('Confirm your location'),
                     complete: _geofenceResult != null,
-                    child: OutlinedButton.icon(
+                    child: OutlinedButton(
                       onPressed: _checkingLocation ? null : _refreshLocation,
-                      icon: const Icon(Icons.gps_fixed),
-                      label: Text(
-                        _checkingLocation
-                            ? 'Checking GPS...'
-                            : _geofenceResult == null
-                            ? 'Check Location'
-                            : 'Refresh Location',
+                      child: AppButtonContent(
+                        loading: _checkingLocation,
+                        loadingLabel: context.appText('Checking GPS...'),
+                        label: context.appText(
+                          _geofenceResult == null
+                              ? 'Check Location'
+                              : 'Refresh Location',
+                        ),
+                        icon: Icons.gps_fixed,
                       ),
                     ),
                   ),
@@ -240,30 +302,35 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
                     const SizedBox(height: 12),
                     _WorkflowStep(
                       number: 2,
-                      title: 'Travel and record arrival',
+                      title: context.appText('Travel and record arrival'),
                       complete: false,
                       child: Column(
                         children: [
-                          const Text(
-                            'Both your phone and the assigned tractor must be within the farm boundary. The server checks GPS freshness, farm tolerance and proximity to the tractor.',
+                          Text(
+                            context.appText(
+                              'Both your phone and the assigned tractor must be within the farm boundary. The server checks GPS freshness, farm tolerance and proximity to the tractor.',
+                            ),
                           ),
                           OutlinedButton.icon(
                             onPressed: _checkingLocation
                                 ? null
                                 : _refreshLocation,
                             icon: const Icon(Icons.route_outlined),
-                            label: const Text('Refresh Route'),
+                            label: Text(context.appText('Refresh Route')),
                           ),
                           const SizedBox(height: 10),
-                          FilledButton.icon(
+                          FilledButton(
                             onPressed: _submittingArrival
                                 ? null
                                 : _recordArrival,
-                            icon: const Icon(Icons.flag_outlined),
-                            label: Text(
-                              _submittingArrival
-                                  ? 'Recording arrival...'
-                                  : 'Record Arrival',
+                            child: AppButtonContent(
+                              loading: _submittingArrival,
+                              loadingLabel: context.appText(
+                                'Recording arrival...',
+                              ),
+                              label: context.appText('Record Arrival'),
+                              icon: Icons.flag_outlined,
+                              progressColor: Colors.white,
                             ),
                           ),
                         ],
@@ -286,19 +353,23 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
                     const SizedBox(height: 12),
                     _WorkflowStep(
                       number: 2,
-                      title: 'Inspect the tractor',
+                      title: context.appText('Inspect the tractor'),
                       complete: _hasInspection,
-                      child: OutlinedButton.icon(
+                      child: OutlinedButton(
                         onPressed: _submittingInspection
                             ? null
                             : _recordInspection,
-                        icon: const Icon(Icons.fact_check_outlined),
-                        label: Text(
-                          _hasInspection
-                              ? "Update Today's Inspection"
-                              : _submittingInspection
-                              ? 'Recording inspection...'
-                              : 'Record Inspection',
+                        child: AppButtonContent(
+                          loading: _submittingInspection,
+                          loadingLabel: context.appText(
+                            'Recording inspection...',
+                          ),
+                          label: context.appText(
+                            _hasInspection
+                                ? "Update Today's Inspection"
+                                : 'Record Inspection',
+                          ),
+                          icon: Icons.fact_check_outlined,
                         ),
                       ),
                     ),
@@ -328,19 +399,21 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
                       const SizedBox(height: 12),
                       _WorkflowStep(
                         number: 3,
-                        title: 'Run safety checks',
+                        title: context.appText('Run safety checks'),
                         complete: _startCheck?.canStart ?? false,
                         child: Column(
                           children: [
-                            FilledButton.tonalIcon(
+                            FilledButton.tonal(
                               onPressed: _runningStartCheck
                                   ? null
                                   : _runStartCheck,
-                              icon: const Icon(Icons.rule_folder_outlined),
-                              label: Text(
-                                _runningStartCheck
-                                    ? 'Running start check...'
-                                    : 'Run Start Check',
+                              child: AppButtonContent(
+                                loading: _runningStartCheck,
+                                loadingLabel: context.appText(
+                                  'Running start check...',
+                                ),
+                                label: context.appText('Run Start Check'),
+                                icon: Icons.rule_folder_outlined,
                               ),
                             ),
                           ],
@@ -353,7 +426,7 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
                       const SizedBox(height: 12),
                       _WorkflowStep(
                         number: 4,
-                        title: 'Start service',
+                        title: context.appText('Start service'),
                         complete: false,
                         child: Column(
                           children: [
@@ -363,25 +436,28 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
                                   const TextInputType.numberWithOptions(
                                     decimal: true,
                                   ),
-                              decoration: const InputDecoration(
-                                labelText: 'Start hour meter',
+                              decoration: InputDecoration(
+                                labelText: context.appText('Start hour meter'),
                               ),
                             ),
                             const SizedBox(height: 10),
                             if (implementNames.isEmpty)
-                              const AppMessage(
-                                message:
-                                    'No implement is configured. The server will validate the service requirements when you start.',
+                              AppMessage(
+                                message: context.appText(
+                                  'No implement is configured. The server will validate the service requirements when you start.',
+                                ),
                                 type: AppMessageType.warning,
                               )
                             else
                               DropdownButtonFormField<String>(
                                 initialValue: _selectedImplement,
-                                decoration: const InputDecoration(
-                                  labelText: 'Implement',
+                                decoration: InputDecoration(
+                                  labelText: context.appText('Implement'),
                                   prefixIcon: Icon(Icons.handyman_outlined),
                                 ),
-                                hint: const Text('Select an implement'),
+                                hint: Text(
+                                  context.appText('Select an implement'),
+                                ),
                                 items: [
                                   for (final implement in implementNames)
                                     DropdownMenuItem(
@@ -393,13 +469,14 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
                                     setState(() => _selectedImplement = value),
                               ),
                             const SizedBox(height: 10),
-                            FilledButton.icon(
+                            FilledButton(
                               onPressed: _submittingStart ? null : _startJob,
-                              icon: const Icon(Icons.play_arrow),
-                              label: Text(
-                                _submittingStart
-                                    ? 'Starting...'
-                                    : 'Start Service',
+                              child: AppButtonContent(
+                                loading: _submittingStart,
+                                loadingLabel: context.appText('Starting...'),
+                                label: context.appText('Start Service'),
+                                icon: Icons.play_arrow,
+                                progressColor: Colors.white,
                               ),
                             ),
                           ],
@@ -518,7 +595,7 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
     });
     await showAppErrorDialog(
       context,
-      title: 'Location could not be verified',
+      title: context.appText('Location could not be verified'),
       message: message,
       buttonLabel: 'Try again',
     );
@@ -528,9 +605,10 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
   Future<void> _recordArrival() async {
     final confirmed = await showAppConfirmationDialog(
       context,
-      title: 'Record arrival?',
-      message:
-          'Confirm that you and the assigned tractor have arrived at the farm.',
+      title: context.appText('Record arrival?'),
+      message: context.appText(
+        'Confirm that you and the assigned tractor have arrived at the farm.',
+      ),
       confirmLabel: 'Record Arrival',
     );
     if (!confirmed || !mounted) return;
@@ -566,9 +644,10 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
     final implement = _selectedImplement;
     final confirmed = await showAppConfirmationDialog(
       context,
-      title: 'Start service?',
-      message:
-          'This starts recorded work time for the job. Confirm the safety check has passed and the tractor is ready.',
+      title: context.appText('Start service?'),
+      message: context.appText(
+        'This starts recorded work time for the job. Confirm the safety check has passed and the tractor is ready.',
+      ),
       confirmLabel: 'Start Service',
     );
     if (!confirmed || !mounted) return;
@@ -658,7 +737,9 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
     if (result.canStart) {
       showAppSnackBar(
         context,
-        message: 'Start check passed. You can start ploughing.',
+        message: context.appText(
+          'Start check passed. You can start ploughing.',
+        ),
         type: AppSnackType.success,
       );
       return;
@@ -666,7 +747,7 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
     final viewResults = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Start check needs attention'),
+        title: Text(context.appText('Start check needs attention')),
         content: Text(
           '${result.failed.length} checks did not pass. Review the results before trying again.',
         ),
@@ -718,17 +799,21 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
   Future<void> _recordInspection() async {
     final job = widget.repository.maybeJobById(widget.jobId);
     if (job == null) return;
-    final inspection = await showDialog<_InspectionPayload>(
-      context: context,
-      builder: (_) =>
-          _InspectionDialog(checklist: widget.repository.inspectionChecklist),
+    final inspection = await Navigator.of(context).push<_InspectionPayload>(
+      appPageRoute(
+        builder: (_) => _InspectionScreen(
+          checklist: widget.repository.inspectionChecklist,
+          jobReference: job.reference ?? job.id,
+          tractorLabel: job.tractorLabel ?? job.tractorId,
+        ),
+      ),
     );
     if (inspection == null) return;
     if (!mounted) return;
 
     final confirmed = await showAppConfirmationDialog(
       context,
-      title: 'Submit inspection?',
+      title: context.appText('Submit inspection?'),
       message: inspection.isFit
           ? 'All checklist items passed. Submit this tractor as fit for work?'
           : 'Issues were recorded. Submit this tractor as requiring attention?',
@@ -838,20 +923,28 @@ class _InspectionPayload {
   final bool isFit;
 }
 
-class _InspectionDialog extends StatefulWidget {
-  const _InspectionDialog({required this.checklist});
+class _InspectionScreen extends StatefulWidget {
+  const _InspectionScreen({
+    required this.checklist,
+    required this.jobReference,
+    required this.tractorLabel,
+  });
 
   final Map<String, String> checklist;
+  final String jobReference;
+  final String tractorLabel;
 
   @override
-  State<_InspectionDialog> createState() => _InspectionDialogState();
+  State<_InspectionScreen> createState() => _InspectionScreenState();
 }
 
-class _InspectionDialogState extends State<_InspectionDialog> {
+class _InspectionScreenState extends State<_InspectionScreen> {
   final _fuelController = TextEditingController();
   final _hourMeterController = TextEditingController();
   final _defectsController = TextEditingController();
   bool _showChecklistError = false;
+  bool _reviewing = false;
+  String? _readingsError;
   late final Map<String, bool?> _checks;
 
   static const _fallbackChecklist = <String, String>{
@@ -874,10 +967,16 @@ class _InspectionDialogState extends State<_InspectionDialog> {
   void initState() {
     super.initState();
     _checks = {for (final key in _checklist.keys) key: null};
+    _fuelController.addListener(_refreshReadings);
+    _hourMeterController.addListener(_refreshReadings);
+    _defectsController.addListener(_refreshReadings);
   }
 
   @override
   void dispose() {
+    _fuelController.removeListener(_refreshReadings);
+    _hourMeterController.removeListener(_refreshReadings);
+    _defectsController.removeListener(_refreshReadings);
     _fuelController.dispose();
     _hourMeterController.dispose();
     _defectsController.dispose();
@@ -886,131 +985,365 @@ class _InspectionDialogState extends State<_InspectionDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Row(
-        children: [
-          Icon(Icons.fact_check_outlined),
-          SizedBox(width: 10),
-          Expanded(child: Text('Pre-start inspection')),
-        ],
+    final completed = _checks.values.whereType<bool>().length;
+    final total = _checks.length;
+    final progress = total == 0 ? 0.0 : completed / total;
+    return Scaffold(
+      appBar: AppBar(
+        titleSpacing: 0,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(context.appText('TRACTOR INSPECTION')),
+            Text(
+              '${widget.jobReference} · ${widget.tractorLabel}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
       ),
-      content: SizedBox(
-        width: 520,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Safety checklist',
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Inspect every item, then select Pass if it is safe or Issue if it needs attention.',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 12),
-              ..._checks.keys.map(
-                (key) => _InspectionCheckRow(
-                  label: _checklist[key] ?? key,
-                  value: _checks[key],
-                  onChanged: (value) {
-                    setState(() {
-                      _checks[key] = value;
-                      _showChecklistError = false;
-                    });
-                  },
+      body: SafeArea(
+        bottom: false,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+          children: [
+            Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 760),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _InspectionProgressCard(
+                      completed: completed,
+                      total: total,
+                      progress: progress,
+                      reviewing: _reviewing,
+                    ),
+                    const SizedBox(height: 20),
+                    if (_reviewing)
+                      _buildReview(context)
+                    else
+                      _buildChecklist(context),
+                  ],
                 ),
               ),
-              if (_showChecklistError) ...[
-                const SizedBox(height: 8),
-                Text(
-                  'Please mark Pass or Issue for every checklist item.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.error,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 18),
-              Text(
-                'Readings and notes',
-                style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            border: Border(
+              top: BorderSide(
+                color: Theme.of(context).colorScheme.outlineVariant,
               ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _fuelController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Fuel level (%)'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _hourMeterController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: const InputDecoration(labelText: 'Hour meter'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _defectsController,
-                maxLines: 3,
-                decoration: const InputDecoration(labelText: 'Defects / notes'),
-              ),
-              const SizedBox(height: 10),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color:
-                      (_isFit
-                              ? Theme.of(context).colorScheme.primary
-                              : Theme.of(context).colorScheme.error)
-                          .withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: ListTile(
-                  leading: Icon(
-                    _isFit
-                        ? Icons.verified_outlined
-                        : Icons.warning_amber_rounded,
-                    color: _isFit
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).colorScheme.error,
-                  ),
-                  title: Text(
-                    _isFit
-                        ? 'Tractor is fit for work'
-                        : 'Tractor requires attention',
-                  ),
-                  subtitle: Text(
-                    _checks.values.any((value) => value == null)
-                        ? 'Complete the checklist to determine its condition.'
-                        : _isFit
-                        ? 'All inspection items passed.'
-                        : 'One or more inspection items have an issue.',
-                  ),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+            child: Align(
+              alignment: Alignment.center,
+              heightFactor: 1,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 760),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _reviewing
+                            ? () => setState(() => _reviewing = false)
+                            : () => Navigator.of(context).pop(),
+                        child: Text(
+                          context.appText(_reviewing ? 'Back' : 'Cancel'),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        key: const ValueKey('inspection-continue'),
+                        onPressed: _reviewing ? _submit : _openReview,
+                        child: AppButtonContent(
+                          label: context.appText(
+                            _reviewing ? 'Use Inspection' : 'Review Inspection',
+                          ),
+                          icon: _reviewing
+                              ? Icons.check_circle_outline
+                              : Icons.arrow_forward_rounded,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),
-      actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
-      actions: [
-        AppDialogActions(
-          onCancel: () => Navigator.of(context).pop(),
-          onConfirm: _submit,
-          confirmLabel: 'Submit Inspection',
+    );
+  }
+
+  Widget _buildChecklist(BuildContext context) {
+    final completed = _checks.values.whereType<bool>().length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          context.appText('Safety checklist'),
+          style: Theme.of(
+            context,
+          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          context.appText('Check every item before starting work.'),
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 14),
+        ..._checks.keys.map(
+          (key) => _InspectionCheckRow(
+            itemKey: key,
+            label: _checklist[key] ?? key,
+            value: _checks[key],
+            onChanged: (value) {
+              setState(() {
+                _checks[key] = value;
+                _showChecklistError = false;
+              });
+            },
+          ),
+        ),
+        if (_showChecklistError) ...[
+          const SizedBox(height: 2),
+          AppMessage(
+            message: context.appText(
+              'Please mark Pass or Issue for every checklist item.',
+            ),
+            type: AppMessageType.warning,
+          ),
+        ],
+        const SizedBox(height: 18),
+        OperatorCard(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                context.appText('Readings and notes'),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 12),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final fields = [
+                    TextField(
+                      controller: _fuelController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: context.appText('Fuel level (%)'),
+                        hintText: '0–100',
+                        prefixIcon: const Icon(
+                          Icons.local_gas_station_outlined,
+                        ),
+                      ),
+                    ),
+                    TextField(
+                      controller: _hourMeterController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: context.appText('Hour meter'),
+                        prefixIcon: const Icon(Icons.speed_outlined),
+                      ),
+                    ),
+                  ];
+                  if (constraints.maxWidth >= 520) {
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: fields[0]),
+                        const SizedBox(width: 12),
+                        Expanded(child: fields[1]),
+                      ],
+                    );
+                  }
+                  return Column(
+                    children: [
+                      fields[0],
+                      const SizedBox(height: 12),
+                      fields[1],
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _defectsController,
+                minLines: 3,
+                maxLines: 5,
+                decoration: InputDecoration(
+                  labelText: context.appText('Defects / notes'),
+                  hintText: context.appText('Describe any issue found'),
+                  alignLabelWithHint: true,
+                  prefixIcon: const Padding(
+                    padding: EdgeInsets.only(bottom: 52),
+                    child: Icon(Icons.notes_outlined),
+                  ),
+                ),
+              ),
+              if (_readingsError != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  context.appText(_readingsError!),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.error,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        AppMessage(
+          title: completed == _checks.length
+              ? (_isFit
+                    ? context.appText('Tractor is fit for work')
+                    : context.appText('Tractor requires attention'))
+              : context.appText('Inspection in progress'),
+          message: completed == _checks.length
+              ? (_isFit
+                    ? context.appText('All inspection items passed.')
+                    : context.appText(
+                        'One or more inspection items have an issue.',
+                      ))
+              : '$completed of ${_checks.length} checks completed.',
+          type: completed != _checks.length
+              ? AppMessageType.info
+              : _isFit
+              ? AppMessageType.success
+              : AppMessageType.warning,
         ),
       ],
     );
   }
 
-  void _submit() {
+  Widget _buildReview(BuildContext context) {
+    final issues = _checks.entries
+        .where((entry) => entry.value == false)
+        .map((entry) => _checklist[entry.key] ?? entry.key)
+        .toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          context.appText('Review inspection'),
+          style: Theme.of(
+            context,
+          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          context.appText(
+            'Check the summary before sending this inspection to the union.',
+          ),
+        ),
+        const SizedBox(height: 16),
+        AppMessage(
+          title: _isFit
+              ? context.appText('Tractor is fit for work')
+              : context.appText('Tractor requires attention'),
+          message: _isFit
+              ? context.appText('All inspection items passed.')
+              : '${issues.length} inspection item${issues.length == 1 ? '' : 's'} need attention.',
+          type: _isFit ? AppMessageType.success : AppMessageType.warning,
+        ),
+        const SizedBox(height: 14),
+        OperatorCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _InspectionReviewFact(
+                icon: Icons.check_circle_outline,
+                label: context.appText('Passed'),
+                value: '${_checks.length - issues.length} / ${_checks.length}',
+              ),
+              const Divider(height: 24),
+              _InspectionReviewFact(
+                icon: issues.isEmpty
+                    ? Icons.verified_outlined
+                    : Icons.warning_amber_rounded,
+                label: context.appText('Issues'),
+                value: issues.isEmpty
+                    ? context.appText('None')
+                    : issues.join(', '),
+              ),
+              if (_fuelController.text.trim().isNotEmpty) ...[
+                const Divider(height: 24),
+                _InspectionReviewFact(
+                  icon: Icons.local_gas_station_outlined,
+                  label: context.appText('Fuel level (%)'),
+                  value: '${_fuelController.text.trim()}%',
+                ),
+              ],
+              if (_hourMeterController.text.trim().isNotEmpty) ...[
+                const Divider(height: 24),
+                _InspectionReviewFact(
+                  icon: Icons.speed_outlined,
+                  label: context.appText('Hour meter'),
+                  value: _hourMeterController.text.trim(),
+                ),
+              ],
+              if (_defectsController.text.trim().isNotEmpty) ...[
+                const Divider(height: 24),
+                _InspectionReviewFact(
+                  icon: Icons.notes_outlined,
+                  label: context.appText('Defects / notes'),
+                  value: _defectsController.text.trim(),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _refreshReadings() {
+    if (mounted && _readingsError != null) {
+      setState(() => _readingsError = null);
+    }
+  }
+
+  void _openReview() {
     if (_checks.values.any((value) => value == null)) {
       setState(() => _showChecklistError = true);
       return;
     }
+    final fuelText = _fuelController.text.trim();
+    final fuel = fuelText.isEmpty ? null : int.tryParse(fuelText);
+    if (fuelText.isNotEmpty && (fuel == null || fuel < 0 || fuel > 100)) {
+      setState(() => _readingsError = 'Enter a fuel level from 0 to 100.');
+      return;
+    }
+    final hourText = _hourMeterController.text.trim();
+    final hourMeter = hourText.isEmpty ? null : num.tryParse(hourText);
+    if (hourText.isNotEmpty && (hourMeter == null || hourMeter < 0)) {
+      setState(() => _readingsError = 'Enter a valid non-negative hour meter.');
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    setState(() => _reviewing = true);
+  }
+
+  void _submit() {
     final fuel = int.tryParse(_fuelController.text.trim());
     final hourMeter = num.tryParse(_hourMeterController.text.trim());
     final defects = _defectsController.text.trim();
@@ -1028,57 +1361,244 @@ class _InspectionDialogState extends State<_InspectionDialog> {
   bool get _isFit => _checks.values.every((value) => value == true);
 }
 
+class _InspectionProgressCard extends StatelessWidget {
+  const _InspectionProgressCard({
+    required this.completed,
+    required this.total,
+    required this.progress,
+    required this.reviewing,
+  });
+
+  final int completed;
+  final int total;
+  final double progress;
+  final bool reviewing;
+
+  @override
+  Widget build(BuildContext context) {
+    return OperatorCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.fact_check_outlined),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  context.appText(
+                    reviewing ? 'Review inspection' : 'Pre-start safety check',
+                  ),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Text(
+                key: const ValueKey('inspection-progress'),
+                reviewing ? context.appText('Review') : '$completed of $total',
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          LinearProgressIndicator(
+            value: reviewing ? 1 : progress,
+            minHeight: 8,
+            borderRadius: BorderRadius.circular(999),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InspectionReviewFact extends StatelessWidget {
+  const _InspectionReviewFact({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 22),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: Theme.of(context).textTheme.labelLarge),
+              const SizedBox(height: 2),
+              Text(value),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _InspectionCheckRow extends StatelessWidget {
   const _InspectionCheckRow({
+    required this.itemKey,
     required this.label,
     required this.value,
     required this.onChanged,
   });
 
+  final String itemKey;
   final String label;
   final bool? value;
   final ValueChanged<bool> onChanged;
 
   @override
   Widget build(BuildContext context) {
+    final icon = switch (itemKey) {
+      'engine_oil' => Icons.oil_barrel_outlined,
+      'coolant' => Icons.water_drop_outlined,
+      'fuel' => Icons.local_gas_station_outlined,
+      'tyres' => Icons.tire_repair_outlined,
+      'brakes' => Icons.motion_photos_paused_outlined,
+      'lights' => Icons.lightbulb_outline,
+      'hydraulics' => Icons.settings_input_component_outlined,
+      'implement' => Icons.handyman_outlined,
+      'leaks' => Icons.plumbing_outlined,
+      'tracker' => Icons.gps_fixed_outlined,
+      _ => Icons.fact_check_outlined,
+    };
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 10),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          border: Border.all(color: Theme.of(context).dividerColor),
-          borderRadius: BorderRadius.circular(8),
+          color: value == true
+              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.045)
+              : value == false
+              ? Theme.of(context).colorScheme.error.withValues(alpha: 0.045)
+              : Theme.of(context).colorScheme.surface,
+          border: Border.all(
+            color: value == true
+                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.35)
+                : value == false
+                ? Theme.of(context).colorScheme.error.withValues(alpha: 0.35)
+                : Theme.of(context).colorScheme.outlineVariant,
+          ),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
-          child: Row(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(child: Text(label)),
-              InkWell(
-                onTap: () => onChanged(true),
-                borderRadius: BorderRadius.circular(20),
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Icon(
-                    value == true
-                        ? Icons.radio_button_checked_rounded
-                        : Icons.radio_button_unchecked_rounded,
+              Row(
+                children: [
+                  Icon(icon, size: 24),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _InspectionChoiceButton(
+                      buttonKey: ValueKey('inspection-$itemKey-pass'),
+                      selected: value == true,
+                      label: context.appText('Pass'),
+                      icon: Icons.check_circle_outline,
+                      onTap: () => onChanged(true),
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _InspectionChoiceButton(
+                      buttonKey: ValueKey('inspection-$itemKey-issue'),
+                      selected: value == false,
+                      label: context.appText('Issue'),
+                      icon: Icons.warning_amber_rounded,
+                      onTap: () => onChanged(false),
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InspectionChoiceButton extends StatelessWidget {
+  const _InspectionChoiceButton({
+    required this.buttonKey,
+    required this.selected,
+    required this.label,
+    required this.icon,
+    required this.onTap,
+    required this.color,
+  });
+
+  final Key buttonKey;
+  final bool selected;
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      selected: selected,
+      button: true,
+      child: InkWell(
+        key: buttonKey,
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+          decoration: BoxDecoration(
+            color: selected
+                ? color.withValues(alpha: 0.13)
+                : Colors.transparent,
+            border: Border.all(
+              color: selected
+                  ? color
+                  : Theme.of(context).colorScheme.outlineVariant,
+            ),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 20, color: selected ? color : null),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: selected ? color : null,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
-              const Text('Pass'),
-              InkWell(
-                onTap: () => onChanged(false),
-                borderRadius: BorderRadius.circular(20),
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Icon(
-                    value == false
-                        ? Icons.radio_button_checked_rounded
-                        : Icons.radio_button_unchecked_rounded,
-                  ),
-                ),
-              ),
-              const Text('Issue'),
             ],
           ),
         ),
@@ -1099,11 +1619,11 @@ class _StartCheckResultsDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Row(
+      title: Row(
         children: [
           Icon(Icons.rule_folder_outlined),
           SizedBox(width: 10),
-          Expanded(child: Text('Start check results')),
+          Expanded(child: Text(context.appText('Start check results'))),
         ],
       ),
       content: SizedBox(
@@ -1126,7 +1646,7 @@ class _StartCheckResultsDialog extends StatelessWidget {
               if (result.phone != null || result.tractor != null) ...[
                 const SizedBox(height: 12),
                 Text(
-                  'Server location evidence',
+                  context.appText('Server location evidence'),
                   style: Theme.of(
                     context,
                   ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
@@ -1191,7 +1711,7 @@ class _StartCheckResultsDialog extends StatelessWidget {
             width: double.infinity,
             child: FilledButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
+              child: Text(context.appText('Close')),
             ),
           ),
       ],
@@ -1218,14 +1738,16 @@ class _OverrideReasonDialogState extends State<_OverrideReasonDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Request Start Override'),
+      title: Text(context.appText('Request Start Override')),
       content: TextField(
         controller: _controller,
         maxLines: 3,
         autofocus: true,
-        decoration: const InputDecoration(
-          labelText: 'Reason',
-          hintText: 'Explain why the start check should be overridden',
+        decoration: InputDecoration(
+          labelText: context.appText('Reason'),
+          hintText: context.appText(
+            'Explain why the start check should be overridden',
+          ),
         ),
       ),
       actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 20),

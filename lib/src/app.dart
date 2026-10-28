@@ -164,10 +164,12 @@ class _SBMechanizationAppState extends State<SBMechanizationApp> {
     if (dialogContext == null) return;
     await showAppAsyncConfirmationDialog(
       dialogContext,
-      title: 'Log out?',
-      message: 'You will need to sign in again to continue using the app.',
-      confirmLabel: 'Log out',
-      workingLabel: 'Logging out...',
+      title: dialogContext.appText('Log out?'),
+      message: dialogContext.appText(
+        'You will need to sign in again to continue using the app.',
+      ),
+      confirmLabel: AppLocalizations.of(dialogContext)!.logout,
+      workingLabel: dialogContext.appText('Logging out...'),
       danger: true,
       onConfirm: _logout,
     );
@@ -206,11 +208,17 @@ class _SBMechanizationAppState extends State<SBMechanizationApp> {
     if (!mounted) return;
     setState(() => _workspace = _Workspace.login);
     _sessionExpiryInProgress = false;
+    final appContext = _navigatorKey.currentContext;
+    final expiredMessage = appContext?.appText(
+      'Your session expired. Please sign in again.',
+    );
     _messengerKey.currentState
       ?..clearSnackBars()
       ..showSnackBar(
-        const SnackBar(
-          content: Text('Your session expired. Please sign in again.'),
+        SnackBar(
+          content: Text(
+            expiredMessage ?? 'Your session expired. Please sign in again.',
+          ),
         ),
       );
   }
@@ -298,10 +306,14 @@ class _SBMechanizationAppState extends State<SBMechanizationApp> {
     await authRepository.signOut();
     if (!mounted) return;
     setState(() => _workspace = _Workspace.login);
+    final appContext = _navigatorKey.currentContext;
     _messengerKey.currentState?.showSnackBar(
-      const SnackBar(
+      SnackBar(
         content: Text(
-          'This account does not have access to a supported mobile workspace.',
+          appContext?.appText(
+                'This account does not have access to a supported mobile workspace.',
+              ) ??
+              'This account does not have access to a supported mobile workspace.',
         ),
       ),
     );

@@ -49,7 +49,7 @@ class AppWelcomeScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Text(
-                            'SB Mechanization',
+                            context.appText('SB Mechanization'),
                             textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.displaySmall
                                 ?.copyWith(
@@ -60,7 +60,9 @@ class AppWelcomeScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            'Mechanization work planned from real farm plots.',
+                            context.appText(
+                              'Mechanization work planned from real farm plots.',
+                            ),
                             textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.titleLarge
                                 ?.copyWith(
@@ -71,7 +73,9 @@ class AppWelcomeScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            'Schedule tractors, guide operators, verify field work, and close jobs with clear accountability.',
+                            context.appText(
+                              'Schedule tractors, guide operators, verify field work, and close jobs with clear accountability.',
+                            ),
                             textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.bodyLarge
                                 ?.copyWith(
@@ -84,7 +88,7 @@ class AppWelcomeScreen extends StatelessWidget {
                           AppGlowButton(
                             onPressed: onContinue,
                             icon: Icons.arrow_forward,
-                            label: 'Get started',
+                            label: context.appText('Get started'),
                           ),
                         ],
                       ),
@@ -110,7 +114,7 @@ class _BrandMark extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(999),
       ),
-      child: const Padding(
+      child: Padding(
         padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -118,7 +122,7 @@ class _BrandMark extends StatelessWidget {
             Icon(Icons.agriculture, color: AppColors.fieldGreen, size: 20),
             SizedBox(width: 8),
             Text(
-              'Mechanization Management',
+              context.appText('Mechanization Management'),
               style: TextStyle(
                 color: AppColors.deepGreen,
                 fontWeight: FontWeight.w700,

@@ -110,6 +110,92 @@ void main() {
   );
 
   testWidgets(
+    'inspection opens as a guided screen and blocks incomplete review',
+    (tester) async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final api = _EvidenceApi()..record['status'] = 'arrived';
+      final repo = (await tester.runAsync(() => _repository(api)))!;
+      addTearDown(repo.dispose);
+      await tester.pumpWidget(
+        _localized(
+          OperatorArrivalScreen(
+            repository: repo,
+            jobId: 'job-1',
+            locationRepository: _NoLocation(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final recordInspection = find.text('Record Inspection');
+      await tester.scrollUntilVisible(
+        recordInspection,
+        240,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(recordInspection);
+      await tester.pumpAndSettle();
+
+      expect(find.text('TRACTOR INSPECTION'), findsOneWidget);
+      final progress = find.byKey(
+        const ValueKey('inspection-progress'),
+        skipOffstage: false,
+      );
+      expect(progress, findsOneWidget);
+      expect(tester.widget<Text>(progress).data, '0 of 10');
+      expect(find.text('Review Inspection'), findsOneWidget);
+
+      await tester.tap(find.text('Review Inspection'));
+      await tester.pump();
+      expect(
+        find.text(
+          'Please mark Pass or Issue for every checklist item.',
+          skipOffstage: false,
+        ),
+        findsOneWidget,
+      );
+
+      final firstPass = find.byKey(
+        const ValueKey('inspection-engine_oil-pass'),
+        skipOffstage: false,
+      );
+      await tester.ensureVisible(firstPass);
+      await tester.tap(firstPass);
+      await tester.pump();
+      expect(tester.widget<Text>(progress).data, '1 of 10');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'arrival screen explains disabled location before opening settings',
+    (tester) async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final api = _EvidenceApi()..record['status'] = 'arrived';
+      final repo = (await tester.runAsync(() => _repository(api)))!;
+      addTearDown(repo.dispose);
+      final location = _DisabledLocation();
+      await tester.pumpWidget(
+        _localized(
+          OperatorArrivalScreen(
+            repository: repo,
+            jobId: 'job-1',
+            locationRepository: location,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Turn on device location'), findsOneWidget);
+      expect(find.text('Open location settings'), findsOneWidget);
+      await tester.tap(find.text('Open location settings'));
+      await tester.pumpAndSettle();
+      expect(location.settingsOpened, isTrue);
+      expect(find.text('Turn on device location'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'completion offers optional after photos and submits without an upload',
     (tester) async {
       final api = _EvidenceApi()..record['status'] = 'in_progress';
@@ -705,6 +791,30 @@ class _NoLocation implements LocationRepository {
       );
   @override
   Stream<DeviceLocation> watchLocation() => const Stream.empty();
+}
+
+class _DisabledLocation
+    implements LocationRepository, LocationSettingsController {
+  bool settingsOpened = false;
+
+  @override
+  Future<LocationResult> getCurrentLocation() async =>
+      const LocationUnavailable(LocationFailure('Location is off.'));
+
+  @override
+  Stream<DeviceLocation> watchLocation() => const Stream.empty();
+
+  @override
+  Future<bool> isLocationServiceEnabled() async => false;
+
+  @override
+  Future<bool> openLocationSettings() async {
+    settingsOpened = true;
+    return true;
+  }
+
+  @override
+  Future<bool> openAppSettings() async => true;
 }
 
 class _TestPicker extends ImagePicker {

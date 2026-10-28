@@ -145,7 +145,7 @@ class _OperationsShellState extends State<OperationsShell> {
                       transitionBuilder: (child, animation) =>
                           FadeTransition(opacity: animation, child: child),
                       child: widget.repository.isInitialScreenLoad(_screen)
-                          ? const AppScreenSkeleton(key: ValueKey('loading'))
+                          ? _initialLoading()
                           : RefreshIndicator(
                               key: ValueKey(_section),
                               onRefresh: _refreshCurrentSection,
@@ -302,6 +302,23 @@ class _OperationsShellState extends State<OperationsShell> {
         onThemeChanged: widget.onThemeChanged,
       ),
     };
+  }
+
+  Widget _initialLoading() {
+    if (_section == OperationsSection.dashboard) {
+      return const AppScreenSkeleton(key: ValueKey('loading-dashboard'));
+    }
+    final layout = switch (_section) {
+      OperationsSection.dashboard => AppSectionSkeletonLayout.list,
+      OperationsSection.schedule => AppSectionSkeletonLayout.calendar,
+      OperationsSection.settings => AppSectionSkeletonLayout.profile,
+      OperationsSection.reports => AppSectionSkeletonLayout.report,
+      _ => AppSectionSkeletonLayout.list,
+    };
+    return AppSectionSkeleton(
+      key: ValueKey('loading-${_section.name}'),
+      layout: layout,
+    );
   }
 
   void _selectSection(OperationsSection section) {

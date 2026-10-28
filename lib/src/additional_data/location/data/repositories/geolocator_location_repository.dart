@@ -6,7 +6,8 @@ import 'package:geolocator/geolocator.dart';
 import '../../domain/entities/device_location.dart';
 import '../../domain/repositories/location_repository.dart';
 
-class GeolocatorLocationRepository implements VerificationLocationRepository {
+class GeolocatorLocationRepository
+    implements VerificationLocationRepository, LocationSettingsController {
   const GeolocatorLocationRepository();
 
   // Some tablets need substantially longer to obtain their first GNSS fix
@@ -17,6 +18,16 @@ class GeolocatorLocationRepository implements VerificationLocationRepository {
   static DateTime? _pendingLocationStartedAt;
   static int? _pendingLocationRequestId;
   static int _requestSequence = 0;
+
+  @override
+  Future<bool> isLocationServiceEnabled() =>
+      Geolocator.isLocationServiceEnabled();
+
+  @override
+  Future<bool> openLocationSettings() => Geolocator.openLocationSettings();
+
+  @override
+  Future<bool> openAppSettings() => Geolocator.openAppSettings();
 
   @override
   Future<LocationResult> getCurrentLocation() async {

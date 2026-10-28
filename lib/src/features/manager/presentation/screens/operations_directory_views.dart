@@ -14,13 +14,13 @@ class TractorsView extends StatelessWidget {
   Widget build(BuildContext context) {
     final tractors = repository.tractors;
     return _DirectoryPage(
-      title: 'Tractors',
+      title: context.appText('Tractors'),
       children: [
         if (tractors.isEmpty)
-          const _DirectoryEmptyState(
+          _DirectoryEmptyState(
             icon: Icons.agriculture_outlined,
-            title: 'No tractors available',
-            message: 'Registered tractors will appear here.',
+            title: context.appText('No tractors available'),
+            message: context.appText('Registered tractors will appear here.'),
           )
         else
           _PrettyGrid(
@@ -145,13 +145,15 @@ class OperatorsView extends StatelessWidget {
   Widget build(BuildContext context) {
     final operators = repository.operators;
     return _DirectoryPage(
-      title: 'Operators',
+      title: context.appText('Operators'),
       children: [
         if (operators.isEmpty)
-          const _DirectoryEmptyState(
+          _DirectoryEmptyState(
             icon: Icons.engineering_outlined,
-            title: 'No operators available',
-            message: 'Registered tractor operators will appear here.',
+            title: context.appText('No operators available'),
+            message: context.appText(
+              'Registered tractor operators will appear here.',
+            ),
           )
         else
           _PrettyGrid(
@@ -180,13 +182,15 @@ class FarmersView extends StatelessWidget {
     final farmers = repository.farmers;
 
     return _DirectoryPage(
-      title: 'Farmers',
+      title: context.appText('Farmers'),
       children: [
         if (farmers.isEmpty)
-          const _DirectoryEmptyState(
+          _DirectoryEmptyState(
             icon: Icons.groups_outlined,
-            title: 'No farmers available',
-            message: 'Registered farmers will appear here after refreshing.',
+            title: context.appText('No farmers available'),
+            message: context.appText(
+              'Registered farmers will appear here after refreshing.',
+            ),
           )
         else
           _PrettyGrid(
@@ -409,15 +413,17 @@ class MaintenanceView extends StatelessWidget {
         .toList();
 
     return _DirectoryPage(
-      title: 'Maintenance',
+      title: context.appText('Maintenance'),
       children: [
         _MaintenanceSummary(repository: repository),
         const SizedBox(height: 16),
         if (blocked.isEmpty)
-          const _DirectoryEmptyState(
+          _DirectoryEmptyState(
             icon: Icons.build_circle_outlined,
-            title: 'No tractors need attention',
-            message: 'Tractors blocked from scheduling will appear here.',
+            title: context.appText('No tractors need attention'),
+            message: context.appText(
+              'Tractors blocked from scheduling will appear here.',
+            ),
             height: 300,
           )
         else
@@ -446,23 +452,23 @@ class ReportsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _DirectoryPage(
-      title: 'Reports',
+      title: context.appText('Reports'),
       children: [
         _PrettyGrid(
           children: [
             MetricCard(
               value: '${repository.requests.length}',
-              label: 'Total Requests',
+              label: context.appText('Total Requests'),
               icon: Icons.fact_check_outlined,
             ),
             MetricCard(
               value: '${repository.jobs.length}',
-              label: 'Total Jobs',
+              label: context.appText('Total Jobs'),
               icon: Icons.route_outlined,
             ),
             MetricCard(
               value: '${repository.tractors.length}',
-              label: 'Fleet Assets',
+              label: context.appText('Fleet Assets'),
               icon: Icons.agriculture_outlined,
             ),
           ],
@@ -471,7 +477,7 @@ class ReportsView extends StatelessWidget {
         _ResponsivePanelRow(
           children: [
             _ReportPanel(
-              title: 'Request Pipeline',
+              title: context.appText('Request Pipeline'),
               icon: Icons.stacked_line_chart,
               rows: [
                 _ReportRow(
@@ -493,7 +499,7 @@ class ReportsView extends StatelessWidget {
               ],
             ),
             _ReportPanel(
-              title: 'Field Performance',
+              title: context.appText('Field Performance'),
               icon: Icons.insights_outlined,
               rows: [
                 _ReportRow('Active jobs', '${repository.activeJobs.length}'),
@@ -505,7 +511,7 @@ class ReportsView extends StatelessWidget {
               ],
             ),
             _ReportPanel(
-              title: 'Fleet Readiness',
+              title: context.appText('Fleet Readiness'),
               icon: Icons.speed_outlined,
               rows: [
                 _ReportRow(
@@ -569,17 +575,17 @@ class _MaintenanceSummary extends StatelessWidget {
       children: [
         MetricCard(
           value: '$available',
-          label: 'Ready to dispatch',
+          label: context.appText('Ready to dispatch'),
           icon: Icons.check_circle_outline,
         ),
         MetricCard(
           value: '${repository.maintenanceCount}',
-          label: 'Under maintenance',
+          label: context.appText('Under maintenance'),
           icon: Icons.build_outlined,
         ),
         MetricCard(
           value: '$blocked',
-          label: 'Blocked resources',
+          label: context.appText('Blocked resources'),
           icon: Icons.block,
         ),
       ],
@@ -662,7 +668,7 @@ class _MaintenanceCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _SmallStat(
-                  label: 'Hours',
+                  label: context.appText('Hours'),
                   value: '$hours',
                   icon: Icons.timer_outlined,
                 ),
@@ -670,7 +676,7 @@ class _MaintenanceCard extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: _SmallStat(
-                  label: 'Last service',
+                  label: context.appText('Last service'),
                   value: 'Not recorded',
                   icon: Icons.history,
                 ),

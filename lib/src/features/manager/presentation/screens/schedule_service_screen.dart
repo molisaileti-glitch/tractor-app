@@ -72,7 +72,7 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
   Widget build(BuildContext context) {
     if (_loadingResources || _resourceError != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Schedule Service')),
+        appBar: AppBar(title: Text(context.appText('Schedule Service'))),
         body: Center(
           child: _loadingResources
               ? const CircularProgressIndicator()
@@ -94,7 +94,7 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
                           ]);
                           if (mounted) _loadResources();
                         },
-                        child: const Text('Retry'),
+                        child: Text(context.appText('Retry')),
                       ),
                     ],
                   ),
@@ -105,8 +105,10 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
     final request = widget.repository.maybeRequestById(widget.requestId);
     if (request == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Request unavailable')),
-        body: const Center(child: Text('This request is no longer available.')),
+        appBar: AppBar(title: Text(context.appText('Request unavailable'))),
+        body: Center(
+          child: Text(context.appText('This request is no longer available.')),
+        ),
       );
     }
     final availableTractors = widget.repository.tractors
@@ -121,12 +123,12 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
     final implementNames = selectedTractor?.implementNames ?? const <String>[];
     return Scaffold(
       appBar: AppBar(
-        title: const Row(
+        title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.calendar_month_outlined),
             SizedBox(width: 10),
-            Text('Schedule service'),
+            Text(context.appText('Schedule service')),
           ],
         ),
       ),
@@ -177,7 +179,7 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
                           : () => setState(() => _currentStep--),
                       steps: [
                         Step(
-                          title: const Text('Tractor'),
+                          title: Text(context.appText('Tractor')),
                           subtitle: Text(
                             _tractorId == null
                                 ? 'Choose an available tractor'
@@ -191,11 +193,14 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               if (availableTractors.isEmpty)
-                                const AppEmptyState(
+                                AppEmptyState(
                                   icon: Icons.agriculture_outlined,
-                                  title: 'No tractors available',
-                                  message:
-                                      'Available tractors will appear here when they are ready for scheduling.',
+                                  title: context.appText(
+                                    'No tractors available',
+                                  ),
+                                  message: context.appText(
+                                    'Available tractors will appear here when they are ready for scheduling.',
+                                  ),
                                 ),
                               for (final tractor in availableTractors) ...[
                                 _SelectableResourceCard(
@@ -223,7 +228,7 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
                           ),
                         ),
                         Step(
-                          title: const Text('Operator'),
+                          title: Text(context.appText('Operator')),
                           subtitle: Text(
                             _operatorId == null
                                 ? 'Choose an available operator'
@@ -237,11 +242,14 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               if (availableOperators.isEmpty)
-                                const AppEmptyState(
+                                AppEmptyState(
                                   icon: Icons.engineering_outlined,
-                                  title: 'No operators available',
-                                  message:
-                                      'Registered operators will appear here when they are available for scheduling.',
+                                  title: context.appText(
+                                    'No operators available',
+                                  ),
+                                  message: context.appText(
+                                    'Registered operators will appear here when they are available for scheduling.',
+                                  ),
                                 ),
                               for (final operator in availableOperators) ...[
                                 _SelectableResourceCard(
@@ -264,9 +272,9 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
                           ),
                         ),
                         Step(
-                          title: const Text('Schedule'),
-                          subtitle: const Text(
-                            'Choose the service date and time',
+                          title: Text(context.appText('Schedule')),
+                          subtitle: Text(
+                            context.appText('Choose the service date and time'),
                           ),
                           isActive: _currentStep >= 2,
                           content: Column(
@@ -278,14 +286,14 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
                                       CrossAxisAlignment.stretch,
                                   children: [
                                     _ScheduleTile(
-                                      label: 'Date',
+                                      label: context.appText('Date'),
                                       value: formatDate(_date),
                                       icon: Icons.calendar_month_outlined,
                                       onTap: _pickDate,
                                     ),
                                     const Divider(height: 1),
                                     _ScheduleTile(
-                                      label: 'Start time',
+                                      label: context.appText('Start time'),
                                       value: _time.format(context),
                                       icon: Icons.schedule,
                                       onTap: _pickTime,
@@ -311,19 +319,22 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
                               ),
                               const SizedBox(height: 14),
                               if (implementNames.isEmpty)
-                                const AppMessage(
-                                  message:
-                                      'No implement is configured for this tractor. The server will validate the service requirements.',
+                                AppMessage(
+                                  message: context.appText(
+                                    'No implement is configured for this tractor. The server will validate the service requirements.',
+                                  ),
                                   type: AppMessageType.warning,
                                 )
                               else
                                 DropdownButtonFormField<String>(
                                   initialValue: _selectedImplement,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Implement',
+                                  decoration: InputDecoration(
+                                    labelText: context.appText('Implement'),
                                     prefixIcon: Icon(Icons.handyman_outlined),
                                   ),
-                                  hint: const Text('Select an implement'),
+                                  hint: Text(
+                                    context.appText('Select an implement'),
+                                  ),
                                   items: [
                                     for (final implement in implementNames)
                                       DropdownMenuItem(
@@ -390,7 +401,9 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
                                       ? null
                                       : _checkAvailability,
                                   icon: const Icon(Icons.refresh_rounded),
-                                  label: const Text('Check availability again'),
+                                  label: Text(
+                                    context.appText('Check availability again'),
+                                  ),
                                 ),
                               ],
                             ],
@@ -484,7 +497,7 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
     );
     final confirmed = await showAppConfirmationDialog(
       context,
-      title: 'Schedule service?',
+      title: context.appText('Schedule service?'),
       message:
           'This will assign the selected tractor and operator on ${formatDate(scheduledAt)} at ${formatTime(scheduledAt)}.',
       confirmLabel: 'Schedule',
@@ -513,9 +526,10 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
     if (scheduledJob?.status == JobStatus.dispatched) {
       await showAppSuccessDialog(
         context,
-        title: 'Service scheduled and dispatched',
-        message:
-            'The backend dispatched this assignment while scheduling it. The operator can now receive it under active jobs.',
+        title: context.appText('Service scheduled and dispatched'),
+        message: context.appText(
+          'The backend dispatched this assignment while scheduling it. The operator can now receive it under active jobs.',
+        ),
       );
       if (!mounted) return;
       Navigator.of(context).popUntil((route) => route.isFirst);
@@ -523,9 +537,10 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
     }
     final dispatchNow = await showAppConfirmationDialog(
       context,
-      title: 'Service scheduled',
-      message:
-          'The schedule has been saved. Would you like to dispatch this job to the operator now?',
+      title: context.appText('Service scheduled'),
+      message: context.appText(
+        'The schedule has been saved. Would you like to dispatch this job to the operator now?',
+      ),
       confirmLabel: 'Dispatch now',
       cancelLabel: 'Later',
     );
@@ -534,9 +549,10 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
       if (scheduledJob == null) {
         await showAppErrorDialog(
           context,
-          title: 'Dispatch unavailable',
-          message:
-              'The schedule was saved, but the created job could not be loaded. Refresh the Jobs section and dispatch it from the job actions menu.',
+          title: context.appText('Dispatch unavailable'),
+          message: context.appText(
+            'The schedule was saved, but the created job could not be loaded. Refresh the Jobs section and dispatch it from the job actions menu.',
+          ),
         );
         if (!mounted) return;
         Navigator.of(context).popUntil((route) => route.isFirst);
@@ -548,25 +564,27 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
       if (error != null) {
         await showAppErrorDialog(
           context,
-          title: 'Dispatch failed',
+          title: context.appText('Dispatch failed'),
           message: error,
         );
         if (!mounted) return;
       } else {
         await showAppSuccessDialog(
           context,
-          title: 'Job dispatched',
-          message:
-              'The assignment has been sent to the operator. You can continue tracking it under Jobs or Schedule.',
+          title: context.appText('Job dispatched'),
+          message: context.appText(
+            'The assignment has been sent to the operator. You can continue tracking it under Jobs or Schedule.',
+          ),
         );
         if (!mounted) return;
       }
     } else {
       await showAppFeedbackDialog(
         context,
-        title: 'Dispatch later',
-        message:
-            'You can dispatch this assignment later from the Jobs section using the job actions menu.',
+        title: context.appText('Dispatch later'),
+        message: context.appText(
+          'You can dispatch this assignment later from the Jobs section using the job actions menu.',
+        ),
         icon: Icons.schedule_send_outlined,
         color: Theme.of(context).colorScheme.primary,
         buttonLabel: 'Got it',
@@ -702,7 +720,10 @@ class _DurationSelector extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Estimated duration', style: theme.textTheme.labelLarge),
+        Text(
+          context.appText('Estimated duration'),
+          style: theme.textTheme.labelLarge,
+        ),
         const SizedBox(height: 10),
         Wrap(
           spacing: 10,

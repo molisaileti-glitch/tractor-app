@@ -111,12 +111,12 @@ class _OperatorFarmerConfirmationScreenState
     canPop: !_sheetOpen,
     child: Scaffold(
       appBar: AppBar(
-        title: const Text('Farmer confirmation'),
+        title: Text(context.appText('Farmer confirmation')),
         actions: [
           IconButton(
             key: const ValueKey('farmer-confirmation-refresh'),
             onPressed: _sheetOpen || _refreshing ? null : _refresh,
-            tooltip: 'Refresh farmer details',
+            tooltip: context.appText('Refresh farmer details'),
             icon: _refreshing
                 ? const SizedBox.square(
                     dimension: 20,
@@ -131,8 +131,8 @@ class _OperatorFarmerConfirmationScreenState
         builder: (context, _) {
           final job = widget.repository.maybeJobById(widget.jobId);
           if (job == null) {
-            return const Center(
-              child: Text('This job is no longer available.'),
+            return Center(
+              child: Text(context.appText('This job is no longer available.')),
             );
           }
           final pending = _isPending(job);
@@ -180,10 +180,13 @@ class _OperatorFarmerConfirmationScreenState
                                   : 'This job is ${job.status.label.toLowerCase()}. Farmer confirmation becomes available after the work is completed.',
                             )
                           else ...[
-                            const AppMessage(
-                              title: 'Give the phone to the farmer',
-                              message:
-                                  'The farmer enters their PIN or SMS code, then may rate the tractor service. The rating is optional.',
+                            AppMessage(
+                              title: context.appText(
+                                'Give the phone to the farmer',
+                              ),
+                              message: context.appText(
+                                'The farmer enters their PIN or SMS code, then may rate the tractor service. The rating is optional.',
+                              ),
                             ),
                             const SizedBox(height: 14),
                             OperatorCard(
@@ -208,7 +211,9 @@ class _OperatorFarmerConfirmationScreenState
                                               CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              'Confirm the completed service',
+                                              context.appText(
+                                                'Confirm the completed service',
+                                              ),
                                               style: Theme.of(context)
                                                   .textTheme
                                                   .titleMedium
@@ -218,7 +223,9 @@ class _OperatorFarmerConfirmationScreenState
                                             ),
                                             const SizedBox(height: 5),
                                             Text(
-                                              'Two short steps: verify the farmer, then collect optional feedback.',
+                                              context.appText(
+                                                'Two short steps: verify the farmer, then collect optional feedback.',
+                                              ),
                                               style: Theme.of(context)
                                                   .textTheme
                                                   .bodyMedium
@@ -246,8 +253,10 @@ class _OperatorFarmerConfirmationScreenState
                                       icon: const Icon(
                                         Icons.how_to_reg_outlined,
                                       ),
-                                      label: const Text(
-                                        'Start farmer confirmation',
+                                      label: Text(
+                                        context.appText(
+                                          'Start farmer confirmation',
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -256,7 +265,9 @@ class _OperatorFarmerConfirmationScreenState
                                     onPressed: _sheetOpen
                                         ? null
                                         : () => Navigator.of(context).pop(),
-                                    child: const Text('Confirm later'),
+                                    child: Text(
+                                      context.appText('Confirm later'),
+                                    ),
                                   ),
                                 ],
                               ),
@@ -339,14 +350,14 @@ class _JobSummary extends StatelessWidget {
           const SizedBox(height: 8),
           _SummaryLine(
             icon: Icons.location_on_outlined,
-            label: 'Farm',
+            label: context.appText('Farm'),
             value: job.plot.name,
           ),
           if (job.tractorLabel != null) ...[
             const SizedBox(height: 10),
             _SummaryLine(
               icon: Icons.agriculture_outlined,
-              label: 'Tractor',
+              label: context.appText('Tractor'),
               value: job.tractorLabel!,
             ),
           ],

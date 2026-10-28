@@ -5,6 +5,7 @@ import '../../../../shared/application/app_preferences_controller.dart';
 import '../../../../shared/presentation/screens/app_settings_screen.dart';
 import '../../data/repositories/operator_local_repository.dart';
 import '../widgets/operator_widgets.dart';
+import '../../../../l10n/localized_copy.dart';
 
 class OperatorProfileScreen extends StatelessWidget {
   const OperatorProfileScreen({
@@ -62,7 +63,7 @@ class OperatorProfileScreen extends StatelessWidget {
                     children: [
                       _ProfileLine(
                         icon: Icons.assignment_outlined,
-                        title: 'Loaded assignments',
+                        title: context.appText('Loaded assignments'),
                         subtitle: strings.activeAndCompleted(
                           activeJobs,
                           completedJobs,

@@ -308,20 +308,22 @@ class _OverrideCard extends StatelessWidget {
                           );
                           if (note == null || note.trim().isEmpty) return;
                           if (!context.mounted) return;
-                          final confirmed = await showAppConfirmationDialog(
+                          final confirmed = await showAppAsyncConfirmationDialog(
                             context,
-                            title: 'Deny override?',
-                            message:
-                                'The operator will not be able to use this override to start the job.',
+                            title: context.appText('Deny override?'),
+                            message: context.appText(
+                              'The operator will not be able to use this override to start the job.',
+                            ),
+                            onConfirm: () => repository.decideOverride(
+                              overrideId: item.id,
+                              approve: false,
+                              note: note.trim(),
+                            ),
                             confirmLabel: 'Deny',
+                            workingLabel: 'Denying...',
                             danger: true,
                           );
                           if (!confirmed) return;
-                          await repository.decideOverride(
-                            overrideId: item.id,
-                            approve: false,
-                            note: note.trim(),
-                          );
                           if (!context.mounted) return;
                           await _showOversightActionResult(
                             context,
@@ -350,19 +352,21 @@ class _OverrideCard extends StatelessWidget {
                           );
                           if (note == null || note.trim().isEmpty) return;
                           if (!context.mounted) return;
-                          final confirmed = await showAppConfirmationDialog(
+                          final confirmed = await showAppAsyncConfirmationDialog(
                             context,
-                            title: 'Approve override?',
-                            message:
-                                'The operator may use this approval to bypass the allowed failed start checks until it expires.',
+                            title: context.appText('Approve override?'),
+                            message: context.appText(
+                              'The operator may use this approval to bypass the allowed failed start checks until it expires.',
+                            ),
+                            onConfirm: () => repository.decideOverride(
+                              overrideId: item.id,
+                              approve: true,
+                              note: note.trim(),
+                            ),
                             confirmLabel: 'Approve',
+                            workingLabel: 'Approving...',
                           );
                           if (!confirmed) return;
-                          await repository.decideOverride(
-                            overrideId: item.id,
-                            approve: true,
-                            note: note.trim(),
-                          );
                           if (!context.mounted) return;
                           await _showOversightActionResult(
                             context,
@@ -450,16 +454,21 @@ class _ExceptionCard extends StatelessWidget {
                 child: OutlinedButton.icon(
                   onPressed: canAcknowledge
                       ? () async {
-                          final confirmed = await showAppConfirmationDialog(
+                          var acknowledged = false;
+                          final confirmed = await showAppAsyncConfirmationDialog(
                             context,
-                            title: 'Acknowledge exception?',
-                            message:
-                                'This records that the exception has been seen and is being handled.',
+                            title: context.appText('Acknowledge exception?'),
+                            message: context.appText(
+                              'This records that the exception has been seen and is being handled.',
+                            ),
+                            onConfirm: () async {
+                              acknowledged = await repository
+                                  .acknowledgeException(item.id);
+                            },
                             confirmLabel: 'Acknowledge',
+                            workingLabel: 'Acknowledging...',
                           );
                           if (confirmed) {
-                            final acknowledged = await repository
-                                .acknowledgeException(item.id);
                             if (!context.mounted) return;
                             showAppSnackBar(
                               context,
@@ -492,18 +501,20 @@ class _ExceptionCard extends StatelessWidget {
                           );
                           if (note == null || note.trim().isEmpty) return;
                           if (!context.mounted) return;
-                          final confirmed = await showAppConfirmationDialog(
+                          final confirmed = await showAppAsyncConfirmationDialog(
                             context,
-                            title: 'Resolve exception?',
-                            message:
-                                'Confirm that the issue has been handled. The resolution note will be recorded.',
+                            title: context.appText('Resolve exception?'),
+                            message: context.appText(
+                              'Confirm that the issue has been handled. The resolution note will be recorded.',
+                            ),
+                            onConfirm: () => repository.resolveException(
+                              exceptionId: item.id,
+                              remarks: note.trim(),
+                            ),
                             confirmLabel: 'Resolve',
+                            workingLabel: 'Resolving...',
                           );
                           if (!confirmed) return;
-                          await repository.resolveException(
-                            exceptionId: item.id,
-                            remarks: note.trim(),
-                          );
                           if (!context.mounted) return;
                           await _showOversightActionResult(
                             context,

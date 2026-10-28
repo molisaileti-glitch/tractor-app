@@ -370,6 +370,14 @@ class AppLocalizationsSw extends AppLocalizations {
   String get mechanizationOperations => 'Shughuli za mitambo';
 
   @override
+  String get appLogoSemantics => 'Nembo ya SB Mechanization';
+
+  @override
+  String appVersion(String version) {
+    return 'Toleo $version';
+  }
+
+  @override
   String get enterOtpCode =>
       'Weka nambari ya tarakimu 6 iliyotumwa kwenye simu yako';
 
