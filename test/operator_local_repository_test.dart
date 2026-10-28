@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tractor/src/core/network/kwanza_track_mobile_api_client.dart';
+import 'package:tractor/src/core/network/mechanization_mobile_api_client.dart';
 import 'package:tractor/src/features/operator/data/repositories/operator_local_repository.dart';
 
 void main() {
@@ -53,7 +53,7 @@ Future<void> _waitForSync(OperatorLocalRepository repository) async {
   }
 }
 
-class _OperatorApiClient extends KwanzaTrackMobileApiClient {
+class _OperatorApiClient extends MechanizationMobileApiClient {
   const _OperatorApiClient({
     this.includeToday = true,
     this.includeCalendar = false,
@@ -144,7 +144,7 @@ class _OperatorApiClient extends KwanzaTrackMobileApiClient {
     required String jobId,
   }) async {
     if (!validTodayDetail) {
-      throw const KwanzaTrackApiException('Job not found', statusCode: 404);
+      throw const MechanizationApiException('Job not found', statusCode: 404);
     }
     return {
       'data': {

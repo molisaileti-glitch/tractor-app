@@ -21,7 +21,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get darkMode => 'Dark mode';
 
   @override
-  String get darkModeDescription => 'Use the dark KwanzaTrack theme';
+  String get darkModeDescription => 'Use the dark SB Mechanization theme';
 
   @override
   String get language => 'Language';

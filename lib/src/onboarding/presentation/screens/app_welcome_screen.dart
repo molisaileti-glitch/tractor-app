@@ -49,7 +49,7 @@ class AppWelcomeScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Text(
-                            'Kwanza Track',
+                            'SB Mechanization',
                             textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.displaySmall
                                 ?.copyWith(

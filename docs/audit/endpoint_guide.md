@@ -1,6 +1,6 @@
-# KwanzaTrack endpoint guide and app connection map
+# SB Mechanization API endpoint guide and app connection map
 
-**Connection-status snapshot:** the connection labels below describe the baseline audit before repairs. See [operator/union flow repairs](operator_union_fixes.md) for the implemented changes. The endpoint definitions remain based on the supplied API contract.
+**Connection-status snapshot:** the connection labels below describe the baseline audit before repairs. See the [current mechanization integration guide](../mechanization_integration.md) for implemented behavior. The endpoint definitions remain based on the supplied API contract.
 
 Reviewed 23 October 2026 against the two supplied September 2026 API documents and the current working tree.
 
@@ -172,7 +172,7 @@ All 16 are **External backend: no implementation found in this Flutter repositor
 
 ## 11. Webhook delivery — outgoing server callback, not another fixed API path
 
-The portal POSTs to **your registered callback URL**. Headers identify `X-KwanzaTrack-Event` and `X-KwanzaTrack-Signature:sha256=<hex>`. Body contains delivery `id`, event name, occurrence time, and request/job object. Verify HMAC-SHA256 against the **raw body**, then deduplicate by delivery ID and process asynchronously. Reply 2xx within eight seconds; documented retries are after 30 seconds, five minutes, and 30 minutes. Repeated deliveries should not apply the same change twice. The sample signature verifier needs a length check before `timingSafeEqual` to safely reject missing/malformed signatures.
+The portal POSTs to **your registered callback URL**. Its documented headers identify the event name and HMAC signature. The body contains the delivery `id`, event name, occurrence time, and request/job object. Verify HMAC-SHA256 against the **raw body**, then deduplicate by delivery ID and process asynchronously. Reply 2xx within eight seconds; documented retries are after 30 seconds, five minutes, and 30 minutes. Repeated deliveries should not apply the same change twice. The sample signature verifier needs a length check before `timingSafeEqual` to safely reject missing/malformed signatures.
 
 The documented events cover request create/approve/return/resubmit/reject/cancel/update/status changes and job schedule/dispatch/reassign/reschedule/travel/arrival/start/pause/resume/complete/farmer-confirm/dispute/verify/close/flag/unflag/cancel/override request/approve/deny. A callback receiver belongs in the farmer backend. None exists in this Flutter repository.
 
@@ -180,7 +180,7 @@ The documented events cover request create/approve/return/resubmit/reject/cancel
 
 | Method and endpoint | What it does | Current app connection |
 |---|---|---|
-| `GET http://45.77.1.62:8080/api/v1/input-requests/service-orders` | Older separate service-order feed. Expects JSON lists or common wrapper keys. It sends no bearer token and is outside both supplied KwanzaTrack API groups. | **Dormant.** `ServiceOrdersRemoteDataSource` and repository forwarding method exist; no screen caller found. It does not connect local farmer requests to union jobs. Android globally permits cleartext and iOS has an exception for this host. Remove or migrate if no longer needed. |
+| `GET http://45.77.1.62:8080/api/v1/input-requests/service-orders` | Older separate service-order feed. It sent no bearer token and is outside both supplied API groups. | **Removed from the app on 2026-10-27.** The client and unused repository forwarding method had no screen caller and did not connect local farmer requests to union jobs. This row is retained only as audit history. |
 | `POST https://routes.googleapis.com/directions/v2:computeRoutes` | Sends origin/destination, DRIVE/TRAFFIC_AWARE settings, API key/platform headers and field mask; returns driving-route polyline, distance, and duration. Widget selects shortest returned route by distance. This is navigation guidance, not the tractor work trail. | **Wired.** Operator route map calls it directly. Keys and application/certificate settings are compiled into source; cloud restrictions/quota cannot be verified locally. No full response timeout; GoogleMap platform coverage is separate from having desktop/web scaffolding. |
 
 ## Correct overall sequence

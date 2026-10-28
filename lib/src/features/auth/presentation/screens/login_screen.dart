@@ -35,7 +35,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  static const _deviceName = 'Kwanza Track Mobile';
+  static const _deviceName = 'SB Mechanization Mobile';
   final _identifierController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
@@ -230,7 +230,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
     setState(() {
       _loginError =
-          'This account does not have access to a supported Kwanza Track mobile workspace.';
+          'This account does not have access to a supported SB Mechanization mobile workspace.';
     });
   }
 }
@@ -344,18 +344,21 @@ class _BrandLockup extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(
-            width: 118,
-            height: 92,
-            child: Image.asset(
-              'assets/images/login_logo.png',
-              fit: BoxFit.contain,
-              semanticLabel: 'Kwanza Track logo',
+          ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: SizedBox(
+              width: 92,
+              height: 92,
+              child: Image.asset(
+                'assets/images/tractor_launcher_icon.png',
+                fit: BoxFit.cover,
+                semanticLabel: 'SB Mechanization logo',
+              ),
             ),
           ),
           const SizedBox(height: 13),
           Text(
-            'Kwanza Track',
+            'SB Mechanization',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               color: Theme.of(context).colorScheme.onSurface,

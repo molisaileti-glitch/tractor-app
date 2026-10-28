@@ -5,3 +5,11 @@ abstract class LocationRepository {
 
   Stream<DeviceLocation> watchLocation();
 }
+
+abstract class VerificationLocationRepository implements LocationRepository {
+  /// A short, foreground-only stream used while the operator is confirming
+  /// field evidence. Implementations may increase accuracy and update rate.
+  Stream<DeviceLocation> watchVerificationLocation({
+    bool forceNativeProvider = false,
+  });
+}

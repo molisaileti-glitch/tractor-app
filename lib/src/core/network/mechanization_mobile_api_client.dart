@@ -5,7 +5,7 @@ import 'dart:typed_data' show BytesBuilder;
 
 import 'package:flutter/foundation.dart';
 
-import '../constants/kwanza_track_endpoints.dart';
+import '../constants/mechanization_endpoints.dart';
 
 class _PhotoUpload {
   const _PhotoUpload(this.bytes, this.name, this.mime, this.fields);
@@ -15,8 +15,8 @@ class _PhotoUpload {
   final Map<String, String> fields;
 }
 
-class KwanzaTrackApiException implements Exception {
-  const KwanzaTrackApiException(
+class MechanizationApiException implements Exception {
+  const MechanizationApiException(
     this.message, {
     this.code,
     this.statusCode,
@@ -42,9 +42,9 @@ class KwanzaTrackApiException implements Exception {
   String toString() => message;
 }
 
-class KwanzaTrackMobileApiClient {
-  const KwanzaTrackMobileApiClient({
-    this.baseUrl = KwanzaTrackEndpoints.baseUrl,
+class MechanizationMobileApiClient {
+  const MechanizationMobileApiClient({
+    this.baseUrl = MechanizationEndpoints.baseUrl,
     this.apiPrefix = '/api/v1/mech',
   });
 
@@ -310,10 +310,12 @@ class KwanzaTrackMobileApiClient {
       'issue',
       'other',
     }.contains(kind)) {
-      throw const KwanzaTrackApiException('Choose a valid photo type.');
+      throw const MechanizationApiException('Choose a valid photo type.');
     }
     if (bytes.isEmpty || bytes.length > 8 * 1024 * 1024) {
-      throw const KwanzaTrackApiException('Choose a photo smaller than 8 MB.');
+      throw const MechanizationApiException(
+        'Choose a photo smaller than 8 MB.',
+      );
     }
     final mime =
         bytes.length >= 3 &&
@@ -330,7 +332,7 @@ class KwanzaTrackMobileApiClient {
         ? 'image/webp'
         : null;
     if (mime == null) {
-      throw const KwanzaTrackApiException('Choose a JPG, PNG or WebP photo.');
+      throw const MechanizationApiException('Choose a JPG, PNG or WebP photo.');
     }
     final safeName = fileName
         .split(RegExp(r'[/\\]'))
@@ -878,7 +880,7 @@ class KwanzaTrackMobileApiClient {
     final retryAt = _retryNotBefore[token];
     if (retryAt != null && retryAt.isAfter(DateTime.now())) {
       final remaining = retryAt.difference(DateTime.now());
-      throw KwanzaTrackApiException(
+      throw MechanizationApiException(
         'Please wait ${remaining.inSeconds + 1} seconds before trying again.',
         statusCode: 429,
         retryAfter: remaining,
@@ -909,7 +911,7 @@ class KwanzaTrackMobileApiClient {
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       if (upload != null) {
         final boundary =
-            'kwanza-${DateTime.now().microsecondsSinceEpoch}-$requestId';
+            'sb-mechanization-${DateTime.now().microsecondsSinceEpoch}-$requestId';
         request.headers.contentType = ContentType(
           'multipart',
           'form-data',
@@ -977,7 +979,7 @@ class KwanzaTrackMobileApiClient {
       );
       _logJson(requestId, 'response body', decoded);
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw KwanzaTrackApiException(
+        throw MechanizationApiException(
           decoded['message']?.toString() ??
               'Request failed with HTTP ${response.statusCode}.',
           code: decoded['code']?.toString(),
@@ -989,7 +991,7 @@ class KwanzaTrackMobileApiClient {
         );
       }
       if (decoded['success'] == false) {
-        throw KwanzaTrackApiException(
+        throw MechanizationApiException(
           decoded['message']?.toString() ?? 'Request failed.',
           code: decoded['code']?.toString(),
           statusCode: response.statusCode,
@@ -1002,18 +1004,18 @@ class KwanzaTrackMobileApiClient {
       return decoded;
     } on TimeoutException {
       _log(requestId, 'xx> timeout after ${stopwatch.elapsedMilliseconds}ms');
-      throw const KwanzaTrackApiException('Request timed out.');
+      throw const MechanizationApiException('Request timed out.');
     } on SocketException catch (error) {
       _log(requestId, 'xx> socket error: $error');
-      throw const KwanzaTrackApiException('Server is unreachable.');
+      throw const MechanizationApiException('Server is unreachable.');
     } on HttpException {
-      throw const KwanzaTrackApiException(
+      throw const MechanizationApiException(
         'The server connection was interrupted. Please try again.',
       );
     } on FormatException catch (error) {
       _log(requestId, 'xx> invalid JSON: $error');
-      throw const KwanzaTrackApiException('Server returned invalid JSON.');
-    } on KwanzaTrackApiException catch (error) {
+      throw const MechanizationApiException('Server returned invalid JSON.');
+    } on MechanizationApiException catch (error) {
       _log(
         requestId,
         'xx> API error status=${error.statusCode} code=${error.code} '

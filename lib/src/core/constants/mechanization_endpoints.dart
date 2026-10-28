@@ -1,3 +1,3 @@
-abstract final class KwanzaTrackEndpoints {
+abstract final class MechanizationEndpoints {
   static const baseUrl = 'https://tractor.shambabora.co.tz';
 }

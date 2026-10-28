@@ -6,7 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../../../additional_data/location/domain/entities/device_location.dart';
 import '../../../../additional_data/location/domain/repositories/location_repository.dart';
 import '../../../../additional_data/location/data/repositories/geolocator_location_repository.dart';
-import '../../../../core/network/kwanza_track_mobile_api_client.dart';
+import '../../../../core/network/mechanization_mobile_api_client.dart';
 import '../../../../core/network/mechanization_data.dart';
 import '../../../farmer/domain/entities/farm_plot.dart';
 import '../../../farmer/domain/entities/service_request.dart';
@@ -16,14 +16,15 @@ enum OperatorDataScreen { dashboard, schedule, history, profile }
 
 class OperatorLocalRepository extends ChangeNotifier {
   OperatorLocalRepository.seeded({
-    KwanzaTrackMobileApiClient? mobileApiClient,
+    MechanizationMobileApiClient? mobileApiClient,
     LocationRepository? locationRepository,
-  }) : mobileApiClient = mobileApiClient ?? const KwanzaTrackMobileApiClient(),
+  }) : mobileApiClient =
+           mobileApiClient ?? const MechanizationMobileApiClient(),
        _locationRepository =
            locationRepository ?? const GeolocatorLocationRepository(),
        _jobs = [];
 
-  final KwanzaTrackMobileApiClient mobileApiClient;
+  final MechanizationMobileApiClient mobileApiClient;
   final LocationRepository _locationRepository;
   final List<OperatorJob> _jobs;
   final Map<String, Map<String, Object?>> _jobPayloads = {};
@@ -156,7 +157,7 @@ class OperatorLocalRepository extends ChangeNotifier {
       _rebuildJobs();
     } catch (error) {
       if (!current()) return;
-      _screenErrors[screen] = error is KwanzaTrackApiException
+      _screenErrors[screen] = error is MechanizationApiException
           ? error.message
           : 'Could not refresh this screen: $error';
     }
@@ -175,6 +176,16 @@ class OperatorLocalRepository extends ChangeNotifier {
   bool get requiresPhoneLocation => _policy['require_phone_location'] != false;
   bool get requiresFarmerConfirmation =>
       _policy['require_farmer_confirmation'] != false;
+  double get phoneAccuracyMaxMeters {
+    final configured = _asDouble(_policy['phone_accuracy_max_m']);
+    return configured == null || configured <= 0 ? 100 : configured;
+  }
+
+  Duration get phoneFixMaximumAge {
+    final seconds = _asInt(_policy['fix_max_age_s']);
+    return Duration(seconds: seconds == null || seconds <= 0 ? 180 : seconds);
+  }
+
   bool inspectedToday(String tractorId) =>
       _inspectedTractors.contains(tractorId);
   bool canAddJobPhotos(OperatorJob job) =>
@@ -319,7 +330,7 @@ class OperatorLocalRepository extends ChangeNotifier {
       if (!_currentSession(token, session)) return;
       _applyTrackerPositionsResponse(response);
       notifyListeners();
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (!_currentSession(token, session)) return;
       if (kDebugMode) {
         debugPrint('[Tracker Poll] ${error.message}');
@@ -363,7 +374,7 @@ class OperatorLocalRepository extends ChangeNotifier {
       _assignmentAccessErrors.remove(jobId);
       notifyListeners();
       return true;
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (!_currentSession(token, session)) return false;
       if (dataVersion != _dataVersion) return true;
       final todayAssignment = _todayJobs
@@ -417,7 +428,7 @@ class OperatorLocalRepository extends ChangeNotifier {
       _applyJobResponse(response, acceptedByOperator: true);
       notifyListeners();
       return true;
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (!_currentSession(token, session)) return false;
       _lastActionError = error.message;
       notifyListeners();
@@ -503,7 +514,7 @@ class OperatorLocalRepository extends ChangeNotifier {
       }
       notifyListeners();
       return true;
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (!_currentSession(token, session)) return false;
       _lastActionError = error.message;
       notifyListeners();
@@ -545,7 +556,7 @@ class OperatorLocalRepository extends ChangeNotifier {
         _inspectedTractors.remove(tractorId);
       }
       notifyListeners();
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (!_currentSession(token, session) ||
           version != (_inspectionVersions[tractorId] ?? 0)) {
         return;
@@ -574,7 +585,7 @@ class OperatorLocalRepository extends ChangeNotifier {
           job.copyWith(trackPoints: _pathPointsFromResponse(response)),
         );
       }
-    } on KwanzaTrackApiException {
+    } on MechanizationApiException {
       /* Detail remains usable without a trail. */
     }
   }
@@ -629,7 +640,7 @@ class OperatorLocalRepository extends ChangeNotifier {
       _lastActionError = null;
       notifyListeners();
       return true;
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (!_currentSession(token, session)) return false;
       if (error.code == 'start_denied' && error.errors.isNotEmpty) {
         _startChecks[jobId] = _startCheckFromJson(error.errors);
@@ -677,7 +688,7 @@ class OperatorLocalRepository extends ChangeNotifier {
       final result = _startCheckFromJson(_map(response['data']));
       _startChecks[jobId] = result;
       return result;
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (!_currentSession(token, session)) return null;
       _lastActionError = error.message;
       notifyListeners();
@@ -713,7 +724,7 @@ class OperatorLocalRepository extends ChangeNotifier {
       });
       notifyListeners();
       return true;
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (!_currentSession(token, session)) return false;
       _lastActionError = error.message;
       notifyListeners();
@@ -824,7 +835,7 @@ class OperatorLocalRepository extends ChangeNotifier {
       _lastActionError = null;
       notifyListeners();
       return true;
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (!_currentSession(token, session)) return false;
       _lastActionError = error.message;
       notifyListeners();
@@ -854,7 +865,7 @@ class OperatorLocalRepository extends ChangeNotifier {
         return false;
       }
       return true;
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (!_currentSession(token, session)) return false;
       _lastActionError = error.message;
       return false;
@@ -925,7 +936,7 @@ class OperatorLocalRepository extends ChangeNotifier {
       }
       notifyListeners();
       return confirmed;
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (!_currentSession(token, session)) return false;
       _lastActionError = error.message;
       notifyListeners();
@@ -1056,7 +1067,7 @@ class OperatorLocalRepository extends ChangeNotifier {
           _map(data['job']).isEmpty ? data : _map(data['job']),
         );
         validated.add(parsed ?? compactJob);
-      } on KwanzaTrackApiException catch (error) {
+      } on MechanizationApiException catch (error) {
         if (!_currentSession(token, session)) return;
         if (kDebugMode) {
           debugPrint(
@@ -1080,7 +1091,7 @@ class OperatorLocalRepository extends ChangeNotifier {
 
   String _assignmentAccessMessage(
     OperatorJob job,
-    KwanzaTrackApiException error,
+    MechanizationApiException error,
   ) {
     final reference = job.reference ?? job.id;
     if (error.statusCode == 403 || error.statusCode == 404) {
@@ -1414,6 +1425,7 @@ class OperatorLocalRepository extends ChangeNotifier {
       location: _text(plot, const ['village', 'ward', 'district']) ?? '',
       boundaryRegistered: boundaryPoints.length >= 3 || plot['mapped'] == true,
       boundaryPoints: boundaryPoints,
+      toleranceMeters: _asDouble(plot['tolerance_m']) ?? 0,
     );
   }
 
@@ -1480,7 +1492,7 @@ class OperatorLocalRepository extends ChangeNotifier {
       _applyJobResponse(response);
       notifyListeners();
       return true;
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (!_currentSession(token, session)) return false;
       _lastActionError = error.message;
       notifyListeners();
@@ -1507,7 +1519,7 @@ class OperatorLocalRepository extends ChangeNotifier {
       if (!_currentSession(token, session)) return false;
       notifyListeners();
       return true;
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (!_currentSession(token, session)) return false;
       _lastActionError = error.message;
       notifyListeners();
@@ -1630,11 +1642,36 @@ class OperatorLocalRepository extends ChangeNotifier {
               .map((item) => item.toString())
               .toList(growable: false)
         : const <String>[];
+    final phone = _map(json['phone']);
+    final tractor = _map(json['tractor']);
     return OperatorStartCheckResult(
       canStart: json['can_start'] == true,
       overrideAllowed: json['override_allowed'] == true,
       failed: failed,
       checks: checks,
+      toleranceMeters: _asDouble(json['tolerance_m']),
+      checkedAt: _dateTime(json['checked_at']),
+      phone: phone.isEmpty
+          ? null
+          : OperatorStartCheckPosition(
+              latitude: _asDouble(phone['latitude']),
+              longitude: _asDouble(phone['longitude']),
+              accuracyMeters: _asDouble(phone['accuracy_m']),
+              ageSeconds: _asInt(phone['age_s']),
+              distanceToPlotMeters: _asDouble(phone['distance_to_plot_m']),
+              distanceToTractorMeters: _asDouble(
+                phone['distance_to_tractor_m'],
+              ),
+            ),
+      tractor: tractor.isEmpty
+          ? null
+          : OperatorStartCheckPosition(
+              latitude: _asDouble(tractor['latitude']),
+              longitude: _asDouble(tractor['longitude']),
+              ageSeconds: _asInt(tractor['age_s']),
+              distanceToPlotMeters: _asDouble(tractor['distance_to_plot_m']),
+              online: _asBool(tractor['online']),
+            ),
     );
   }
 

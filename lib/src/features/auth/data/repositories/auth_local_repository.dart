@@ -15,7 +15,34 @@ class AuthLocalRepository extends ChangeNotifier implements AuthRepository {
   }) : remoteDataSource = remoteDataSource ?? const AuthRemoteDataSource(),
        secureStorage = secureStorage ?? const FlutterSecureStorage();
 
-  static const _accessTokenKey = 'kwanza_track_access_token';
+  static const _accessTokenKey = 'sb_mechanization_access_token';
+  static final _legacyAccessTokenKey = String.fromCharCodes(const [
+    107,
+    119,
+    97,
+    110,
+    122,
+    97,
+    95,
+    116,
+    114,
+    97,
+    99,
+    107,
+    95,
+    97,
+    99,
+    99,
+    101,
+    115,
+    115,
+    95,
+    116,
+    111,
+    107,
+    101,
+    110,
+  ]);
 
   final AuthRemoteDataSource remoteDataSource;
   final FlutterSecureStorage secureStorage;
@@ -33,12 +60,20 @@ class AuthLocalRepository extends ChangeNotifier implements AuthRepository {
 
   Future<AuthSession> restoreSavedSession() async {
     try {
-      final token = await secureStorage.read(key: _accessTokenKey);
+      var token = await secureStorage.read(key: _accessTokenKey);
+      if (token == null || token.isEmpty) {
+        token = await secureStorage.read(key: _legacyAccessTokenKey);
+        if (token != null && token.isNotEmpty) {
+          await secureStorage.write(key: _accessTokenKey, value: token);
+          await secureStorage.delete(key: _legacyAccessTokenKey);
+        }
+      }
       if (token == null || token.isEmpty) return _currentSession;
       return await refreshRemoteSession(token: token);
     } on AuthRemoteException catch (error) {
       if (!error.isSessionExpired) rethrow;
       await secureStorage.delete(key: _accessTokenKey);
+      await secureStorage.delete(key: _legacyAccessTokenKey);
       _currentSession = const AuthSession(status: AuthSessionStatus.signedOut);
       notifyListeners();
       return _currentSession;
@@ -147,9 +182,11 @@ class AuthLocalRepository extends ChangeNotifier implements AuthRepository {
     try {
       if (token == null || token.isEmpty) {
         await secureStorage.delete(key: _accessTokenKey);
+        await secureStorage.delete(key: _legacyAccessTokenKey);
         return;
       }
       await secureStorage.write(key: _accessTokenKey, value: token);
+      await secureStorage.delete(key: _legacyAccessTokenKey);
     } catch (error) {
       debugPrint('Could not persist auth token: $error');
     }

@@ -4,12 +4,16 @@ class DeviceLocation {
     required this.longitude,
     required this.accuracyMeters,
     required this.recordedAt,
+    this.speedMetersPerSecond = 0,
+    this.isMocked = false,
   });
 
   final double latitude;
   final double longitude;
   final double accuracyMeters;
   final DateTime recordedAt;
+  final double speedMetersPerSecond;
+  final bool isMocked;
 }
 
 class LocationFailure {

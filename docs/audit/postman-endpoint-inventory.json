@@ -1,4 +1,4 @@
-﻿[
+[
     {
         "Group":  "1 · App sign-in",
         "Name":  "Login (step 1)",
@@ -1197,7 +1197,7 @@
         "ExampleUrl":  "{{base_url}}/api/integration/v1/mechanization/webhook",
         "Body":  {
                      "mode":  "raw",
-                     "raw":  "{\n    \"url\": \"https://your-server.example/hooks/kwanzatrack\"\n}",
+                     "raw":  "{\n    \"url\": \"https://your-server.example/hooks/sb-mechanization\"\n}",
                      "options":  {
                                      "raw":  {
                                                  "language":  "json"

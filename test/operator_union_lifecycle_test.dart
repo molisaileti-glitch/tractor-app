@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
 import 'package:tractor/src/features/manager/presentation/screens/operations_jobs_view.dart';
 import 'package:tractor/src/additional_data/location/domain/entities/device_location.dart';
-import 'package:tractor/src/core/network/kwanza_track_mobile_api_client.dart';
+import 'package:tractor/src/core/network/mechanization_mobile_api_client.dart';
 import 'package:tractor/src/features/manager/data/repositories/union_operations_repository.dart';
 import 'package:tractor/src/features/manager/domain/entities/operations_models.dart';
 import 'package:tractor/src/features/operator/data/repositories/operator_local_repository.dart';
@@ -249,7 +249,7 @@ Future<void> _settle(bool Function() loading) async {
 }
 
 /// Fake server enforces transitions and deliberately returns brief action jobs.
-class _MechanizationServer implements KwanzaTrackMobileApiClient {
+class _MechanizationServer implements MechanizationMobileApiClient {
   static const tractorId = '10000000-0000-4000-8000-000000000001';
   static const operatorId = '20000000-0000-4000-8000-000000000001';
   static const jobId = '30000000-0000-4000-8000-000000000001';

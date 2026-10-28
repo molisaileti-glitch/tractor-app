@@ -10,7 +10,7 @@ import 'package:tractor/src/core/theme/app_theme.dart';
 import 'package:tractor/src/l10n/generated/app_localizations.dart';
 
 /// Render the actual widget with sample data for design review:
-/// flutter test --dart-define=CALENDAR_PREVIEW=true test/calendar_preview_test.dart
+/// flutter test --dart-define=CALENDAR_PREVIEW=true tool/previews/calendar_preview_test.dart
 void main() {
   testWidgets(
     'render calendar and expanded jobs for review',

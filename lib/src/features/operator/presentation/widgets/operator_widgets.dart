@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -155,6 +156,9 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
   String? _routeKey;
   bool _loadingRoute = false;
   String? _routeError;
+  LatLng? _lastRouteOrigin;
+  DateTime? _lastRouteRequestedAt;
+  bool _routeQuotaExhausted = false;
 
   @override
   void initState() {
@@ -168,13 +172,11 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
     super.didUpdateWidget(oldWidget);
     unawaited(_loadRouteIfNeeded());
     final oldTracker = oldWidget.tractorPosition;
-    final trackerMoved =
-        oldTracker?.latitude != widget.tractorPosition?.latitude ||
-        oldTracker?.longitude != widget.tractorPosition?.longitude;
-    final phoneMoved =
-        oldWidget.routeFromLatitude != widget.routeFromLatitude ||
-        oldWidget.routeFromLongitude != widget.routeFromLongitude;
-    if (trackerMoved || phoneMoved) {
+    final liveTractorAppeared =
+        oldTracker?.isLive != true && widget.tractorPosition?.isLive == true;
+    final phoneAppeared =
+        oldWidget.routeFromLatitude == null && widget.routeFromLatitude != null;
+    if (liveTractorAppeared || phoneAppeared) {
       final mappedJobs = [
         if (widget.job != null) widget.job!,
         ...widget.jobs.where((item) => item.id != widget.job?.id),
@@ -189,7 +191,7 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
           routeStart,
           destination,
           _phonePoint,
-          _tractorPoint,
+          _liveTractorPoint,
         ),
       );
     }
@@ -264,7 +266,7 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
                     routeStart,
                     routeDestination,
                     phonePoint,
-                    tractorPoint,
+                    _liveTractorPoint,
                   ),
                 );
               },
@@ -393,9 +395,11 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
                       ),
                     ),
                     TextButton(
-                      onPressed: () => _selectRoute(
-                        _usesTractorRoute ? 'tractor' : 'operator',
-                      ),
+                      onPressed: _routeQuotaExhausted
+                          ? null
+                          : () => _selectRoute(
+                              _usesTractorRoute ? 'tractor' : 'operator',
+                            ),
                       child: const Text('Retry'),
                     ),
                   ],
@@ -490,6 +494,8 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
     setState(() {
       _routeOrigin = origin;
       _routeKey = null;
+      _lastRouteOrigin = null;
+      _lastRouteRequestedAt = null;
       _routePoints = const [];
       _routeSummary = null;
       _routeError = null;
@@ -521,6 +527,9 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
     }
     return LatLng(position.latitude, position.longitude);
   }
+
+  LatLng? get _liveTractorPoint =>
+      widget.tractorPosition?.isLive == true ? _tractorPoint : null;
 
   bool _validCoordinate(double? lat, double? lng) =>
       lat != null &&
@@ -912,7 +921,30 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
       return;
     }
 
+    if (_routeQuotaExhausted) {
+      if (_routeError == null && mounted) {
+        setState(() {
+          _routeError =
+              'The Google road-directions quota has been reached for today. '
+              'Operator, tractor and farm positions are still available.';
+        });
+      }
+      return;
+    }
+
     final destination = _jobPoint(mappedJobs.first);
+    final requestedAt = DateTime.now();
+    final lastRequestedAt = _lastRouteRequestedAt;
+    if (lastRequestedAt != null &&
+        requestedAt.difference(lastRequestedAt) < const Duration(minutes: 2)) {
+      return;
+    }
+    final lastOrigin = _lastRouteOrigin;
+    if (lastOrigin != null &&
+        _routePoints.isNotEmpty &&
+        _mapDistanceMeters(lastOrigin, start) < 100) {
+      return;
+    }
     final nextKey =
         '${start.latitude.toStringAsFixed(6)},${start.longitude.toStringAsFixed(6)}:'
         '${destination.latitude.toStringAsFixed(6)},${destination.longitude.toStringAsFixed(6)}';
@@ -925,6 +957,8 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
       _routePoints = const [];
       _routeSummary = null;
     });
+    _lastRouteOrigin = start;
+    _lastRouteRequestedAt = requestedAt;
 
     try {
       debugPrint(
@@ -946,19 +980,37 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
         '${result.summary != null ? ' (${result.summary})' : ''}',
       );
       unawaited(
-        _fitMap(mappedJobs, start, destination, _phonePoint, _tractorPoint),
+        _fitMap(mappedJobs, start, destination, _phonePoint, _liveTractorPoint),
       );
     } catch (error) {
       debugPrint('[Routes API] $error');
       if (!mounted || _routeKey != nextKey) return;
+      final quotaExceeded = error.toString().contains('429');
       setState(() {
         _routePoints = const [];
         _routeSummary = null;
         _loadingRoute = false;
-        _routeError =
-            'Road directions are unavailable right now. Please try again.';
+        _routeQuotaExhausted = quotaExceeded;
+        _routeError = quotaExceeded
+            ? 'The Google road-directions quota has been reached for today. '
+                  'Operator, tractor and farm positions are still available.'
+            : 'Road directions are unavailable right now. Please try again.';
       });
     }
+  }
+
+  double _mapDistanceMeters(LatLng first, LatLng second) {
+    const earthRadiusMeters = 6371000.0;
+    const radians = math.pi / 180;
+    final latitudeDelta = (second.latitude - first.latitude) * radians;
+    final longitudeDelta = (second.longitude - first.longitude) * radians;
+    final a =
+        math.sin(latitudeDelta / 2) * math.sin(latitudeDelta / 2) +
+        math.cos(first.latitude * radians) *
+            math.cos(second.latitude * radians) *
+            math.sin(longitudeDelta / 2) *
+            math.sin(longitudeDelta / 2);
+    return earthRadiusMeters * 2 * math.asin(math.sqrt(a.clamp(0.0, 1.0)));
   }
 
   Future<_DrivingRouteResult> _fetchDrivingRoute(

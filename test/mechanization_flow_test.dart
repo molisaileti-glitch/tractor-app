@@ -7,7 +7,7 @@ import 'package:tractor/src/l10n/generated/app_localizations.dart';
 import 'package:tractor/src/features/operator/presentation/screens/operator_jobs_screen.dart';
 import 'package:tractor/src/features/operator/presentation/screens/operator_shell.dart';
 import 'package:tractor/src/shared/application/app_preferences_controller.dart';
-import 'package:tractor/src/core/network/kwanza_track_mobile_api_client.dart';
+import 'package:tractor/src/core/network/mechanization_mobile_api_client.dart';
 import 'package:tractor/src/features/manager/data/repositories/union_operations_repository.dart';
 import 'package:tractor/src/features/manager/domain/entities/operations_models.dart';
 import 'package:tractor/src/features/operator/data/repositories/operator_local_repository.dart';
@@ -122,7 +122,10 @@ void main() {
           #jobs: (_) async => {'data': <Object?>[]},
           #job: (_) async {
             if (!detailAvailable) {
-              throw const KwanzaTrackApiException('Not found', statusCode: 404);
+              throw const MechanizationApiException(
+                'Not found',
+                statusCode: 404,
+              );
             }
             return {'data': _Api._job('dispatched')};
           },
@@ -315,7 +318,7 @@ void main() {
         #markEnRoute: (call) async {
           ids.add(call.namedArguments[#clientEventId] as String?);
           if (++attempts == 1) {
-            throw const KwanzaTrackApiException('Request timed out.');
+            throw const MechanizationApiException('Request timed out.');
           }
           return {'data': _Api._job('en_route', full: false)};
         },
@@ -527,8 +530,10 @@ void main() {
     () async {
       final api = _Api(
         handlers: {
-          #dashboard: (_) async =>
-              throw const KwanzaTrackApiException('Forbidden', statusCode: 403),
+          #dashboard: (_) async => throw const MechanizationApiException(
+            'Forbidden',
+            statusCode: 403,
+          ),
         },
       );
       final repository = UnionOperationsRepository.seeded(mobileApiClient: api);
@@ -581,7 +586,7 @@ void main() {
         handlers: {
           #jobs: (_) async {
             if (failRead) {
-              throw const KwanzaTrackApiException(
+              throw const MechanizationApiException(
                 'Jobs temporarily unavailable',
                 statusCode: 503,
               );
@@ -641,7 +646,7 @@ void main() {
     () async {
       final api = _Api(
         handlers: {
-          #startJob: (_) async => throw const KwanzaTrackApiException(
+          #startJob: (_) async => throw const MechanizationApiException(
             'Inspection is missing',
             code: 'start_denied',
             statusCode: 422,
@@ -684,7 +689,7 @@ Future<void> _wait(bool Function() busy) async {
   }
 }
 
-class _Api implements KwanzaTrackMobileApiClient {
+class _Api implements MechanizationMobileApiClient {
   _Api({this.meGate, this.handlers = const {}});
   final Map<Symbol, Future<Map<String, Object?>> Function(Invocation)> handlers;
   final List<Invocation> calls = [];

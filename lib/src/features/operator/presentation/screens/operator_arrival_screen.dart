@@ -32,7 +32,6 @@ class OperatorArrivalScreen extends StatefulWidget {
 }
 
 class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
-  LocationRepository get _phoneLocationRepository => widget.locationRepository;
   final CheckPlotGeofence _checkPlotGeofence = const CheckPlotGeofence();
 
   bool _checkingLocation = false;
@@ -71,13 +70,6 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
               ? null
               : _checkPlotGeofence(plot: job.plot, location: phone);
         });
-      }
-      if (_startCheck != null && _readyForChecks) {
-        final result = await widget.repository.runStartCheck(
-          jobId: widget.jobId,
-          phone: phone,
-        );
-        if (mounted) setState(() => _startCheck = result);
       }
     } finally {
       _pollingReadiness = false;
@@ -125,8 +117,7 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
         ),
       );
     }
-    final isInsideFarm = _geofenceResult?.isInside ?? false;
-    final distanceMeters = _geofenceResult?.distanceFromPlotMeters;
+    final isWithinAllowedArea = _geofenceResult?.isWithinAllowedArea ?? false;
     final hasArrived =
         job.status == OperatorJobStatus.arrived ||
         job.status == OperatorJobStatus.inProgress;
@@ -177,10 +168,10 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Icon(
-                          isInsideFarm
+                          isWithinAllowedArea
                               ? Icons.check_circle_outline
                               : Icons.warning_amber_outlined,
-                          color: isInsideFarm
+                          color: isWithinAllowedArea
                               ? Theme.of(context).colorScheme.primary
                               : Theme.of(context).colorScheme.error,
                         ),
@@ -189,8 +180,7 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
                           child: Text(
                             _statusText(
                               hasArrived: hasArrived,
-                              isInsideFarm: isInsideFarm,
-                              distanceMeters: distanceMeters,
+                              result: _geofenceResult,
                             ),
                             style: Theme.of(context).textTheme.bodyLarge
                                 ?.copyWith(fontWeight: FontWeight.w700),
@@ -219,6 +209,11 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
                             label: 'Accuracy',
                             value:
                                 '${_geofenceResult!.location.accuracyMeters.toStringAsFixed(0)} m',
+                          ),
+                          _LocationFact(
+                            label: 'Farm tolerance',
+                            value:
+                                '${job.plot.toleranceMeters.toStringAsFixed(0)} m',
                           ),
                         ],
                       ),
@@ -423,8 +418,7 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
 
   String _statusText({
     required bool hasArrived,
-    required bool isInsideFarm,
-    required double? distanceMeters,
+    required PlotGeofenceResult? result,
   }) {
     if (_checkingLocation) {
       return hasArrived
@@ -434,21 +428,29 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
     if (_locationError != null) {
       return 'Location could not be verified.';
     }
-    if (_geofenceResult == null) {
+    if (result == null) {
       return hasArrived
           ? 'Check location before starting this service.'
           : 'Check location to show the route to the farm.';
     }
-    if (hasArrived) {
-      return 'Phone location captured. The start check verifies both phone and tractor against the farm boundary.';
-    }
-    if (isInsideFarm) {
-      return 'You appear to be at the assigned farm. Record arrival before starting service.';
-    }
-    final distanceText = distanceMeters == null || distanceMeters.isInfinite
+    final distanceMeters = result.distanceFromPlotMeters;
+    final distanceText = distanceMeters.isInfinite
         ? 'unknown'
         : '${distanceMeters.toStringAsFixed(0)} m';
-    return 'Follow the route guide to the assigned farm. Distance from plot: $distanceText.';
+    return switch (result.state) {
+      PlotGeofenceState.insideBoundary =>
+        hasArrived
+            ? 'GPS evidence is inside the mapped farm boundary. Run Start Check for the server decision.'
+            : 'You appear to be inside the assigned farm boundary. Record arrival when the tractor is also present.',
+      PlotGeofenceState.withinTolerance =>
+        'GPS evidence is $distanceText outside the mapped boundary but within the farm tolerance. Run Start Check for the server decision.',
+      PlotGeofenceState.uncertain =>
+        'GPS accuracy overlaps the allowed farm area. Keep the tablet in open sky and verify again.',
+      PlotGeofenceState.outsideAllowedArea =>
+        'GPS evidence is outside the allowed farm area. Distance from the mapped boundary: $distanceText.',
+      PlotGeofenceState.unavailable =>
+        'The farm boundary or current GPS evidence is unavailable.',
+    };
   }
 
   Future<void> _refreshLocation() async {
@@ -463,40 +465,64 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
       _locationError = null;
     });
 
-    final result = await _phoneLocationRepository.getCurrentLocation();
+    final location = await _acquireReliableLocation();
     if (!mounted) return;
-
-    if (result is LocationSuccess) {
+    if (location != null) {
       debugPrint(
         '[Operator GPS] Location ready: '
-        '${result.location.latitude},${result.location.longitude} '
-        '(accuracy ${result.location.accuracyMeters} m)',
+        '${location.latitude},${location.longitude} '
+        '(accuracy ${location.accuracyMeters} m)',
       );
       setState(() {
         _geofenceResult = _checkPlotGeofence(
           plot: job.plot,
-          location: result.location,
+          location: location,
         );
         _startCheck = null;
         _checkingLocation = false;
       });
       return;
     }
+  }
 
-    if (result is LocationUnavailable) {
-      debugPrint('[Operator GPS] ${result.failure.message}');
-      setState(() {
-        _geofenceResult = null;
-        _locationError = result.failure.message;
-        _checkingLocation = false;
-      });
-      await showAppErrorDialog(
-        context,
-        title: 'Location could not be verified',
-        message: result.failure.message,
-        buttonLabel: 'Try again',
-      );
+  Future<DeviceLocation?> _acquireReliableLocation() async {
+    final mapState = _mapKey.currentState;
+    if (mapState == null) {
+      const message = 'The job map is still preparing GPS. Try again shortly.';
+      if (mounted) {
+        setState(() {
+          _checkingLocation = false;
+          _locationError = message;
+        });
+      }
+      return null;
     }
+    final result = await mapState.acquireFieldEvidence(
+      maximumAccuracyMeters: widget.repository.phoneAccuracyMaxMeters,
+      maximumFixAge: widget.repository.phoneFixMaximumAge,
+    );
+    if (!mounted) return null;
+    if (result.location != null) {
+      setState(() {
+        _checkingLocation = false;
+        _locationError = null;
+      });
+      return result.location;
+    }
+    final message =
+        result.message ??
+        'A reliable GPS position was not established. Keep the tablet in open sky and try again.';
+    setState(() {
+      _checkingLocation = false;
+      _locationError = message;
+    });
+    await showAppErrorDialog(
+      context,
+      title: 'Location could not be verified',
+      message: message,
+      buttonLabel: 'Try again',
+    );
+    return null;
   }
 
   Future<void> _recordArrival() async {
@@ -509,9 +535,19 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
     );
     if (!confirmed || !mounted) return;
     setState(() => _submittingArrival = true);
+    final phone =
+        _mapKey.currentState?.currentFieldEvidence(
+          maximumAge: widget.repository.phoneFixMaximumAge,
+        ) ??
+        await _acquireReliableLocation();
+    if (!mounted) return;
+    if (phone == null && widget.repository.requiresPhoneLocation) {
+      setState(() => _submittingArrival = false);
+      return;
+    }
     final arrived = await widget.repository.arriveJob(
       widget.jobId,
-      phone: _geofenceResult?.location,
+      phone: phone,
     );
     if (!mounted) return;
     setState(() => _submittingArrival = false);
@@ -537,7 +573,14 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
     );
     if (!confirmed || !mounted) return;
     setState(() => _submittingStart = true);
-    final location = await widget.repository.captureFieldLocation();
+    final evidenceMaximumAge = Duration(
+      seconds: widget.repository.phoneFixMaximumAge.inSeconds.clamp(1, 30),
+    );
+    final location =
+        _mapKey.currentState?.currentFieldEvidence(
+          maximumAge: evidenceMaximumAge,
+        ) ??
+        await _acquireReliableLocation();
     if (!mounted) return;
     if (location == null &&
         widget.repository.requiresPhoneLocation &&
@@ -589,8 +632,12 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen> {
 
   Future<void> _runStartCheck() async {
     setState(() => _runningStartCheck = true);
-    final phone = await widget.repository.captureFieldLocation();
+    final phone = await _acquireReliableLocation();
     if (!mounted) return;
+    if (phone == null && widget.repository.requiresPhoneLocation) {
+      setState(() => _runningStartCheck = false);
+      return;
+    }
     final result = await widget.repository.runStartCheck(
       jobId: widget.jobId,
       phone: phone,
@@ -1076,6 +1123,37 @@ class _StartCheckResultsDialog extends StatelessWidget {
                     ? 'All required checks passed.'
                     : '${result.failed.length} checks need attention before work can start.',
               ),
+              if (result.phone != null || result.tractor != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  'Server location evidence',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                ),
+                if (result.toleranceMeters != null)
+                  Text(
+                    'Farm tolerance: ${result.toleranceMeters!.toStringAsFixed(0)} m',
+                  ),
+                if (result.phone?.accuracyMeters != null)
+                  Text(
+                    'Phone accuracy: ${result.phone!.accuracyMeters!.toStringAsFixed(0)} m',
+                  ),
+                if (result.phone?.distanceToPlotMeters != null)
+                  Text(
+                    'Phone distance from farm: ${result.phone!.distanceToPlotMeters!.toStringAsFixed(0)} m',
+                  ),
+                if (result.phone?.distanceToTractorMeters != null)
+                  Text(
+                    'Phone distance from tractor: ${result.phone!.distanceToTractorMeters!.toStringAsFixed(0)} m',
+                  ),
+                if (result.tractor?.distanceToPlotMeters != null)
+                  Text(
+                    'Tractor distance from farm: ${result.tractor!.distanceToPlotMeters!.toStringAsFixed(0)} m',
+                  ),
+                if (result.tractor?.ageSeconds != null)
+                  Text('Tractor fix age: ${result.tractor!.ageSeconds} s'),
+              ],
               const SizedBox(height: 12),
               for (final check in result.checks)
                 ListTile(

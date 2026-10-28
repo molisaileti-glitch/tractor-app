@@ -1,5 +1,5 @@
 name: tractor
-description: "A new Flutter project."
+description: "SB Mechanization mobile application."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -61,26 +61,26 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: assets/images/launcher_icon.png
-  image_path_android: assets/images/launcher_icon_android.png
+  image_path: assets/images/tractor_launcher_icon.png
+  image_path_android: assets/images/tractor_launcher_icon.png
   adaptive_icon_background: "#001B2B"
-  adaptive_icon_foreground: assets/images/launcher_foreground_android.png
-  adaptive_icon_foreground_inset: 0
+  adaptive_icon_foreground: assets/images/tractor_launcher_icon.png
+  adaptive_icon_foreground_inset: 20
   min_sdk_android: 21
   remove_alpha_ios: true
 
 flutter_native_splash:
   color: "#FFFFFF"
   color_dark: "#071A1D"
-  image: assets/images/splash_logo_light.png
-  image_dark: assets/images/splash_logo_dark.png
+  image: assets/images/tractor_launcher_icon.png
+  image_dark: assets/images/tractor_launcher_icon.png
   android: true
   ios: true
   android_12:
     color: "#FFFFFF"
     color_dark: "#071A1D"
-    image: assets/images/splash_logo_light.png
-    image_dark: assets/images/splash_logo_dark.png
+    image: assets/images/tractor_launcher_icon.png
+    image_dark: assets/images/tractor_launcher_icon.png
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -94,13 +94,7 @@ flutter:
   # the material Icons class.
   uses-material-design: true
   assets:
-    - assets/images/login_logo.png
-    - assets/images/logo.png
-    - assets/images/launcher_icon.png
-    - assets/images/launcher_icon_android.png
-    - assets/images/launcher_foreground_android.png
-    - assets/images/splash_logo_light.png
-    - assets/images/splash_logo_dark.png
+    - assets/images/tractor_launcher_icon.png
     - assets/images/tractor.jpeg
 
   # To add assets to your application, add an assets section, like this:

@@ -6,6 +6,7 @@ class FarmPlot {
     required this.location,
     required this.boundaryRegistered,
     required this.boundaryPoints,
+    this.toleranceMeters = 0,
   });
 
   final String id;
@@ -14,6 +15,7 @@ class FarmPlot {
   final String location;
   final bool boundaryRegistered;
   final List<BoundaryPoint> boundaryPoints;
+  final double toleranceMeters;
 }
 
 class BoundaryPoint {

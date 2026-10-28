@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platform_interface.dart';
 import 'package:tractor/src/components/job_schedule_calendar.dart';
-import 'package:tractor/src/core/network/kwanza_track_mobile_api_client.dart';
+import 'package:tractor/src/core/network/mechanization_mobile_api_client.dart';
 import 'package:tractor/src/features/manager/data/repositories/union_operations_repository.dart';
 import 'package:tractor/src/features/manager/presentation/screens/operations_jobs_view.dart';
 import 'package:tractor/src/features/manager/presentation/screens/operations_schedule_view.dart';
@@ -509,7 +509,7 @@ class _MapPlatform extends GoogleMapsFlutterPlatform {
   }) => const SizedBox.expand();
 }
 
-class _CalendarApi implements KwanzaTrackMobileApiClient {
+class _CalendarApi implements MechanizationMobileApiClient {
   String? opened;
   bool invalidFix = false;
   String jobStatus = 'dispatched';

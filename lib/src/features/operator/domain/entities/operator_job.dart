@@ -251,12 +251,40 @@ class OperatorStartCheckResult {
     required this.overrideAllowed,
     required this.failed,
     required this.checks,
+    this.toleranceMeters,
+    this.checkedAt,
+    this.phone,
+    this.tractor,
   });
 
   final bool canStart;
   final bool overrideAllowed;
   final List<String> failed;
   final List<OperatorStartCheckItem> checks;
+  final double? toleranceMeters;
+  final DateTime? checkedAt;
+  final OperatorStartCheckPosition? phone;
+  final OperatorStartCheckPosition? tractor;
+}
+
+class OperatorStartCheckPosition {
+  const OperatorStartCheckPosition({
+    this.latitude,
+    this.longitude,
+    this.accuracyMeters,
+    this.ageSeconds,
+    this.distanceToPlotMeters,
+    this.distanceToTractorMeters,
+    this.online,
+  });
+
+  final double? latitude;
+  final double? longitude;
+  final double? accuracyMeters;
+  final int? ageSeconds;
+  final double? distanceToPlotMeters;
+  final double? distanceToTractorMeters;
+  final bool? online;
 }
 
 class OperatorStartCheckItem {

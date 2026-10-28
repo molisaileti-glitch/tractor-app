@@ -4,7 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
-import '../../../../core/constants/kwanza_track_endpoints.dart';
+import '../../../../core/constants/mechanization_endpoints.dart';
 import '../models/auth_challenge_model.dart';
 import '../models/auth_verified_session_model.dart';
 
@@ -28,7 +28,7 @@ class AuthRemoteException implements Exception {
 }
 
 class AuthRemoteDataSource {
-  const AuthRemoteDataSource({this.baseUrl = KwanzaTrackEndpoints.baseUrl});
+  const AuthRemoteDataSource({this.baseUrl = MechanizationEndpoints.baseUrl});
 
   static int _requestSequence = 0;
 
@@ -67,24 +67,18 @@ class AuthRemoteDataSource {
     required String code,
     required String deviceName,
   }) async {
-    final json = await _post(
-      '/api/app/verify-otp',
-      {
-        'challenge_id': challengeId,
-        'code': code,
-        'device_name': deviceName,
-      },
-      operation: 'verify login OTP',
-    );
+    final json = await _post('/api/app/verify-otp', {
+      'challenge_id': challengeId,
+      'code': code,
+      'device_name': deviceName,
+    }, operation: 'verify login OTP');
     return AuthVerifiedSessionModel.fromJson(_data(json));
   }
 
   Future<AuthChallengeModel> resendOtp({required String challengeId}) async {
-    final json = await _post(
-      '/api/app/resend-otp',
-      {'challenge_id': challengeId},
-      operation: 'resend login OTP',
-    );
+    final json = await _post('/api/app/resend-otp', {
+      'challenge_id': challengeId,
+    }, operation: 'resend login OTP');
     return AuthChallengeModel.fromJson(_data(json));
   }
 
@@ -98,12 +92,7 @@ class AuthRemoteDataSource {
   }
 
   Future<void> logout({required String token}) async {
-    await _post(
-      '/api/app/logout',
-      const {},
-      token: token,
-      operation: 'logout',
-    );
+    await _post('/api/app/logout', const {}, token: token, operation: 'logout');
   }
 
   Future<Map<String, Object?>> _get(

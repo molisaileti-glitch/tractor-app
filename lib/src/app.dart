@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'core/network/kwanza_track_mobile_api_client.dart';
+import 'core/network/mechanization_mobile_api_client.dart';
 import 'components/components.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/data/repositories/auth_local_repository.dart';
@@ -30,14 +30,14 @@ enum _Workspace {
   technician,
 }
 
-class TractorApp extends StatefulWidget {
-  const TractorApp({super.key});
+class SBMechanizationApp extends StatefulWidget {
+  const SBMechanizationApp({super.key});
 
   @override
-  State<TractorApp> createState() => _TractorAppState();
+  State<SBMechanizationApp> createState() => _SBMechanizationAppState();
 }
 
-class _TractorAppState extends State<TractorApp> {
+class _SBMechanizationAppState extends State<SBMechanizationApp> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   final GlobalKey<ScaffoldMessengerState> _messengerKey =
       GlobalKey<ScaffoldMessengerState>();
@@ -57,15 +57,15 @@ class _TractorAppState extends State<TractorApp> {
   @override
   void initState() {
     super.initState();
-    KwanzaTrackMobileApiClient.onUnauthorized = _handleSessionExpired;
+    MechanizationMobileApiClient.onUnauthorized = _handleSessionExpired;
     preferences.load();
     _restoreSavedSession();
   }
 
   @override
   void dispose() {
-    if (KwanzaTrackMobileApiClient.onUnauthorized == _handleSessionExpired) {
-      KwanzaTrackMobileApiClient.onUnauthorized = null;
+    if (MechanizationMobileApiClient.onUnauthorized == _handleSessionExpired) {
+      MechanizationMobileApiClient.onUnauthorized = null;
     }
     operationsRepository.dispose();
     operatorRepository.dispose();
@@ -81,7 +81,7 @@ class _TractorAppState extends State<TractorApp> {
     return AnimatedBuilder(
       animation: preferences,
       builder: (context, _) => MaterialApp(
-        title: 'Kwanza Track',
+        title: 'SB Mechanization',
         debugShowCheckedModeBanner: false,
         navigatorKey: _navigatorKey,
         scaffoldMessengerKey: _messengerKey,

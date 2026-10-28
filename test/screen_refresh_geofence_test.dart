@@ -7,7 +7,7 @@ import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platf
 import 'package:tractor/src/additional_data/location/domain/entities/device_location.dart';
 import 'package:tractor/src/additional_data/location/domain/repositories/location_repository.dart';
 import 'package:tractor/src/additional_data/location/domain/usecases/check_plot_geofence.dart';
-import 'package:tractor/src/core/network/kwanza_track_mobile_api_client.dart';
+import 'package:tractor/src/core/network/mechanization_mobile_api_client.dart';
 import 'package:tractor/src/features/farmer/domain/entities/farm_plot.dart';
 import 'package:tractor/src/features/manager/data/repositories/union_operations_repository.dart';
 import 'package:tractor/src/features/manager/presentation/screens/operations_shell.dart';
@@ -58,7 +58,7 @@ void main() {
       expect(api.names, [#calendar]);
       expect(repo.isRefreshingScreen(OperatorDataScreen.dashboard), isFalse);
       api.calendarGate!.completeError(
-        const KwanzaTrackApiException('Calendar unavailable'),
+        const MechanizationApiException('Calendar unavailable'),
       );
       await Future.wait([first, second]);
       expect(
@@ -237,6 +237,55 @@ void main() {
     },
   );
 
+  testWidgets('field evidence uses three raw verification fixes', (
+    tester,
+  ) async {
+    final previous = GoogleMapsFlutterPlatform.instance;
+    GoogleMapsFlutterPlatform.instance = _MapPlatform();
+    addTearDown(() => GoogleMapsFlutterPlatform.instance = previous);
+    final api = _ScreenApi();
+    final repo = OperatorLocalRepository.seeded(mobileApiClient: api);
+    final location = _VerificationPhoneLocation();
+    addTearDown(repo.dispose);
+    await tester.runAsync(() async {
+      repo.setMechanizationAccessToken('operator');
+      await _settle(() => repo.isSyncingMechanization);
+    });
+    final key = GlobalKey<OperatorLiveJobMapState>();
+    await tester.pumpWidget(
+      _app(
+        Scaffold(
+          body: OperatorLiveJobMap(
+            key: key,
+            repository: repo,
+            jobId: 'job-1',
+            fill: true,
+            routeEnabled: false,
+            refreshOnOpen: false,
+            pollingEnabled: false,
+            locationRepository: location,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    final result = await tester.runAsync(
+      () => key.currentState!.acquireFieldEvidence(
+        maximumAccuracyMeters: 50,
+        maximumFixAge: const Duration(seconds: 15),
+      ),
+    );
+    await tester.pump();
+
+    expect(result!.isReady, isTrue);
+    expect(location.verificationSubscriptions, 1);
+    expect(location.nativeFallbackSubscriptions, 0);
+    expect(location.normalSubscriptions, 2);
+    expect(location.samples, contains(result.location));
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   test(
     'server boundary/proximity failures and missing permission never start work',
     () async {
@@ -272,6 +321,37 @@ void main() {
         isFalse,
       );
       expect(api.names.where((name) => name == #startJob), isEmpty);
+    },
+  );
+
+  test(
+    'start check and start action reuse the same raw evidence fix',
+    () async {
+      final api = _ScreenApi();
+      final repo = OperatorLocalRepository.seeded(mobileApiClient: api);
+      addTearDown(repo.dispose);
+      repo.setMechanizationAccessToken('operator');
+      await _settle(() => repo.isSyncingMechanization);
+      api.calls.clear();
+      final evidence = _location(-6.05, 35.05);
+
+      expect(await repo.startJob('job-1', phone: evidence), isTrue);
+
+      final checkCall = api.calls.singleWhere(
+        (call) => call.memberName == #startCheck,
+      );
+      final startCall = api.calls.singleWhere(
+        (call) => call.memberName == #startJob,
+      );
+      expect(
+        checkCall.namedArguments[#phone],
+        startCall.namedArguments[#phone],
+      );
+      expect(startCall.namedArguments[#phone], {
+        'latitude': evidence.latitude,
+        'longitude': evidence.longitude,
+        'accuracy_m': evidence.accuracyMeters,
+      });
     },
   );
 
@@ -324,6 +404,58 @@ void main() {
   );
 
   test(
+    'operator preserves server GPS policy plot tolerance and check evidence',
+    () async {
+      final api = _ScreenApi();
+      final repo = OperatorLocalRepository.seeded(mobileApiClient: api);
+      addTearDown(repo.dispose);
+      repo.setMechanizationAccessToken('operator');
+      await _settle(() => repo.isSyncingMechanization);
+
+      expect(repo.phoneAccuracyMaxMeters, 75);
+      expect(repo.phoneFixMaximumAge, const Duration(seconds: 120));
+      expect(repo.maybeJobById('job-1')!.plot.toleranceMeters, 50);
+
+      api.checkResponse = {
+        'can_start': false,
+        'override_allowed': true,
+        'failed': ['phone_near_tractor'],
+        'checks': [],
+        'tolerance_m': 50,
+        'checked_at': '2026-10-28T08:00:00Z',
+        'phone': {
+          'latitude': -6.05,
+          'longitude': 35.05,
+          'accuracy_m': 8,
+          'distance_to_plot_m': 0,
+          'distance_to_tractor_m': 1183,
+        },
+        'tractor': {
+          'latitude': -6.06,
+          'longitude': 35.06,
+          'age_s': 4,
+          'distance_to_plot_m': 1180,
+          'online': true,
+        },
+      };
+      final result = await repo.runStartCheck(
+        jobId: 'job-1',
+        phone: _location(-6.05, 35.05),
+      );
+
+      expect(result!.toleranceMeters, 50);
+      expect(result.phone!.accuracyMeters, 8);
+      expect(result.phone!.distanceToTractorMeters, 1183);
+      expect(result.tractor!.ageSeconds, 4);
+      expect(result.tractor!.distanceToPlotMeters, 1180);
+      expect(
+        result.checkedAt,
+        DateTime.parse('2026-10-28T08:00:00Z').toLocal(),
+      );
+    },
+  );
+
+  test(
     'edge positions count as inside and outside distance measures the nearest edge',
     () {
       expect(
@@ -341,6 +473,65 @@ void main() {
       expect(outside.distanceFromPlotMeters, inInclusiveRange(10, 12));
     },
   );
+
+  test('geofence distinguishes boundary tolerance uncertainty and outside', () {
+    const tolerantPlot = FarmPlot(
+      id: 'small',
+      name: 'Small farm',
+      areaHectares: 1,
+      location: 'Field',
+      boundaryRegistered: true,
+      toleranceMeters: 20,
+      boundaryPoints: [
+        BoundaryPoint(label: 'A', latitude: -6, longitude: 35),
+        BoundaryPoint(label: 'B', latitude: -6, longitude: 35.001),
+        BoundaryPoint(label: 'C', latitude: -6.001, longitude: 35.001),
+        BoundaryPoint(label: 'D', latitude: -6.001, longitude: 35),
+      ],
+    );
+    DeviceLocation at(double longitude, {double accuracy = 5}) =>
+        DeviceLocation(
+          latitude: -6.0005,
+          longitude: longitude,
+          accuracyMeters: accuracy,
+          recordedAt: DateTime.now(),
+        );
+
+    expect(
+      const CheckPlotGeofence()(
+        plot: tolerantPlot,
+        location: DeviceLocation(
+          latitude: -6.0005,
+          longitude: 35.0005,
+          accuracyMeters: 5,
+          recordedAt: _fixedNow,
+        ),
+      ).state,
+      PlotGeofenceState.unavailable,
+      reason: 'A deliberately old fixture must not be accepted as live GPS.',
+    );
+    expect(
+      const CheckPlotGeofence()(
+        plot: tolerantPlot,
+        location: at(35.0011),
+      ).state,
+      PlotGeofenceState.withinTolerance,
+    );
+    expect(
+      const CheckPlotGeofence()(
+        plot: tolerantPlot,
+        location: at(35.00125, accuracy: 15),
+      ).state,
+      PlotGeofenceState.uncertain,
+    );
+    expect(
+      const CheckPlotGeofence()(
+        plot: tolerantPlot,
+        location: at(35.0015, accuracy: 5),
+      ).state,
+      PlotGeofenceState.outsideAllowedArea,
+    );
+  });
 
   test(
     'stale GPS and a centre without a polygon cannot establish boundary presence',
@@ -375,6 +566,8 @@ void main() {
     },
   );
 }
+
+final _fixedNow = DateTime.utc(2026, 1, 1);
 
 DeviceLocation _location(double lat, double lng) => DeviceLocation(
   latitude: lat,
@@ -417,6 +610,43 @@ class _PhoneLocation implements LocationRepository {
   Stream<DeviceLocation> watchLocation() => const Stream.empty();
 }
 
+class _VerificationPhoneLocation implements VerificationLocationRepository {
+  _VerificationPhoneLocation()
+    : samples = [
+        for (var index = 0; index < 3; index++)
+          DeviceLocation(
+            latitude: -6.05 + index * 0.000005,
+            longitude: 35.05 + index * 0.000005,
+            accuracyMeters: 7,
+            recordedAt: DateTime.now().add(Duration(seconds: index * 3)),
+          ),
+      ];
+
+  final List<DeviceLocation> samples;
+  int verificationSubscriptions = 0;
+  int nativeFallbackSubscriptions = 0;
+  int normalSubscriptions = 0;
+
+  @override
+  Future<LocationResult> getCurrentLocation() async =>
+      LocationSuccess(samples.first);
+
+  @override
+  Stream<DeviceLocation> watchLocation() {
+    normalSubscriptions += 1;
+    return const Stream.empty();
+  }
+
+  @override
+  Stream<DeviceLocation> watchVerificationLocation({
+    bool forceNativeProvider = false,
+  }) {
+    verificationSubscriptions += 1;
+    if (forceNativeProvider) nativeFallbackSubscriptions += 1;
+    return Stream.fromIterable(samples);
+  }
+}
+
 class _MapPlatform extends GoogleMapsFlutterPlatform {
   @override
   Widget buildViewWithConfiguration(
@@ -428,7 +658,7 @@ class _MapPlatform extends GoogleMapsFlutterPlatform {
   }) => const SizedBox.expand();
 }
 
-class _ScreenApi implements KwanzaTrackMobileApiClient {
+class _ScreenApi implements MechanizationMobileApiClient {
   final calls = <Invocation>[];
   List<Symbol> get names => calls.map((call) => call.memberName).toList();
   Completer<Map<String, Object?>>? calendarGate;
@@ -454,6 +684,7 @@ class _ScreenApi implements KwanzaTrackMobileApiClient {
       'id': 'plot-1',
       'name': 'Farm',
       'mapped': true,
+      'tolerance_m': 50,
       'boundary': [
         for (final point in _plot.boundaryPoints)
           {'latitude': point.latitude, 'longitude': point.longitude},
@@ -481,6 +712,7 @@ class _ScreenApi implements KwanzaTrackMobileApiClient {
         data = {
           'user': {'name': 'Operator'},
           'today': [],
+          'policy': {'phone_accuracy_max_m': 75, 'fix_max_age_s': 120},
         };
       case #jobs:
         data = [

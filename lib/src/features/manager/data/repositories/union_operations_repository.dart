@@ -3,11 +3,10 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../../../core/network/kwanza_track_mobile_api_client.dart';
+import '../../../../core/network/mechanization_mobile_api_client.dart';
 import '../../../../core/network/mechanization_data.dart';
 import '../../../farmer/domain/entities/farm_plot.dart';
 import '../../../farmer/domain/entities/service_request.dart';
-import '../remote/service_orders_remote_data_source.dart';
 import '../../domain/entities/operations_models.dart';
 
 enum UnionDataScreen {
@@ -26,18 +25,15 @@ enum UnionDataScreen {
 
 class UnionOperationsRepository extends ChangeNotifier {
   UnionOperationsRepository.seeded({
-    ServiceOrdersRemoteDataSource? remoteDataSource,
-    KwanzaTrackMobileApiClient? mobileApiClient,
-  }) : remoteDataSource =
-           remoteDataSource ?? const ServiceOrdersRemoteDataSource(),
-       mobileApiClient = mobileApiClient ?? const KwanzaTrackMobileApiClient(),
+    MechanizationMobileApiClient? mobileApiClient,
+  }) : mobileApiClient =
+           mobileApiClient ?? const MechanizationMobileApiClient(),
        _requests = [],
        _tractors = [],
        _operators = [],
        _jobs = [];
 
-  final ServiceOrdersRemoteDataSource remoteDataSource;
-  final KwanzaTrackMobileApiClient mobileApiClient;
+  final MechanizationMobileApiClient mobileApiClient;
   final Map<String, Map<String, Object?>> _jobPayloads = {};
   final Map<String, Map<String, Object?>> _requestPayloads = {};
   Set<String>? _permissions;
@@ -229,7 +225,7 @@ class UnionOperationsRepository extends ChangeNotifier {
       if (errors.isNotEmpty) _screenErrors[screen] = errors.join('\n');
     } catch (error) {
       if (!current()) return;
-      _screenErrors[screen] = error is KwanzaTrackApiException
+      _screenErrors[screen] = error is MechanizationApiException
           ? error.message
           : 'Could not refresh this screen: $error';
     }
@@ -250,7 +246,7 @@ class UnionOperationsRepository extends ChangeNotifier {
     if (permission != null && !can(permission)) return {'data': <Object?>[]};
     try {
       return await read();
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (error.statusCode == 401 || error.statusCode == 419) rethrow;
       return {'data': <Object?>[], '_load_error': error.message};
     }
@@ -287,10 +283,6 @@ class UnionOperationsRepository extends ChangeNotifier {
   String? get mechanizationUserRole => _mechanizationUserRole;
   bool get hasMechanizationToken =>
       _accessToken != null && _accessToken!.isNotEmpty;
-
-  Future<ServiceOrdersFetchResult> fetchRemoteServiceOrders() {
-    return remoteDataSource.fetchServiceOrders();
-  }
 
   void setMechanizationAccessToken(String? token, {List<String>? permissions}) {
     final trimmed = token?.trim();
@@ -361,7 +353,7 @@ class UnionOperationsRepository extends ChangeNotifier {
         );
       }
       notifyListeners();
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (!_currentSession(token, session)) return;
       _mechanizationSyncError = error.message;
       notifyListeners();
@@ -385,7 +377,7 @@ class UnionOperationsRepository extends ChangeNotifier {
         notifyListeners();
       }
       return tractor;
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (!_currentSession(token, session)) return null;
       _mechanizationSyncError = error.message;
       notifyListeners();
@@ -508,7 +500,7 @@ class UnionOperationsRepository extends ChangeNotifier {
       await _enrichRequestBoundaries(token);
       if (!_currentSession(token, session)) return;
       notifyListeners();
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (!_currentSession(token, session)) return;
       _mechanizationActionError = error.message;
       notifyListeners();
@@ -538,7 +530,7 @@ class UnionOperationsRepository extends ChangeNotifier {
         }
       }
       notifyListeners();
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (!_currentSession(token, session) || dataVersion != _dataVersion) {
         return;
       }
@@ -561,7 +553,7 @@ class UnionOperationsRepository extends ChangeNotifier {
       final job = _jobFromResponse(response);
       if (job != null) _upsertJob(job);
       notifyListeners();
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (!_currentSession(token, session) || dataVersion != _dataVersion) {
         return;
       }
@@ -574,7 +566,7 @@ class UnionOperationsRepository extends ChangeNotifier {
     final token = _accessToken;
     final session = _sessionVersion;
     if (token == null) {
-      throw const KwanzaTrackApiException('Please sign in again.');
+      throw const MechanizationApiException('Please sign in again.');
     }
     final response = await mobileApiClient.serviceTypes(token: token);
     if (!_currentSession(token, session)) return [];
@@ -585,7 +577,7 @@ class UnionOperationsRepository extends ChangeNotifier {
     final token = _accessToken;
     final session = _sessionVersion;
     if (token == null) {
-      throw const KwanzaTrackApiException('Please sign in again.');
+      throw const MechanizationApiException('Please sign in again.');
     }
     final response = await mobileApiClient.farmer(
       token: token,
@@ -635,7 +627,7 @@ class UnionOperationsRepository extends ChangeNotifier {
       final request = _requestFromJson(_dataMap(response));
       if (request != null) _upsertRequest(request);
       notifyListeners();
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (!_currentSession(token, session)) return;
       _mechanizationActionError = error.message;
       notifyListeners();
@@ -876,7 +868,7 @@ class UnionOperationsRepository extends ChangeNotifier {
       );
       notifyListeners();
       return result;
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (!_currentSession(token, session)) return null;
       _mechanizationActionError = error.message;
       notifyListeners();
@@ -1324,7 +1316,7 @@ class UnionOperationsRepository extends ChangeNotifier {
       _applyOverridesResponse(responses[0]);
       _applyExceptionsResponse(responses[1]);
       notifyListeners();
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (!_currentSession(token, session)) return;
       _mechanizationActionError = error.message;
       notifyListeners();
@@ -1356,7 +1348,7 @@ class UnionOperationsRepository extends ChangeNotifier {
       if (!_currentSession(token, session)) return;
       await refreshOversightData();
       if (!_currentSession(token, session)) return;
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (!_currentSession(token, session)) return;
       _mechanizationActionError = error.message;
       notifyListeners();
@@ -1388,7 +1380,7 @@ class UnionOperationsRepository extends ChangeNotifier {
       await refreshOversightData();
       if (!_currentSession(token, session)) return false;
       return _mechanizationActionError == null;
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (!_currentSession(token, session)) return false;
       _mechanizationActionError = error.message;
       notifyListeners();
@@ -1421,7 +1413,7 @@ class UnionOperationsRepository extends ChangeNotifier {
       if (!_currentSession(token, session)) return;
       await refreshOversightData();
       if (!_currentSession(token, session)) return;
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (!_currentSession(token, session)) return;
       _mechanizationActionError = error.message;
       notifyListeners();
@@ -1669,7 +1661,7 @@ class UnionOperationsRepository extends ChangeNotifier {
       }
       notifyListeners();
       return true;
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (!_currentSession(token, session)) return true;
       _mechanizationActionError = error.message;
       notifyListeners();
@@ -1697,7 +1689,7 @@ class UnionOperationsRepository extends ChangeNotifier {
       if (remoteRequest != null) _upsertRequest(remoteRequest);
       notifyListeners();
       return true;
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (!_currentSession(token, session)) return true;
       _mechanizationActionError = error.message;
       notifyListeners();
@@ -1749,7 +1741,7 @@ class UnionOperationsRepository extends ChangeNotifier {
       );
       notifyListeners();
       return true;
-    } on KwanzaTrackApiException catch (error) {
+    } on MechanizationApiException catch (error) {
       if (!_currentSession(token, session)) return true;
       _mechanizationActionError = error.message;
       notifyListeners();
@@ -2387,7 +2379,7 @@ class UnionOperationsRepository extends ChangeNotifier {
             );
           }
         }
-      } on KwanzaTrackApiException catch (error) {
+      } on MechanizationApiException catch (error) {
         if (!_currentSession(token, session)) return;
         if (kDebugMode) {
           debugPrint(
@@ -2421,7 +2413,7 @@ class UnionOperationsRepository extends ChangeNotifier {
     if (rawPointCount < 3) {
       debugPrint(
         '[Mechanization Request] WARNING ${requestReference ?? requestId}: '
-        'KwanzaTrack did not return a drawable plot boundary (minimum 3 points).',
+        'The mechanization server did not return a drawable plot boundary (minimum 3 points).',
       );
       return;
     }

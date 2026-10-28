@@ -125,7 +125,7 @@ abstract class AppLocalizations {
   /// No description provided for @darkModeDescription.
   ///
   /// In en, this message translates to:
-  /// **'Use the dark KwanzaTrack theme'**
+  /// **'Use the dark SB Mechanization theme'**
   String get darkModeDescription;
 
   /// No description provided for @language.

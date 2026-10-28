@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tractor/src/core/network/kwanza_track_mobile_api_client.dart';
+import 'package:tractor/src/core/network/mechanization_mobile_api_client.dart';
 
 void main() {
   test(
@@ -47,7 +47,7 @@ void main() {
   test(
     'photo validation rejects unsupported and oversized files before sending',
     () {
-      const api = KwanzaTrackMobileApiClient();
+      const api = MechanizationMobileApiClient();
       expect(
         () => api.uploadJobPhoto(
           token: 'token',
@@ -56,7 +56,7 @@ void main() {
           fileName: 'bad.jpg',
           kind: 'before',
         ),
-        throwsA(isA<KwanzaTrackApiException>()),
+        throwsA(isA<MechanizationApiException>()),
       );
       expect(
         () => api.uploadJobPhoto(
@@ -66,7 +66,7 @@ void main() {
           fileName: 'large.jpg',
           kind: 'before',
         ),
-        throwsA(isA<KwanzaTrackApiException>()),
+        throwsA(isA<MechanizationApiException>()),
       );
     },
   );
@@ -177,7 +177,7 @@ void main() {
     await expectLater(
       api.startJob(token: 'mobile-token', jobId: 'job-1'),
       throwsA(
-        isA<KwanzaTrackApiException>()
+        isA<MechanizationApiException>()
             .having((e) => e.statusCode, 'status', 422)
             .having((e) => e.code, 'code', 'start_denied')
             .having((e) => e.errors['failed'], 'failed checks', [
@@ -190,10 +190,10 @@ void main() {
   test(
     'HTML unauthorized response still identifies the expired token',
     () async {
-      final previous = KwanzaTrackMobileApiClient.onUnauthorized;
-      addTearDown(() => KwanzaTrackMobileApiClient.onUnauthorized = previous);
+      final previous = MechanizationMobileApiClient.onUnauthorized;
+      addTearDown(() => MechanizationMobileApiClient.onUnauthorized = previous);
       String? expiredToken;
-      KwanzaTrackMobileApiClient.onUnauthorized = (token) {
+      MechanizationMobileApiClient.onUnauthorized = (token) {
         expiredToken = token;
       };
       final api = await _server((request) async {
@@ -204,7 +204,7 @@ void main() {
       await expectLater(
         api.me(token: 'expired-token'),
         throwsA(
-          isA<KwanzaTrackApiException>().having(
+          isA<MechanizationApiException>().having(
             (e) => e.statusCode,
             'status',
             401,
@@ -228,7 +228,7 @@ void main() {
     await expectLater(
       api.me(token: 'rate-limited-token'),
       throwsA(
-        isA<KwanzaTrackApiException>().having(
+        isA<MechanizationApiException>().having(
           (e) => e.retryAfter,
           'retry delay',
           const Duration(seconds: 60),
@@ -238,7 +238,7 @@ void main() {
     await expectLater(
       api.me(token: 'rate-limited-token'),
       throwsA(
-        isA<KwanzaTrackApiException>().having(
+        isA<MechanizationApiException>().having(
           (e) => e.statusCode,
           'status',
           429,
@@ -249,13 +249,15 @@ void main() {
   });
 }
 
-Future<KwanzaTrackMobileApiClient> _server(
+Future<MechanizationMobileApiClient> _server(
   Future<void> Function(HttpRequest) handle,
 ) async {
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
   addTearDown(() => server.close(force: true));
   server.listen(handle);
-  return KwanzaTrackMobileApiClient(baseUrl: 'http://127.0.0.1:${server.port}');
+  return MechanizationMobileApiClient(
+    baseUrl: 'http://127.0.0.1:${server.port}',
+  );
 }
 
 Future<void> _reply(

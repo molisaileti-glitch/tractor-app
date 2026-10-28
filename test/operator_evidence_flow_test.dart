@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:tractor/src/core/network/kwanza_track_mobile_api_client.dart';
+import 'package:tractor/src/core/network/mechanization_mobile_api_client.dart';
 import 'package:tractor/src/features/operator/data/repositories/operator_local_repository.dart';
 import 'package:tractor/src/features/operator/domain/entities/operator_job.dart';
 import 'package:tractor/src/features/operator/presentation/screens/operator_farmer_confirmation_screen.dart';
@@ -231,6 +231,34 @@ void main() {
     },
   );
 
+  test('a pending farmer confirmation blocks duplicate submissions', () async {
+    final api = _EvidenceApi()..confirmationGate = Completer<void>();
+    final repo = await _repository(api);
+    addTearDown(repo.dispose);
+
+    final first = repo.confirmFarmerService(
+      jobId: 'job-1',
+      method: 'pin',
+      credential: '0123',
+      rating: 5,
+    );
+    while (api.confirmations == 0) {
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+    }
+    final duplicate = await repo.confirmFarmerService(
+      jobId: 'job-1',
+      method: 'pin',
+      credential: '0123',
+      rating: 5,
+    );
+
+    expect(duplicate, isFalse);
+    expect(api.confirmations, 1);
+    api.confirmationGate!.complete();
+    expect(await first, isTrue);
+    expect(api.confirmations, 1);
+  });
+
   test(
     'dispute sends the note and flags the work without satisfaction confirmation',
     () async {
@@ -302,47 +330,49 @@ void main() {
     },
   );
 
-  testWidgets(
-    'farmer screen submits the farmer PIN and refreshes confirmation state',
-    (tester) async {
-      final api = _EvidenceApi();
-      final repo = (await tester.runAsync(() => _repository(api)))!;
-      addTearDown(repo.dispose);
-      await tester.pumpWidget(
-        MaterialApp(
-          home: OperatorFarmerConfirmationScreen(
-            repository: repo,
-            jobId: 'job-1',
-          ),
+  testWidgets('farmer sheet submits the PIN and selected rating together', (
+    tester,
+  ) async {
+    final api = _EvidenceApi();
+    final repo = (await tester.runAsync(() => _repository(api)))!;
+    addTearDown(repo.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OperatorFarmerConfirmationScreen(
+          repository: repo,
+          jobId: 'job-1',
         ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('Farmer four-digit PIN'), findsOneWidget);
-      await tester.enterText(
-        find.byKey(const ValueKey('farmer-credential')),
-        '0123',
-      );
-      final confirm = find.text('Farmer: confirm satisfaction');
-      await tester.drag(
-        find.byKey(const ValueKey('farmer-confirmation-list')),
-        const Offset(0, -400),
-      );
-      await tester.pump();
-      await tester.drag(
-        find.byKey(const ValueKey('farmer-confirmation-list')),
-        const Offset(0, -400),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(confirm);
-      await tester.pumpAndSettle();
-      expect(api.lastConfirmation!['pin'], '0123');
-      expect(
-        find.text('The farmer has already confirmed this service.'),
-        findsOneWidget,
-      );
-      expect(tester.takeException(), isNull);
-    },
-  );
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Farmer four-digit PIN'), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const ValueKey('farmer-credential')),
+      '0123',
+    );
+    await tester.pump();
+    final continueButton = find.byKey(
+      const ValueKey('farmer-confirmation-continue'),
+    );
+    await tester.ensureVisible(continueButton);
+    await tester.tap(continueButton);
+    await tester.pumpAndSettle();
+    expect(find.text('How was the tractor service?'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('farmer-rating-star-4')));
+    await tester.pump();
+    expect(find.text('Very good'), findsOneWidget);
+    final confirm = find.byKey(const ValueKey('farmer-rating-submit'));
+    await tester.ensureVisible(confirm);
+    await tester.tap(confirm);
+    await tester.pumpAndSettle();
+    expect(api.lastConfirmation!['pin'], '0123');
+    expect(api.lastConfirmation!['rating'], 4);
+    expect(
+      find.text('The farmer has already confirmed this service.'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'PIN entry stays available and pull refresh discovers a configured PIN',
@@ -367,20 +397,29 @@ void main() {
       expect(find.text('Farmer four-digit PIN'), findsOneWidget);
 
       (api.record['farmer'] as Map<String, Object?>)['has_pin'] = true;
-      await tester.drag(
-        find.byKey(const ValueKey('farmer-confirmation-list')),
-        const Offset(0, 400),
+      await tester.tap(find.byKey(const ValueKey('farmer-confirmation-close')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('farmer-confirmation-refresh')),
       );
       await tester.pumpAndSettle();
 
       expect(find.text('Farmer PIN is now available.'), findsOneWidget);
+      final start = find.byKey(const ValueKey('start-farmer-confirmation'));
+      await tester.drag(
+        find.byKey(const ValueKey('farmer-confirmation-list')),
+        const Offset(0, -220),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(start);
+      await tester.pumpAndSettle();
       expect(find.text('Farmer four-digit PIN'), findsOneWidget);
       expect(find.textContaining('PIN status is still updating'), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
 
-  testWidgets('farmer confirmation sections do not overflow a narrow screen', (
+  testWidgets('two-step confirmation sheet does not overflow a narrow screen', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(320, 650));
@@ -405,9 +444,126 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Verify the farmer'), findsOneWidget);
-    expect(find.text('Service feedback'), findsOneWidget);
-    expect(find.text('Confirm the service'), findsOneWidget);
+    expect(find.text('Farmer confirmation'), findsWidgets);
+    expect(find.text('Farmer four-digit PIN'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('farmer-credential')),
+      '0123',
+    );
+    await tester.pump();
+    final continueButton = find.byKey(
+      const ValueKey('farmer-confirmation-continue'),
+    );
+    await tester.ensureVisible(continueButton);
+    await tester.tap(continueButton);
+    await tester.pumpAndSettle();
+    expect(find.text('How was the tractor service?'), findsOneWidget);
+    expect(find.byKey(const ValueKey('farmer-rating-star-1')), findsOneWidget);
+    final skip = find.byKey(const ValueKey('farmer-rating-skip'));
+    await tester.ensureVisible(skip);
+    expect(skip, findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('closing the sheet does not confirm and skipping omits rating', (
+    tester,
+  ) async {
+    final api = _EvidenceApi();
+    final repo = (await tester.runAsync(() => _repository(api)))!;
+    addTearDown(repo.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OperatorFarmerConfirmationScreen(
+          repository: repo,
+          jobId: 'job-1',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('farmer-confirmation-close')));
+    await tester.pumpAndSettle();
+    expect(api.confirmations, 0);
+    expect(repo.jobById('job-1').farmerConfirmedAt, isNull);
+
+    await tester.tap(find.byKey(const ValueKey('start-farmer-confirmation')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('farmer-credential')),
+      '0123',
+    );
+    await tester.pump();
+    final continueButton = find.byKey(
+      const ValueKey('farmer-confirmation-continue'),
+    );
+    await tester.ensureVisible(continueButton);
+    await tester.tap(continueButton);
+    await tester.pumpAndSettle();
+    final skip = find.byKey(const ValueKey('farmer-rating-skip'));
+    await tester.ensureVisible(skip);
+    await tester.tap(skip);
+    await tester.pumpAndSettle();
+
+    expect(api.confirmations, 1);
+    expect(api.lastConfirmation!.containsKey('rating'), isFalse);
+    expect(repo.jobById('job-1').farmerConfirmedAt, isNotNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a rejected PIN keeps the rating for the retry', (tester) async {
+    final api = _EvidenceApi();
+    final repo = (await tester.runAsync(() => _repository(api)))!;
+    addTearDown(repo.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OperatorFarmerConfirmationScreen(
+          repository: repo,
+          jobId: 'job-1',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('farmer-credential')),
+      '9999',
+    );
+    await tester.pump();
+    var continueButton = find.byKey(
+      const ValueKey('farmer-confirmation-continue'),
+    );
+    await tester.ensureVisible(continueButton);
+    await tester.tap(continueButton);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('farmer-rating-star-4')));
+    await tester.pump();
+    final submit = find.byKey(const ValueKey('farmer-rating-submit'));
+    await tester.ensureVisible(submit);
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Invalid farmer PIN'), findsOneWidget);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('farmer-credential')))
+          .controller!
+          .text,
+      isEmpty,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('farmer-credential')),
+      '0123',
+    );
+    await tester.pump();
+    continueButton = find.byKey(const ValueKey('farmer-confirmation-continue'));
+    await tester.ensureVisible(continueButton);
+    await tester.tap(continueButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Very good'), findsOneWidget);
+    expect(find.byIcon(Icons.star_rounded), findsNWidgets(4));
     expect(tester.takeException(), isNull);
   });
 }
@@ -430,11 +586,12 @@ Future<OperatorLocalRepository> _repository(_EvidenceApi api) async {
   return repo;
 }
 
-class _EvidenceApi implements KwanzaTrackMobileApiClient {
+class _EvidenceApi implements MechanizationMobileApiClient {
   bool failUpload = false;
   bool sent = true;
   bool? inspectionFit;
   Completer<Map<String, Object?>>? inspectionGate;
+  Completer<void>? confirmationGate;
   int uploads = 0;
   int confirmations = 0;
   Map<String, Object?>? lastConfirmation;
@@ -492,12 +649,13 @@ class _EvidenceApi implements KwanzaTrackMobileApiClient {
         data = {'sent': sent, 'expires_in_s': 600};
       case #farmerConfirm:
         confirmations++;
+        if (confirmationGate != null) await confirmationGate!.future;
         lastConfirmation = Map<String, Object?>.from(
           call.namedArguments[#body] as Map,
         );
         if (lastConfirmation!['pin'] != '0123' &&
             lastConfirmation!['code'] != '123456') {
-          throw const KwanzaTrackApiException(
+          throw const MechanizationApiException(
             'Invalid farmer PIN',
             statusCode: 422,
           );
@@ -513,7 +671,10 @@ class _EvidenceApi implements KwanzaTrackMobileApiClient {
       case #uploadJobPhoto:
         uploads++;
         if (failUpload) {
-          throw const KwanzaTrackApiException('Upload failed', statusCode: 503);
+          throw const MechanizationApiException(
+            'Upload failed',
+            statusCode: 503,
+          );
         }
         final photo = {
           'id': 'photo-1',

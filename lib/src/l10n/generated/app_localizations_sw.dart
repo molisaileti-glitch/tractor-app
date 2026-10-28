@@ -21,7 +21,7 @@ class AppLocalizationsSw extends AppLocalizations {
   String get darkMode => 'Mandhari meusi';
 
   @override
-  String get darkModeDescription => 'Tumia mandhari meusi ya KwanzaTrack';
+  String get darkModeDescription => 'Tumia mandhari meusi ya SB Mechanization';
 
   @override
   String get language => 'Lugha';

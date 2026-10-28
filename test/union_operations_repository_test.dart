@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tractor/src/core/network/kwanza_track_mobile_api_client.dart';
+import 'package:tractor/src/core/network/mechanization_mobile_api_client.dart';
 import 'package:tractor/src/features/manager/data/repositories/union_operations_repository.dart';
 
 void main() {
@@ -28,7 +28,7 @@ Future<void> _waitForSync(UnionOperationsRepository repository) async {
   }
 }
 
-class _UnionApiClient extends KwanzaTrackMobileApiClient {
+class _UnionApiClient extends MechanizationMobileApiClient {
   const _UnionApiClient();
 
   @override

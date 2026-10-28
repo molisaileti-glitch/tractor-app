@@ -3,16 +3,29 @@ import 'dart:math' as math;
 import '../../../../features/farmer/domain/entities/farm_plot.dart';
 import '../entities/device_location.dart';
 
+enum PlotGeofenceState {
+  insideBoundary,
+  withinTolerance,
+  uncertain,
+  outsideAllowedArea,
+  unavailable,
+}
+
 class PlotGeofenceResult {
   const PlotGeofenceResult({
-    required this.isInside,
+    required this.state,
     required this.distanceFromPlotMeters,
     required this.location,
   });
 
-  final bool isInside;
+  final PlotGeofenceState state;
   final double distanceFromPlotMeters;
   final DeviceLocation location;
+
+  bool get isInside => state == PlotGeofenceState.insideBoundary;
+  bool get isWithinAllowedArea =>
+      state == PlotGeofenceState.insideBoundary ||
+      state == PlotGeofenceState.withinTolerance;
 }
 
 class CheckPlotGeofence {
@@ -30,13 +43,16 @@ class CheckPlotGeofence {
     final age = DateTime.now().difference(location.recordedAt).inSeconds;
     if (plot.boundaryPoints.length < 3 ||
         !valid(location.latitude, location.longitude) ||
+        !location.accuracyMeters.isFinite ||
+        location.accuracyMeters < 0 ||
+        location.isMocked ||
         age < -30 ||
         age > 180 ||
         plot.boundaryPoints.any(
           (point) => !valid(point.latitude, point.longitude),
         )) {
       return PlotGeofenceResult(
-        isInside: false,
+        state: PlotGeofenceState.unavailable,
         distanceFromPlotMeters: double.infinity,
         location: location,
       );
@@ -47,8 +63,21 @@ class CheckPlotGeofence {
     // is not the backend's configured geofence tolerance.
     final isInside =
         distance <= 0.05 || _containsPoint(plot.boundaryPoints, location);
+    final tolerance = plot.toleranceMeters.isFinite
+        ? math.max(0, plot.toleranceMeters)
+        : 0.0;
+    final accuracy = location.accuracyMeters.isFinite
+        ? math.max(0, location.accuracyMeters)
+        : 0.0;
+    final state = isInside
+        ? PlotGeofenceState.insideBoundary
+        : distance <= tolerance
+        ? PlotGeofenceState.withinTolerance
+        : distance <= tolerance + accuracy
+        ? PlotGeofenceState.uncertain
+        : PlotGeofenceState.outsideAllowedArea;
     return PlotGeofenceResult(
-      isInside: isInside,
+      state: state,
       distanceFromPlotMeters: isInside ? 0 : distance,
       location: location,
     );
