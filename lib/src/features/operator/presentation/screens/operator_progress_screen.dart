@@ -1,3 +1,5 @@
+// File purpose: Implements the operator progress screen and connects user actions to feature state.
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';

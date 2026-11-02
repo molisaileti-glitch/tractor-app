@@ -1,3 +1,5 @@
+// File purpose: Protects calendar layout, empty states, job selection, marker grouping, and map interaction behavior.
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';

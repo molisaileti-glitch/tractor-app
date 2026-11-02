@@ -1,3 +1,5 @@
+// File purpose: Loads and persists the selected theme and language, including migration from legacy preference keys.
+
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 

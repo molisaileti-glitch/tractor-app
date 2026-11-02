@@ -1,3 +1,5 @@
+// File purpose: Provides reusable technician UI for technician widgets presentation and interaction.
+
 import 'package:flutter/material.dart';
 
 import '../../../manager/domain/entities/operations_models.dart';

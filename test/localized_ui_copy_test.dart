@@ -1,3 +1,5 @@
+// File purpose: Scans maintained UI source to prevent known English-only strings from bypassing localization.
+
 import 'dart:io';
 import 'dart:ui' as ui;
 

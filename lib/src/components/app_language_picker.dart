@@ -1,3 +1,5 @@
+// File purpose: Provides the shared app language picker component used across application features.
+
 import 'package:flutter/material.dart';
 
 import '../l10n/generated/app_localizations.dart';

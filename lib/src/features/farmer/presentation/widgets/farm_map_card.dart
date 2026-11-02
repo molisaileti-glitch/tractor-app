@@ -1,3 +1,5 @@
+// File purpose: Provides reusable farmer UI for farm map card presentation and interaction.
+
 import 'package:flutter/material.dart';
 
 class FarmMapCard extends StatelessWidget {

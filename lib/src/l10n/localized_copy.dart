@@ -1,3 +1,5 @@
+// File purpose: Provides runtime English and Kiswahili copy for text that is not yet generated from ARB resources.
+
 import 'package:flutter/widgets.dart';
 
 /// Localizes short UI copy that has not yet been promoted to a generated ARB
@@ -33,6 +35,13 @@ const Map<String, String> swahiliCopy = {
   'Resolving...': 'Inatatua...',
   'Rescheduling...': 'Inapanga upya...',
   'Approving...': 'Inaidhinisha...',
+  'Accepting...': 'Inakubali...',
+  'Accept failed.': 'Imeshindwa kukubali kazi.',
+  'Starting journey...': 'Inaanza safari...',
+  'Please wait...': 'Tafadhali subiri...',
+  'Could not start the journey.': 'Imeshindwa kuanza safari.',
+  'Assignment accepted. Start the journey from this job when ready.':
+      'Kazi imekubaliwa. Anza safari kutoka kwenye kazi hii ukiwa tayari.',
   'Registering...': 'Inasajili...',
   'Rejecting...': 'Inakataa...',
   'Turn on device location': 'Washa eneo la kifaa',
@@ -271,6 +280,37 @@ const Map<String, String> swahiliCopy = {
   'Clear job flag?': 'Uondoe alama ya kazi?',
   'Could not load job': 'Imeshindikana kupakia kazi',
   'Work evidence': 'Ushahidi wa kazi',
+  'View tractor trail': 'Tazama njia ya trekta',
+  'Tractor trail': 'Njia ya trekta',
+  'Refresh trail': 'Sasisha njia',
+  'Trail unavailable': 'Njia haipatikani',
+  'No tractor trail yet': 'Bado hakuna njia ya trekta',
+  'Return to verification': 'Rudi kwenye uthibitishaji',
+  'Tracker evidence': 'Ushahidi wa kifuatiliaji',
+  'Refresh the job and try opening its trail again.':
+      'Sasisha kazi kisha ujaribu kufungua njia yake tena.',
+  'The backend has not returned tracker samples for this job. Refresh after the tracker sends positions.':
+      'Seva bado haijarudisha sampuli za kifuatiliaji kwa kazi hii. Sasisha baada ya kifuatiliaji kutuma maeneo.',
+  'Map samples returned': 'Sampuli za ramani zilizopokelewa',
+  'Verification samples': 'Sampuli za uthibitishaji',
+  'Not calculated': 'Haijahesabiwa',
+  'Inside plot': 'Ndani ya shamba',
+  'Outside plot': 'Nje ya shamba',
+  'Unknown': 'Haijulikani',
+  'Tracker estimate': 'Makadirio ya kifuatiliaji',
+  'Trail start': 'Mwanzo wa njia',
+  'Latest tracker sample': 'Sampuli ya mwisho ya kifuatiliaji',
+  'Tractor location': 'Eneo la trekta',
+  'Waiting for tractor location': 'Inasubiri eneo la trekta',
+  'Last known location': 'Eneo la mwisho linalojulikana',
+  'Online': 'Mtandaoni',
+  'Fix age': 'Muda wa eneo',
+  'seconds': 'sekunde',
+  'minutes': 'dakika',
+  'hours': 'saa',
+  'acres': 'ekari',
+  'Enter your best field estimate. The backend calculates tracker-estimated acres after completion for union review.':
+      'Weka makadirio yako bora ya shambani. Seva huhesabu ekari zilizokadiriwa na kifuatiliaji baada ya kukamilisha kwa ukaguzi wa chama.',
   'No tracker analysis is available yet.':
       'Bado hakuna uchambuzi wa kifuatiliaji.',
   'Could not load evidence': 'Imeshindikana kupakia ushahidi',

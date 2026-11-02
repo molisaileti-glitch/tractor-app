@@ -1,3 +1,5 @@
+// File purpose: Implements the operator profile screen and connects user actions to feature state.
+
 import 'package:flutter/material.dart';
 
 import '../../../../l10n/generated/app_localizations.dart';

@@ -1,3 +1,5 @@
+// File purpose: Provides regression coverage for Union Operations Repository behavior and its important failure cases.
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tractor/src/core/network/mechanization_mobile_api_client.dart';
 import 'package:tractor/src/features/manager/data/repositories/union_operations_repository.dart';
@@ -7,7 +9,7 @@ void main() {
     'keeps union jobs and calendar planning in separate collections',
     () async {
       final repository = UnionOperationsRepository.seeded(
-        mobileApiClient: const _UnionApiClient(),
+        mobileApiClient: _UnionApiClient(),
       );
 
       repository.setMechanizationAccessToken('test-token');
@@ -20,6 +22,43 @@ void main() {
       expect(repository.scheduleJobs.single.id, 'calendar-job');
     },
   );
+
+  test('loads the documented job path for union trail review', () async {
+    final repository = UnionOperationsRepository.seeded(
+      mobileApiClient: _UnionApiClient(),
+    );
+    addTearDown(repository.dispose);
+
+    repository.setMechanizationAccessToken('test-token');
+    await _waitForSync(repository);
+
+    expect(await repository.refreshJobTrail('active-job'), isTrue);
+    final trail = repository.trailForJob('active-job');
+    expect(trail, hasLength(3));
+    expect(trail.first.latitude, -6.1709);
+    expect(trail.first.longitude, 35.7409);
+    expect(trail.first.inside, isTrue);
+    expect(trail[1].inside, isFalse);
+    expect(trail.last.inside, isNull);
+    expect(trail.first.speedKph, 7.5);
+    expect(trail.first.recordedAt, isNotNull);
+    final liveTractor = repository.liveTractorForJob('active-job');
+    expect(liveTractor, isNotNull);
+    expect(liveTractor!.latitude, -6.1712);
+    expect(liveTractor.longitude, 35.7412);
+    expect(liveTractor.online, isTrue);
+    expect(liveTractor.speedKph, 5.5);
+    expect(liveTractor.ageSeconds, 8);
+    expect(liveTractor.fixTime, isNotNull);
+    expect(
+      liveTractor.isLiveAt(DateTime.parse('2026-10-28T08:00:45+03:00')),
+      isTrue,
+    );
+    expect(
+      liveTractor.isLiveAt(DateTime.parse('2026-10-28T08:04:00+03:00')),
+      isFalse,
+    );
+  });
 }
 
 Future<void> _waitForSync(UnionOperationsRepository repository) async {
@@ -29,7 +68,7 @@ Future<void> _waitForSync(UnionOperationsRepository repository) async {
 }
 
 class _UnionApiClient extends MechanizationMobileApiClient {
-  const _UnionApiClient();
+  _UnionApiClient();
 
   @override
   Future<Map<String, Object?>> me({required String token}) async => {
@@ -89,6 +128,48 @@ class _UnionApiClient extends MechanizationMobileApiClient {
   @override
   Future<Map<String, Object?>> calendarBacklog({required String token}) async =>
       {'data': <Object?>[]};
+
+  @override
+  Future<Map<String, Object?>> jobPath({
+    required String token,
+    required String jobId,
+  }) async => {
+    'data': {
+      'path': [
+        {
+          't': '2026-10-28T08:00:00+03:00',
+          'lat': -6.1709,
+          'lng': 35.7409,
+          'speed': 7.5,
+          'in': true,
+        },
+        {
+          't': '2026-10-28T08:00:15+03:00',
+          'lat': -6.1710,
+          'lng': 35.7410,
+          'speed': 6,
+          'in': false,
+        },
+        {
+          't': '2026-10-28T08:00:30+03:00',
+          'lat': -6.1711,
+          'lng': 35.7411,
+          'speed': 0,
+          'in': null,
+        },
+      ],
+      'live': {
+        'online': true,
+        'position': {
+          'latitude': -6.1712,
+          'longitude': 35.7412,
+          'speed_kph': 5.5,
+          'fix_time': '2026-10-28T08:00:38+03:00',
+          'age_s': 8,
+        },
+      },
+    },
+  };
 
   @override
   Future<Map<String, Object?>> requests({

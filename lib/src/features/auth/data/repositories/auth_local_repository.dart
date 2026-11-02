@@ -1,3 +1,5 @@
+// File purpose: Coordinates sign-in state, secure token storage, profile loading, logout, and legacy token migration.
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -12,7 +14,8 @@ class AuthLocalRepository extends ChangeNotifier implements AuthRepository {
   AuthLocalRepository({
     AuthRemoteDataSource? remoteDataSource,
     FlutterSecureStorage? secureStorage,
-  }) : remoteDataSource = remoteDataSource ?? const AuthRemoteDataSource(),
+  }) : _ownsRemoteDataSource = remoteDataSource == null,
+       remoteDataSource = remoteDataSource ?? AuthRemoteDataSource(),
        secureStorage = secureStorage ?? const FlutterSecureStorage();
 
   static const _accessTokenKey = 'sb_mechanization_access_token';
@@ -45,6 +48,7 @@ class AuthLocalRepository extends ChangeNotifier implements AuthRepository {
   ]);
 
   final AuthRemoteDataSource remoteDataSource;
+  final bool _ownsRemoteDataSource;
   final FlutterSecureStorage secureStorage;
 
   AuthSession _currentSession = const AuthSession(
@@ -190,5 +194,11 @@ class AuthLocalRepository extends ChangeNotifier implements AuthRepository {
     } catch (error) {
       debugPrint('Could not persist auth token: $error');
     }
+  }
+
+  @override
+  void dispose() {
+    if (_ownsRemoteDataSource) remoteDataSource.close();
+    super.dispose();
   }
 }

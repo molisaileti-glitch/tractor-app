@@ -1,3 +1,5 @@
+// File purpose: Provides regression coverage for Operator Evidence Flow behavior and its important failure cases.
+
 import 'dart:async';
 import 'dart:convert';
 

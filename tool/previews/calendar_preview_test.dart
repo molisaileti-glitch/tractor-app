@@ -1,3 +1,5 @@
+// File purpose: Generates deterministic calendar preview images for visual review outside the production application.
+
 import 'dart:io';
 import 'dart:ui' as ui;
 

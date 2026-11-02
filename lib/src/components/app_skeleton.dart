@@ -1,3 +1,5 @@
+// File purpose: Provides the shared app skeleton component used across application features.
+
 import 'package:flutter/material.dart';
 
 class AppSkeleton extends StatefulWidget {

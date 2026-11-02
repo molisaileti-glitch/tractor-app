@@ -1,3 +1,5 @@
+// File purpose: Implements the farmer service progress screen and connects user actions to feature state.
+
 import 'package:flutter/material.dart';
 
 import '../../data/repositories/farmer_local_repository.dart';

@@ -1,3 +1,5 @@
+// File purpose: Defines the device-location interface used by application code and test substitutes.
+
 import '../entities/device_location.dart';
 
 abstract class LocationRepository {

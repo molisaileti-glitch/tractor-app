@@ -1,3 +1,5 @@
+// File purpose: Implements the union manager operations dashboard screen and connects user actions to feature state.
+
 import 'package:flutter/material.dart';
 
 import '../../../../components/components.dart';

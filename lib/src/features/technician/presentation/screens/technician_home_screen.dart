@@ -1,3 +1,5 @@
+// File purpose: Implements the technician home screen and connects user actions to feature state.
+
 import 'package:flutter/material.dart';
 
 import '../../../manager/data/repositories/union_operations_repository.dart';

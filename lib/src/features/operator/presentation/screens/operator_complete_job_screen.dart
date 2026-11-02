@@ -1,3 +1,5 @@
+// File purpose: Implements the operator complete job screen and connects user actions to feature state.
+
 import 'package:flutter/material.dart';
 
 import '../../../../components/components.dart';
@@ -89,6 +91,10 @@ class _OperatorCompleteJobScreenState extends State<OperatorCompleteJobScreen> {
                   ),
                   decoration: InputDecoration(
                     labelText: context.appText('Reported acres'),
+                    helperText: context.appText(
+                      'Enter your best field estimate. The backend calculates tracker-estimated acres after completion for union review.',
+                    ),
+                    helperMaxLines: 3,
                   ),
                 ),
                 const SizedBox(height: 12),

@@ -1,3 +1,5 @@
+// File purpose: Provides regression coverage for Operator Local Repository behavior and its important failure cases.
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tractor/src/core/network/mechanization_mobile_api_client.dart';
 import 'package:tractor/src/features/operator/data/repositories/operator_local_repository.dart';
@@ -18,7 +20,7 @@ void main() {
 
   test('keeps calendar planning separate from actionable jobs', () async {
     final repository = OperatorLocalRepository.seeded(
-      mobileApiClient: const _OperatorApiClient(
+      mobileApiClient: _OperatorApiClient(
         includeToday: false,
         includeCalendar: true,
       ),
@@ -35,7 +37,7 @@ void main() {
 
   test('shows a me.today assignment with a detail access warning', () async {
     final repository = OperatorLocalRepository.seeded(
-      mobileApiClient: const _OperatorApiClient(validTodayDetail: false),
+      mobileApiClient: _OperatorApiClient(validTodayDetail: false),
     );
 
     repository.setMechanizationAccessToken('test-token');
@@ -54,7 +56,7 @@ Future<void> _waitForSync(OperatorLocalRepository repository) async {
 }
 
 class _OperatorApiClient extends MechanizationMobileApiClient {
-  const _OperatorApiClient({
+  _OperatorApiClient({
     this.includeToday = true,
     this.includeCalendar = false,
     this.validTodayDetail = true,

@@ -1,3 +1,5 @@
+// File purpose: Defines the calendar assignment view model shared by operator and union schedules.
+
 import 'package:flutter/material.dart';
 
 import '../l10n/generated/app_localizations.dart';

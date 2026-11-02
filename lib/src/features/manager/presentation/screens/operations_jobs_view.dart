@@ -1,4 +1,9 @@
+// File purpose: Implements the union manager operations jobs screen and connects user actions to feature state.
+
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../../components/components.dart';
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
@@ -166,6 +171,13 @@ class _JobCard extends StatelessWidget {
           job.status == JobStatus.completedPendingConfirmation ||
           job.status == JobStatus.verified ||
           job.status == JobStatus.flagged);
+  bool get _hasTrailStage =>
+      job.status == JobStatus.inProgress ||
+      job.status == JobStatus.paused ||
+      job.status == JobStatus.completedPendingConfirmation ||
+      job.status == JobStatus.verified ||
+      job.status == JobStatus.flagged ||
+      job.status == JobStatus.closed;
 
   @override
   Widget build(BuildContext context) {
@@ -297,6 +309,14 @@ class _JobCard extends StatelessWidget {
               icon: const Icon(Icons.insights_outlined),
               label: Text(context.appText('Review work evidence')),
             ),
+            if (_hasTrailStage) ...[
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: () => _openTrail(context),
+                icon: const Icon(Icons.map_outlined),
+                label: Text(context.appText('View tractor trail')),
+              ),
+            ],
             if (_canDispatch) ...[
               const SizedBox(height: 16),
               FilledButton.icon(
@@ -325,6 +345,15 @@ class _JobCard extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  void _openTrail(BuildContext context) {
+    Navigator.of(context).push(
+      appPageRoute(
+        builder: (_) =>
+            UnionJobTrailScreen(repository: repository, jobId: job.id),
       ),
     );
   }
@@ -975,6 +1004,458 @@ class _ConfirmJobInput {
   final int rating;
   final String note;
   final bool dispute;
+}
+
+/// Union review surface for the documented GET /jobs/{id}/path payload.
+/// Active jobs poll only while this route is visible; completed trails load
+/// once and can be refreshed manually.
+class UnionJobTrailScreen extends StatefulWidget {
+  const UnionJobTrailScreen({
+    super.key,
+    required this.repository,
+    required this.jobId,
+  });
+
+  final UnionOperationsRepository repository;
+  final String jobId;
+
+  @override
+  State<UnionJobTrailScreen> createState() => _UnionJobTrailScreenState();
+}
+
+class _UnionJobTrailScreenState extends State<UnionJobTrailScreen>
+    with WidgetsBindingObserver {
+  Timer? _pollTimer;
+  bool _loading = false;
+  String? _error;
+  int _pollTicks = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(_refresh());
+      _syncPolling();
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refresh());
+      _syncPolling();
+    } else {
+      _pollTimer?.cancel();
+      _pollTimer = null;
+    }
+  }
+
+  void _syncPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    final status = widget.repository.maybeJobById(widget.jobId)?.status;
+    if (status != JobStatus.inProgress && status != JobStatus.paused) return;
+    _pollTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (mounted && (ModalRoute.of(context)?.isCurrent ?? false)) {
+        _pollTicks++;
+        unawaited(_refresh(showSpinner: false, reloadJob: _pollTicks % 4 == 0));
+      }
+    });
+  }
+
+  Future<void> _refresh({
+    bool showSpinner = true,
+    bool reloadJob = true,
+  }) async {
+    if (_loading) return;
+    if (showSpinner && mounted) setState(() => _loading = true);
+    _loading = true;
+    if (reloadJob) await widget.repository.refreshJobDetail(widget.jobId);
+    final loaded = await widget.repository.refreshJobTrail(widget.jobId);
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      _error = loaded ? null : widget.repository.mechanizationActionError;
+    });
+    _syncPolling();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: widget.repository,
+      builder: (context, _) {
+        final job = widget.repository.maybeJobById(widget.jobId);
+        final trail = widget.repository.trailForJob(widget.jobId);
+        final liveTractor = widget.repository.liveTractorForJob(widget.jobId);
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(
+              job?.reference == null
+                  ? context.appText('Tractor trail')
+                  : '${job!.reference} · ${context.appText('Tractor trail')}',
+            ),
+            actions: [
+              IconButton(
+                tooltip: context.appText('Refresh trail'),
+                onPressed: _loading ? null : _refresh,
+                icon: _loading
+                    ? const SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh_rounded),
+              ),
+            ],
+          ),
+          body: RefreshIndicator(
+            onRefresh: _refresh,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
+              children: [
+                if (_error != null) ...[
+                  AppMessage(
+                    type: AppMessageType.error,
+                    title: context.appText('Trail unavailable'),
+                    message: _error!,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                if (job == null)
+                  SizedBox(
+                    height: 360,
+                    child: AppEmptyState(
+                      icon: Icons.route_outlined,
+                      title: context.appText('Job unavailable'),
+                      message: context.appText(
+                        'Refresh the job and try opening its trail again.',
+                      ),
+                    ),
+                  )
+                else ...[
+                  _UnionTrailSummary(
+                    job: job,
+                    sampleCount: trail.length,
+                    liveTractor: liveTractor,
+                  ),
+                  const SizedBox(height: 12),
+                  if (trail.isEmpty && liveTractor == null)
+                    Column(
+                      children: [
+                        SizedBox(
+                          height: 300,
+                          child: AppEmptyState(
+                            icon: Icons.wrong_location_outlined,
+                            title: context.appText('No tractor trail yet'),
+                            message: context.appText(
+                              'The backend has not returned tracker samples for this job. Refresh after the tracker sends positions.',
+                            ),
+                          ),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: _loading ? null : _refresh,
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: Text(context.appText('Refresh trail')),
+                        ),
+                      ],
+                    )
+                  else
+                    SizedBox(
+                      height: 480,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: _UnionTrailMap(
+                          job: job,
+                          trail: trail,
+                          liveTractor: liveTractor,
+                        ),
+                      ),
+                    ),
+                  if (trail.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    const _TrailColourGuide(),
+                  ],
+                  if (job.status == JobStatus.completedPendingConfirmation) ...[
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.verified_outlined),
+                      label: Text(context.appText('Return to verification')),
+                    ),
+                  ],
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _UnionTrailSummary extends StatelessWidget {
+  const _UnionTrailSummary({
+    required this.job,
+    required this.sampleCount,
+    required this.liveTractor,
+  });
+
+  final OperationsJob job;
+  final int sampleCount;
+  final OperationsLiveTractorPosition? liveTractor;
+
+  @override
+  Widget build(BuildContext context) {
+    final verificationPoints = job.verification['points'];
+    final insidePercentage = job.verification['inside_pct'];
+    final estimatedAcres = job.verification['est_acres'];
+    final notCalculated = context.appText('Not calculated');
+    final insideText = insidePercentage == null
+        ? notCalculated
+        : '$insidePercentage%';
+    final estimateText = estimatedAcres == null
+        ? notCalculated
+        : '$estimatedAcres ${context.appText('acres')}';
+    final fixAge = liveTractor?.ageAt(DateTime.now());
+    final tractorIsLive = liveTractor?.isLiveAt(DateTime.now()) ?? false;
+    final locationStatus = liveTractor == null
+        ? context.appText('Waiting for tractor location')
+        : tractorIsLive
+        ? context.appText('Online')
+        : context.appText('Last known location');
+    return OperationsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            context.appText('Tracker evidence'),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 8),
+          Text('${context.appText('Tractor location')}: $locationStatus'),
+          if (fixAge != null)
+            Text(
+              '${context.appText('Fix age')}: ${_compactFixAge(context, fixAge)}',
+            ),
+          Text('${context.appText('Map samples returned')}: $sampleCount'),
+          Text(
+            '${context.appText('Verification samples')}: ${verificationPoints ?? notCalculated}',
+          ),
+          Text('${context.appText('Inside plot')}: $insideText'),
+          Text('${context.appText('Tracker estimate')}: $estimateText'),
+        ],
+      ),
+    );
+  }
+}
+
+class _UnionTrailMap extends StatelessWidget {
+  const _UnionTrailMap({
+    required this.job,
+    required this.trail,
+    required this.liveTractor,
+  });
+
+  final OperationsJob job;
+  final List<OperationsTrailPoint> trail;
+  final OperationsLiveTractorPosition? liveTractor;
+
+  @override
+  Widget build(BuildContext context) {
+    final boundary = job.plot.boundaryPoints
+        .map((point) => LatLng(point.latitude, point.longitude))
+        .toList(growable: false);
+    final path = trail
+        .map((point) => LatLng(point.latitude, point.longitude))
+        .toList(growable: false);
+    final livePoint = liveTractor == null
+        ? null
+        : LatLng(liveTractor!.latitude, liveTractor!.longitude);
+    final allPoints = [...boundary, ...path, ?livePoint];
+    final initial = allPoints.first;
+    return GoogleMap(
+      initialCameraPosition: CameraPosition(target: initial, zoom: 17),
+      onMapCreated: (controller) {
+        if (allPoints.length < 2) return;
+        controller.moveCamera(
+          CameraUpdate.newLatLngBounds(_trailBounds(allPoints), 48),
+        );
+      },
+      mapType: MapType.hybrid,
+      markers: {
+        if (path.isNotEmpty)
+          Marker(
+            markerId: const MarkerId('trail-start'),
+            position: path.first,
+            infoWindow: InfoWindow(title: context.appText('Trail start')),
+            icon: BitmapDescriptor.defaultMarkerWithHue(
+              BitmapDescriptor.hueAzure,
+            ),
+          ),
+        if (livePoint == null && path.length > 1)
+          Marker(
+            markerId: const MarkerId('trail-latest'),
+            position: path.last,
+            infoWindow: InfoWindow(
+              title: context.appText('Latest tracker sample'),
+            ),
+            icon: BitmapDescriptor.defaultMarkerWithHue(
+              BitmapDescriptor.hueOrange,
+            ),
+          ),
+        if (livePoint != null)
+          Marker(
+            markerId: const MarkerId('live-tractor'),
+            position: livePoint,
+            infoWindow: InfoWindow(
+              title: context.appText('Tractor location'),
+              snippet: _liveTractorSnippet(context, liveTractor!),
+            ),
+            icon: BitmapDescriptor.defaultMarkerWithHue(
+              BitmapDescriptor.hueOrange,
+            ),
+          ),
+      },
+      polygons: {
+        if (boundary.length >= 3)
+          Polygon(
+            polygonId: const PolygonId('job-plot-boundary'),
+            points: boundary,
+            fillColor: Theme.of(
+              context,
+            ).colorScheme.primary.withValues(alpha: 0.12),
+            strokeColor: Theme.of(context).colorScheme.primary,
+            strokeWidth: 3,
+          ),
+      },
+      polylines: {
+        for (var index = 1; index < trail.length; index++)
+          Polyline(
+            polylineId: PolylineId('trail-segment-$index'),
+            points: [path[index - 1], path[index]],
+            width: 5,
+            color: switch (trail[index].inside) {
+              true => const Color(0xFF16A34A),
+              false => const Color(0xFFDC2626),
+              null => const Color(0xFF64748B),
+            },
+          ),
+      },
+      mapToolbarEnabled: false,
+      myLocationButtonEnabled: false,
+      zoomControlsEnabled: true,
+      compassEnabled: true,
+    );
+  }
+}
+
+String _liveTractorSnippet(
+  BuildContext context,
+  OperationsLiveTractorPosition position,
+) {
+  final status = position.isLiveAt(DateTime.now())
+      ? context.appText('Online')
+      : context.appText('Last known location');
+  final age = position.ageAt(DateTime.now());
+  if (age == null) return status;
+  return '$status · ${context.appText('Fix age')}: ${_compactFixAge(context, age)}';
+}
+
+String _compactFixAge(BuildContext context, int seconds) {
+  if (seconds < 60) return '$seconds ${context.appText('seconds')}';
+  final minutes = seconds ~/ 60;
+  if (minutes < 60) return '$minutes ${context.appText('minutes')}';
+  return '${minutes ~/ 60} ${context.appText('hours')}';
+}
+
+class _TrailColourGuide extends StatelessWidget {
+  const _TrailColourGuide();
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 14,
+      runSpacing: 8,
+      children: [
+        _TrailGuideItem(
+          color: const Color(0xFF16A34A),
+          label: context.appText('Inside plot'),
+        ),
+        _TrailGuideItem(
+          color: const Color(0xFFDC2626),
+          label: context.appText('Outside plot'),
+        ),
+        _TrailGuideItem(
+          color: const Color(0xFF64748B),
+          label: context.appText('Unknown'),
+        ),
+      ],
+    );
+  }
+}
+
+class _TrailGuideItem extends StatelessWidget {
+  const _TrailGuideItem({required this.color, required this.label});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 20,
+          height: 5,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(99),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(label),
+      ],
+    );
+  }
+}
+
+LatLngBounds _trailBounds(List<LatLng> points) {
+  var minLat = points.first.latitude;
+  var maxLat = points.first.latitude;
+  var minLng = points.first.longitude;
+  var maxLng = points.first.longitude;
+  for (final point in points.skip(1)) {
+    if (point.latitude < minLat) minLat = point.latitude;
+    if (point.latitude > maxLat) maxLat = point.latitude;
+    if (point.longitude < minLng) minLng = point.longitude;
+    if (point.longitude > maxLng) maxLng = point.longitude;
+  }
+  const padding = 0.00005;
+  if (minLat == maxLat) {
+    minLat -= padding;
+    maxLat += padding;
+  }
+  if (minLng == maxLng) {
+    minLng -= padding;
+    maxLng += padding;
+  }
+  return LatLngBounds(
+    southwest: LatLng(minLat, minLng),
+    northeast: LatLng(maxLat, maxLng),
+  );
 }
 
 class RescheduleJobScreen extends StatefulWidget {

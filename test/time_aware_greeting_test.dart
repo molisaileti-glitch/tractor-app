@@ -1,3 +1,5 @@
+// File purpose: Provides regression coverage for Time Aware Greeting behavior and its important failure cases.
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tractor/src/components/time_aware_greeting.dart';

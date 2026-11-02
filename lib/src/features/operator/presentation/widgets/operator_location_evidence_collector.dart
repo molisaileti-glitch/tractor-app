@@ -1,3 +1,5 @@
+// File purpose: Collects a bounded set of fresh GPS samples and selects defensible location evidence for server actions.
+
 import 'dart:math' as math;
 
 import '../../../../additional_data/location/domain/entities/device_location.dart';

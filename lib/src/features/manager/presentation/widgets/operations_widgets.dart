@@ -1,3 +1,5 @@
+// File purpose: Provides reusable union manager UI for operations widgets presentation and interaction.
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
@@ -62,25 +64,6 @@ class MetricCard extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class OperationsSectionTitle extends StatelessWidget {
-  const OperationsSectionTitle(this.text, {super.key});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 22, bottom: 10),
-      child: Text(
-        text,
-        style: Theme.of(
-          context,
-        ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
       ),
     );
   }

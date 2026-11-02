@@ -1,3 +1,5 @@
+// File purpose: Implements the union manager operations shell screen and connects user actions to feature state.
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';

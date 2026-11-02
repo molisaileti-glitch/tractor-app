@@ -1,3 +1,5 @@
+// File purpose: Provides the shared app message component used across application features.
+
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_theme.dart';

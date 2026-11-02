@@ -1,3 +1,5 @@
+// File purpose: Provides consistent confirmation, asynchronous progress, error, and information dialogs.
+
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_theme.dart';
@@ -177,6 +179,7 @@ Future<bool> showAppAsyncConfirmationDialog(
   String workingLabel = 'Please wait...',
   String cancelLabel = 'Cancel',
   bool danger = false,
+  String Function(Object error)? errorMessage,
 }) async {
   final result = await showDialog<bool>(
     context: context,
@@ -189,6 +192,7 @@ Future<bool> showAppAsyncConfirmationDialog(
       workingLabel: workingLabel,
       cancelLabel: cancelLabel,
       danger: danger,
+      errorMessage: errorMessage,
     ),
   );
   return result ?? false;
@@ -203,6 +207,7 @@ class _AsyncConfirmationDialog extends StatefulWidget {
     required this.workingLabel,
     required this.cancelLabel,
     required this.danger,
+    required this.errorMessage,
   });
 
   final String title;
@@ -212,6 +217,7 @@ class _AsyncConfirmationDialog extends StatefulWidget {
   final String workingLabel;
   final String cancelLabel;
   final bool danger;
+  final String Function(Object error)? errorMessage;
 
   @override
   State<_AsyncConfirmationDialog> createState() =>
@@ -231,11 +237,13 @@ class _AsyncConfirmationDialogState extends State<_AsyncConfirmationDialog> {
     try {
       await widget.onConfirm();
       if (mounted) Navigator.of(context).pop(true);
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'The action could not be completed. Please try again.';
+        _error =
+            widget.errorMessage?.call(error) ??
+            'The action could not be completed. Please try again.';
       });
     }
   }

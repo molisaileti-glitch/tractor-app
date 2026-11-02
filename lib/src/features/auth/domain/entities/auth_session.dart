@@ -1,3 +1,5 @@
+// File purpose: Defines authenticated-session state, user role, permissions, and profile identity.
+
 enum AuthSessionStatus { signedOut, signedIn, pendingSync }
 
 class AuthSession {

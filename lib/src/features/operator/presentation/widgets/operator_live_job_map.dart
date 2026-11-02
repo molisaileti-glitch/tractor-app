@@ -1,3 +1,5 @@
+// File purpose: Displays farm boundaries, operator and tractor markers, route guidance, tracker trail, and location readiness.
+
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -107,7 +109,9 @@ class OperatorLiveJobMapState extends State<OperatorLiveJobMap>
     subscription = widget.locationRepository.watchLocation().listen(
       _applyPhoneLocation,
       onError: (Object error, StackTrace stackTrace) {
-        debugPrint('[Operator GPS filter] stream_error=$error');
+        if (kDebugMode) {
+          debugPrint('[Operator GPS filter] stream_error=$error');
+        }
         if (mounted && _foreground && _routeIsCurrent) {
           setState(() {
             _phoneQualityMessage =
@@ -217,14 +221,16 @@ class OperatorLiveJobMapState extends State<OperatorLiveJobMap>
       _phoneError = null;
       _phoneQualityMessage = update.message;
     });
-    debugPrint(
-      '[Operator GPS filter] decision=${update.decision.name}; '
-      'movement_m=${update.distanceMeters.toStringAsFixed(1)}; '
-      'accuracy_m=${rawLocation.accuracyMeters.toStringAsFixed(1)}; '
-      'speed_mps=${rawLocation.speedMetersPerSecond.toStringAsFixed(1)}; '
-      'mocked=${rawLocation.isMocked}; '
-      'usable_for_checks=${update.verifiedLocation != null}',
-    );
+    if (kDebugMode) {
+      debugPrint(
+        '[Operator GPS filter] decision=${update.decision.name}; '
+        'movement_m=${update.distanceMeters.toStringAsFixed(1)}; '
+        'accuracy_m=${rawLocation.accuracyMeters.toStringAsFixed(1)}; '
+        'speed_mps=${rawLocation.speedMetersPerSecond.toStringAsFixed(1)}; '
+        'mocked=${rawLocation.isMocked}; '
+        'usable_for_checks=${update.verifiedLocation != null}',
+      );
+    }
   }
 
   DeviceLocation? get _freshVerifiedPhone {
@@ -367,15 +373,19 @@ class OperatorLiveJobMapState extends State<OperatorLiveJobMap>
         if (mounted) {
           setState(() => _phoneQualityMessage = latest.message);
         }
-        debugPrint(
-          '[Operator GPS evidence] decision=${latest.decision.name}; '
-          'samples=${latest.acceptedSamples}/${latest.requiredSamples}; '
-          'accuracy_m=${rawLocation.accuracyMeters.toStringAsFixed(1)}',
-        );
+        if (kDebugMode) {
+          debugPrint(
+            '[Operator GPS evidence] decision=${latest.decision.name}; '
+            'samples=${latest.acceptedSamples}/${latest.requiredSamples}; '
+            'accuracy_m=${rawLocation.accuracyMeters.toStringAsFixed(1)}',
+          );
+        }
         if (latest.isReady) finish(latest);
       },
       onError: (Object error, StackTrace stackTrace) {
-        debugPrint('[Operator GPS evidence] stream_error=$error');
+        if (kDebugMode) {
+          debugPrint('[Operator GPS evidence] stream_error=$error');
+        }
         finish(
           OperatorEvidenceUpdate(
             decision: OperatorEvidenceDecision.rejectedInvalid,

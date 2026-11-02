@@ -1,3 +1,5 @@
+// File purpose: Coordinates operator assignments, job lifecycle actions, tracker data, inspections, photos, and farmer confirmation API state.
+
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -18,13 +20,14 @@ class OperatorLocalRepository extends ChangeNotifier {
   OperatorLocalRepository.seeded({
     MechanizationMobileApiClient? mobileApiClient,
     LocationRepository? locationRepository,
-  }) : mobileApiClient =
-           mobileApiClient ?? const MechanizationMobileApiClient(),
+  }) : _ownsMobileApiClient = mobileApiClient == null,
+       mobileApiClient = mobileApiClient ?? MechanizationMobileApiClient(),
        _locationRepository =
            locationRepository ?? const GeolocatorLocationRepository(),
        _jobs = [];
 
   final MechanizationMobileApiClient mobileApiClient;
+  final bool _ownsMobileApiClient;
   final LocationRepository _locationRepository;
   final List<OperatorJob> _jobs;
   final Map<String, Map<String, Object?>> _jobPayloads = {};
@@ -111,6 +114,7 @@ class OperatorLocalRepository extends ChangeNotifier {
                 status: 'active',
                 mine: true,
                 page: page,
+                perPage: 50,
               ),
               isCurrent: current,
             ),
@@ -137,6 +141,7 @@ class OperatorLocalRepository extends ChangeNotifier {
               status: 'completed,verified,closed,cancelled',
               mine: true,
               page: page,
+              perPage: 50,
             ),
             isCurrent: current,
           );
@@ -1810,6 +1815,7 @@ class OperatorLocalRepository extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _sessionVersion++;
+    if (_ownsMobileApiClient) mobileApiClient.close();
     super.dispose();
   }
 

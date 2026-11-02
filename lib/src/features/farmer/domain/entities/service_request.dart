@@ -1,3 +1,5 @@
+// File purpose: Defines the farmer domain types for service request data.
+
 import 'farm_plot.dart';
 
 enum ServiceType {

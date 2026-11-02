@@ -1,3 +1,5 @@
+// File purpose: Provides reusable operator UI for operator widgets presentation and interaction.
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -912,10 +914,12 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
     ].where((item) => item.plot.boundaryPoints.isNotEmpty).toList();
     final start = _routeStart;
     if (start == null || mappedJobs.isEmpty) {
-      debugPrint(
-        '[Routes API] Waiting: origin=${start == null ? 'missing' : 'ready'}, '
-        'farm=${mappedJobs.isEmpty ? 'missing' : 'ready'}',
-      );
+      if (kDebugMode) {
+        debugPrint(
+          '[Routes API] Waiting: origin=${start == null ? 'missing' : 'ready'}, '
+          'farm=${mappedJobs.isEmpty ? 'missing' : 'ready'}',
+        );
+      }
       if (_routePoints.isNotEmpty || _routeError != null || _loadingRoute) {
         setState(() {
           _routePoints = const [];
@@ -968,10 +972,12 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
     _lastRouteRequestedAt = requestedAt;
 
     try {
-      debugPrint(
-        '[Routes API] Requesting ${start.latitude},${start.longitude} -> '
-        '${destination.latitude},${destination.longitude}',
-      );
+      if (kDebugMode) {
+        debugPrint(
+          '[Routes API] Requesting ${start.latitude},${start.longitude} -> '
+          '${destination.latitude},${destination.longitude}',
+        );
+      }
       final result = await _fetchDrivingRoute(start, destination);
       if (!mounted || _routeKey != nextKey) return;
       setState(() {
@@ -982,15 +988,17 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
             ? null
             : 'No road route was returned for this farm.';
       });
-      debugPrint(
-        '[Routes API] Received ${result.points.length} route points'
-        '${result.summary != null ? ' (${result.summary})' : ''}',
-      );
+      if (kDebugMode) {
+        debugPrint(
+          '[Routes API] Received ${result.points.length} route points'
+          '${result.summary != null ? ' (${result.summary})' : ''}',
+        );
+      }
       unawaited(
         _fitMap(mappedJobs, start, destination, _phonePoint, _liveTractorPoint),
       );
     } catch (error) {
-      debugPrint('[Routes API] $error');
+      if (kDebugMode) debugPrint('[Routes API] $error');
       if (!mounted || _routeKey != nextKey) return;
       final quotaExceeded = error.toString().contains('429');
       setState(() {
@@ -1028,7 +1036,7 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
       'routes.googleapis.com',
       '/directions/v2:computeRoutes',
     );
-    debugPrint('[Routes API] Endpoint: $uri');
+    if (kDebugMode) debugPrint('[Routes API] Endpoint: $uri');
     final payload = <String, Object?>{
       'origin': {
         'location': {
@@ -1075,10 +1083,12 @@ class _OperatorMapCardState extends State<OperatorMapCard> {
       request.write(jsonEncode(payload));
       final response = await request.close();
       final body = await utf8.decodeStream(response);
-      debugPrint(
-        '[Routes API] Response status=${response.statusCode}; '
-        'bodyBytes=${body.length}',
-      );
+      if (kDebugMode) {
+        debugPrint(
+          '[Routes API] Response status=${response.statusCode}; '
+          'bodyBytes=${body.length}',
+        );
+      }
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw HttpException(
           'Routes request failed (${response.statusCode}): $body',

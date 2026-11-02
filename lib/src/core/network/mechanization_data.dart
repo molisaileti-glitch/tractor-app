@@ -1,3 +1,7 @@
+// File purpose: Merges brief and detailed mechanization payloads without losing fields omitted by later API responses.
+
+import 'package:flutter/foundation.dart';
+
 /// Preserve fields omitted by a brief API response; explicit null clears them.
 Map<String, Object?> mergeMechanizationData(
   Map<String, Object?> previous,
@@ -34,10 +38,13 @@ DateTime? apiScheduleTime(Object? date, Object? time) {
 Future<Map<String, Object?>> allApiPages(
   Future<Map<String, Object?>> Function(int page) fetch, {
   required bool Function() isCurrent,
+  String? debugLabel,
 }) async {
   final rows = <Object?>[];
   var page = 1;
+  final stopwatch = Stopwatch()..start();
   while (isCurrent()) {
+    final pageStartedAt = stopwatch.elapsedMilliseconds;
     final response = await fetch(page);
     if (!isCurrent()) break;
     final data = response['data'];
@@ -45,10 +52,21 @@ Future<Map<String, Object?>> allApiPages(
     if (batch is List) rows.addAll(batch);
     final last =
         int.tryParse('${jsonMap(response['meta'])['last_page']}') ?? page;
+    if (kDebugMode && debugLabel != null) {
+      final pageRows = batch is List ? batch.length : 0;
+      debugPrint(
+        '[API pagination] $debugLabel page=$page/$last rows=$pageRows '
+        'accumulated=${rows.length} '
+        'page_ms=${stopwatch.elapsedMilliseconds - pageStartedAt} '
+        'total_ms=${stopwatch.elapsedMilliseconds}',
+      );
+    }
     if (page >= last || batch is! List || batch.isEmpty) {
+      stopwatch.stop();
       return {...response, 'data': rows};
     }
     page++;
   }
+  stopwatch.stop();
   return {'data': <Object?>[]};
 }

@@ -1,3 +1,5 @@
+// File purpose: Defines the authentication operations consumed by presentation and application layers.
+
 import '../../../farmer/domain/entities/farmer_profile.dart';
 import '../entities/auth_session.dart';
 

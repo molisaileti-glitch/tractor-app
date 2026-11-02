@@ -1,3 +1,5 @@
+// File purpose: Calculates whether a device fix lies inside or within tolerance of a farm boundary.
+
 import 'dart:math' as math;
 
 import '../../../../features/farmer/domain/entities/farm_plot.dart';

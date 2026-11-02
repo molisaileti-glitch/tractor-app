@@ -1,3 +1,5 @@
+// File purpose: Maintains technician tractor, maintenance, parts, and service-record state for the technician workspace.
+
 import 'package:flutter/foundation.dart';
 
 import '../../domain/entities/technician_models.dart';

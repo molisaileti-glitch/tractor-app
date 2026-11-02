@@ -1,3 +1,5 @@
+// File purpose: Protects screen-scoped refresh behavior and server-authoritative geofence readiness flows.
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';

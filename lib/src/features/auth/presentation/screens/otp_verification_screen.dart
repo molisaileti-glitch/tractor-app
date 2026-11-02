@@ -1,3 +1,5 @@
+// File purpose: Implements the authentication otp verification screen and connects user actions to feature state.
+
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';

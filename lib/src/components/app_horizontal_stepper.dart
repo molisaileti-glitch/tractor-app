@@ -1,3 +1,5 @@
+// File purpose: Provides the shared app horizontal stepper component used across application features.
+
 import 'package:flutter/material.dart';
 import 'package:animations/animations.dart';
 

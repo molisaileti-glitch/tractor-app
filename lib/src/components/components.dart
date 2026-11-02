@@ -1,3 +1,5 @@
+// File purpose: Re-exports the shared component library through one stable import.
+
 export 'app_buttons.dart';
 export 'app_dialogs.dart';
 export 'app_empty_state.dart';

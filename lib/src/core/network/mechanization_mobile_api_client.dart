@@ -1,3 +1,5 @@
+// File purpose: Implements the authenticated HTTP and multipart transport for every documented mechanization endpoint.
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -43,10 +45,13 @@ class MechanizationApiException implements Exception {
 }
 
 class MechanizationMobileApiClient {
-  const MechanizationMobileApiClient({
+  MechanizationMobileApiClient({
     this.baseUrl = MechanizationEndpoints.baseUrl,
     this.apiPrefix = '/api/v1/mech',
-  });
+  }) : _client = HttpClient()
+         ..connectionTimeout = const Duration(seconds: 10)
+         ..idleTimeout = const Duration(seconds: 20)
+         ..maxConnectionsPerHost = 6;
 
   static FutureOr<void> Function(String token)? onUnauthorized;
   static int _requestSequence = 0;
@@ -54,6 +59,14 @@ class MechanizationMobileApiClient {
 
   final String baseUrl;
   final String apiPrefix;
+  final HttpClient _client;
+  bool _closed = false;
+
+  void close() {
+    if (_closed) return;
+    _closed = true;
+    _client.close(force: true);
+  }
 
   Future<Map<String, Object?>> me({required String token}) {
     return _get('/me', token: token);
@@ -877,6 +890,9 @@ class MechanizationMobileApiClient {
     String? operation,
     _PhotoUpload? upload,
   }) async {
+    if (_closed) {
+      throw const MechanizationApiException('The API client is closed.');
+    }
     final retryAt = _retryNotBefore[token];
     if (retryAt != null && retryAt.isAfter(DateTime.now())) {
       final remaining = retryAt.difference(DateTime.now());
@@ -889,8 +905,6 @@ class MechanizationMobileApiClient {
     _retryNotBefore.remove(token);
     final requestId = ++_requestSequence;
     final stopwatch = Stopwatch()..start();
-    final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 10);
     try {
       final uri = _uri(path, query);
       if (operation != null) {
@@ -901,12 +915,14 @@ class MechanizationMobileApiClient {
         _logJson(requestId, 'request body', _cleanBody(body));
       }
       final request = switch (method) {
-        'GET' => await client.getUrl(uri).timeout(const Duration(seconds: 10)),
-        'PUT' => await client.putUrl(uri).timeout(const Duration(seconds: 10)),
+        'GET' => await _client.getUrl(uri).timeout(const Duration(seconds: 10)),
+        'PUT' => await _client.putUrl(uri).timeout(const Duration(seconds: 10)),
         'PATCH' =>
-          await client.patchUrl(uri).timeout(const Duration(seconds: 10)),
-        _ => await client.postUrl(uri).timeout(const Duration(seconds: 10)),
+          await _client.patchUrl(uri).timeout(const Duration(seconds: 10)),
+        _ => await _client.postUrl(uri).timeout(const Duration(seconds: 10)),
       };
+      final connectionMilliseconds = stopwatch.elapsedMilliseconds;
+      request.persistentConnection = true;
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       if (upload != null) {
@@ -947,6 +963,7 @@ class MechanizationMobileApiClient {
       final response = await request.close().timeout(
         Duration(seconds: upload == null ? 15 : 60),
       );
+      final responseHeadersMilliseconds = stopwatch.elapsedMilliseconds;
       if (response.statusCode == 401 || response.statusCode == 419) {
         await onUnauthorized?.call(token);
       }
@@ -954,6 +971,7 @@ class MechanizationMobileApiClient {
           .transform(utf8.decoder)
           .join()
           .timeout(const Duration(seconds: 15));
+      final bodyReceivedMilliseconds = stopwatch.elapsedMilliseconds;
       Map<String, Object?> decoded;
       try {
         decoded = responseBody.trim().isEmpty
@@ -963,6 +981,7 @@ class MechanizationMobileApiClient {
         if (response.statusCode >= 200 && response.statusCode < 300) rethrow;
         decoded = {};
       }
+      final decodedMilliseconds = stopwatch.elapsedMilliseconds;
       final retrySeconds = int.tryParse(
         response.headers.value('retry-after') ?? '',
       );
@@ -975,9 +994,14 @@ class MechanizationMobileApiClient {
       }
       _log(
         requestId,
-        '<-- HTTP ${response.statusCode} ${stopwatch.elapsedMilliseconds}ms',
+        '<-- HTTP ${response.statusCode} total=${decodedMilliseconds}ms '
+        'connect=${connectionMilliseconds}ms '
+        'response=${responseHeadersMilliseconds - connectionMilliseconds}ms '
+        'body=${bodyReceivedMilliseconds - responseHeadersMilliseconds}ms '
+        'parse=${decodedMilliseconds - bodyReceivedMilliseconds}ms '
+        'bytes=${responseBody.length}',
       );
-      _logJson(requestId, 'response body', decoded);
+      _logResponse(requestId, decoded, responseBody.length);
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw MechanizationApiException(
           decoded['message']?.toString() ??
@@ -1027,7 +1051,6 @@ class MechanizationMobileApiClient {
       rethrow;
     } finally {
       stopwatch.stop();
-      client.close(force: true);
     }
   }
 
@@ -1038,16 +1061,59 @@ class MechanizationMobileApiClient {
   void _logJson(int requestId, String label, Object? value) {
     if (!kDebugMode) return;
     final encoded = jsonEncode(_sanitizeForLog(value));
+    const maximumLoggedCharacters = 3600;
+    final visible = encoded.length <= maximumLoggedCharacters
+        ? encoded
+        : encoded.substring(0, maximumLoggedCharacters);
     const chunkSize = 900;
-    final total = (encoded.length / chunkSize).ceil();
+    final total = (visible.length / chunkSize).ceil();
     for (var index = 0; index < total; index++) {
       final start = index * chunkSize;
-      final end = (start + chunkSize).clamp(0, encoded.length);
+      final end = (start + chunkSize).clamp(0, visible.length);
       _log(
         requestId,
-        '$label [${index + 1}/$total] ${encoded.substring(start, end)}',
+        '$label [${index + 1}/$total] ${visible.substring(start, end)}',
       );
     }
+    if (encoded.length > maximumLoggedCharacters) {
+      _log(
+        requestId,
+        '$label truncated: logged $maximumLoggedCharacters of '
+        '${encoded.length} characters',
+      );
+    }
+  }
+
+  void _logResponse(
+    int requestId,
+    Map<String, Object?> decoded,
+    int responseCharacters,
+  ) {
+    if (!kDebugMode) return;
+    const detailedResponseLimit = 3600;
+    if (responseCharacters <= detailedResponseLimit) {
+      _logJson(requestId, 'response body', decoded);
+      return;
+    }
+    final data = decoded['data'];
+    final nestedRows = data is Map ? _map(data)['data'] : null;
+    _logJson(requestId, 'response summary', {
+      'success': decoded['success'],
+      'message': decoded['message'],
+      'code': decoded['code'],
+      'meta': decoded['meta'],
+      'data_type': data.runtimeType.toString(),
+      'row_count': data is List
+          ? data.length
+          : nestedRows is List
+          ? nestedRows.length
+          : null,
+    });
+    _log(
+      requestId,
+      'response body omitted from debug output: '
+      '$responseCharacters characters',
+    );
   }
 
   Object? _sanitizeForLog(Object? value, [String? parentKey]) {

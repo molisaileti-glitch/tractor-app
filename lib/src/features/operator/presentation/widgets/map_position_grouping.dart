@@ -1,3 +1,5 @@
+// File purpose: Groups nearby operator and tractor positions so overlapping markers remain readable.
+
 import 'dart:math' as math;
 
 /// Group only reliable nearby fixes, without interpreting proximity as boarding.

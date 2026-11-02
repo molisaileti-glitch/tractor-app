@@ -1,3 +1,5 @@
+// File purpose: Provides reusable farmer UI for plot card presentation and interaction.
+
 import 'package:flutter/material.dart';
 
 import '../../domain/entities/farm_plot.dart';

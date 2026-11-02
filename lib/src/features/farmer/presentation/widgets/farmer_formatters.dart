@@ -1,3 +1,5 @@
+// File purpose: Provides reusable farmer UI for farmer formatters presentation and interaction.
+
 String formatDate(DateTime date) {
   return '${date.day} ${_month(date.month)} ${date.year}';
 }

@@ -1,3 +1,5 @@
+// File purpose: Implements the authentication login screen and connects user actions to feature state.
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -361,6 +363,7 @@ class _BrandLockup extends StatelessWidget {
               height: 92,
               child: Image.asset(
                 'assets/images/tractor_launcher_icon.png',
+                cacheWidth: 256,
                 fit: BoxFit.contain,
                 semanticLabel: strings.appLogoSemantics,
               ),

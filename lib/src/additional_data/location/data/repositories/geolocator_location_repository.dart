@@ -1,3 +1,5 @@
+// File purpose: Wraps Geolocator permission, service, current-fix, stream, timeout, and diagnostic behavior behind the location contract.
+
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -80,7 +82,9 @@ class GeolocatorLocationRepository
         return LocationUnavailable(LocationFailure(permissionResult));
       }
 
-      await _logDiagnosticSnapshot(prefix, phase: 'before_request');
+      if (kDebugMode) {
+        await _logDiagnosticSnapshot(prefix, phase: 'before_request');
+      }
       debugPrint(
         '$prefix Starting native getCurrentPosition; '
         'provider=platform_default; accuracy=high; '
@@ -104,7 +108,9 @@ class GeolocatorLocationRepository
         '$prefix Native position timed out; '
         'elapsed_ms=${stopwatch.elapsedMilliseconds}; error=$error',
       );
-      await _logDiagnosticSnapshot(prefix, phase: 'after_timeout');
+      if (kDebugMode) {
+        await _logDiagnosticSnapshot(prefix, phase: 'after_timeout');
+      }
       return const LocationUnavailable(
         LocationFailure(
           'Phone GPS is on and permission is allowed, but Android did not '
@@ -223,9 +229,12 @@ class GeolocatorLocationRepository
         locationSettings: settings,
       )) {
         updateNumber += 1;
-        debugPrint(
-          '$prefix Update #$updateNumber received; ${_describePosition(position)}',
-        );
+        if (kDebugMode) {
+          debugPrint(
+            '$prefix Update #$updateNumber received; '
+            '${_describePosition(position)}',
+          );
+        }
         yield _fromPosition(position);
       }
       debugPrint('$prefix Native position stream closed');
@@ -269,9 +278,12 @@ class GeolocatorLocationRepository
       locationSettings: settings,
     )) {
       updateNumber += 1;
-      debugPrint(
-        '$prefix Update #$updateNumber received; ${_describePosition(position)}',
-      );
+      if (kDebugMode) {
+        debugPrint(
+          '$prefix Update #$updateNumber received; '
+          '${_describePosition(position)}',
+        );
+      }
       yield _fromPosition(position);
     }
   }

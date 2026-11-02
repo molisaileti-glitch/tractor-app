@@ -1,3 +1,5 @@
+// File purpose: Provides regression coverage for Operator Location Evidence Collector behavior and its important failure cases.
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tractor/src/additional_data/location/domain/entities/device_location.dart';
 import 'package:tractor/src/features/operator/presentation/widgets/operator_location_evidence_collector.dart';

@@ -1,3 +1,5 @@
+// File purpose: Filters and stabilizes noisy phone GPS fixes before map display and geofence evidence use.
+
 import 'dart:math' as math;
 
 import '../../../../additional_data/location/domain/entities/device_location.dart';

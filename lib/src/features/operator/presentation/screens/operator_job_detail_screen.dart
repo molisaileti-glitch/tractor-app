@@ -1,3 +1,5 @@
+// File purpose: Implements the operator job detail screen and connects user actions to feature state.
+
 import 'package:flutter/material.dart';
 
 import '../../../../components/components.dart';
@@ -30,6 +32,7 @@ class _OperatorJobDetailScreenState extends State<OperatorJobDetailScreen> {
   OperatorLocalRepository get repository => widget.repository;
   String get jobId => widget.jobId;
   final _mapKey = GlobalKey<OperatorLiveJobMapState>();
+  bool _primaryActionBusy = false;
 
   @override
   Widget build(BuildContext context) {
@@ -124,6 +127,7 @@ class _OperatorJobDetailScreenState extends State<OperatorJobDetailScreen> {
                             ),
                           )
                         : null,
+                    primaryActionBusy: _primaryActionBusy,
                   ),
                 ),
               ),
@@ -134,104 +138,114 @@ class _OperatorJobDetailScreenState extends State<OperatorJobDetailScreen> {
     );
   }
 
-  void _advance(BuildContext context, OperatorJob job) {
-    if (job.status == OperatorJobStatus.completedPendingConfirmation &&
-        job.farmerConfirmedAt == null) {
-      Navigator.of(context).push(
-        appPageRoute(
-          builder: (_) => OperatorFarmerConfirmationScreen(
-            repository: repository,
-            jobId: job.id,
+  Future<void> _advance(BuildContext context, OperatorJob job) async {
+    if (_primaryActionBusy) return;
+    setState(() => _primaryActionBusy = true);
+    try {
+      if (job.status == OperatorJobStatus.completedPendingConfirmation &&
+          job.farmerConfirmedAt == null) {
+        await Navigator.of(context).push(
+          appPageRoute(
+            builder: (_) => OperatorFarmerConfirmationScreen(
+              repository: repository,
+              jobId: job.id,
+            ),
           ),
-        ),
-      );
-      return;
-    }
-    if ((job.status == OperatorJobStatus.dispatched ||
-            job.status == OperatorJobStatus.assigned) &&
-        !job.acceptedByOperator) {
-      _acceptAssignment(context, job);
-      return;
-    }
-    if (job.status == OperatorJobStatus.inProgress ||
-        job.status == OperatorJobStatus.paused) {
-      Navigator.of(context).push(
-        appPageRoute(
-          builder: (_) =>
-              OperatorProgressScreen(repository: repository, jobId: job.id),
-        ),
-      );
-      return;
-    }
-    if (job.status == OperatorJobStatus.enRoute ||
-        job.status == OperatorJobStatus.arrived) {
-      Navigator.of(context).push(
-        appPageRoute(
-          builder: (_) =>
-              OperatorArrivalScreen(repository: repository, jobId: job.id),
-        ),
-      );
-      return;
-    }
-    if (job.status == OperatorJobStatus.dispatched ||
-        job.status == OperatorJobStatus.assigned) {
-      _startJourney(context, job);
-      return;
-    }
-    if (job.status == OperatorJobStatus.scheduled) {
-      showAppSnackBar(
-        context,
-        message: context.appText(
-          'This job is scheduled but has not been dispatched. It will become actionable after operations dispatches it.',
-        ),
-        type: AppSnackType.info,
-      );
+        );
+        return;
+      }
+      if ((job.status == OperatorJobStatus.dispatched ||
+              job.status == OperatorJobStatus.assigned) &&
+          !job.acceptedByOperator) {
+        await _acceptAssignment(context, job);
+        return;
+      }
+      if (job.status == OperatorJobStatus.inProgress ||
+          job.status == OperatorJobStatus.paused) {
+        await Navigator.of(context).push(
+          appPageRoute(
+            builder: (_) =>
+                OperatorProgressScreen(repository: repository, jobId: job.id),
+          ),
+        );
+        return;
+      }
+      if (job.status == OperatorJobStatus.enRoute ||
+          job.status == OperatorJobStatus.arrived) {
+        await Navigator.of(context).push(
+          appPageRoute(
+            builder: (_) =>
+                OperatorArrivalScreen(repository: repository, jobId: job.id),
+          ),
+        );
+        return;
+      }
+      if (job.status == OperatorJobStatus.dispatched ||
+          job.status == OperatorJobStatus.assigned) {
+        await _startJourney(context, job);
+        return;
+      }
+      if (job.status == OperatorJobStatus.scheduled) {
+        showAppSnackBar(
+          context,
+          message: context.appText(
+            'This job is scheduled but has not been dispatched. It will become actionable after operations dispatches it.',
+          ),
+          type: AppSnackType.info,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _primaryActionBusy = false);
     }
   }
 
   Future<void> _acceptAssignment(BuildContext context, OperatorJob job) async {
-    final confirmed = await showAppConfirmationDialog(
+    final accepted = await showAppAsyncConfirmationDialog(
       context,
       title: context.appText('Accept assignment?'),
       message:
           'Confirm that you are available to operate ${job.tractorLabel ?? 'the assigned tractor'} for this job.',
       confirmLabel: 'Accept',
+      workingLabel: context.appText('Accepting...'),
+      onConfirm: () async {
+        final phone = await repository.captureFieldLocation();
+        final ok = await repository.acceptAssignment(job.id, phone: phone);
+        if (!ok) throw StateError('accept_failed');
+      },
+      errorMessage: (_) =>
+          repository.lastActionError ?? context.appText('Accept failed.'),
     );
-    if (!confirmed || !context.mounted) return;
-    final phone = await repository.captureFieldLocation();
-    final ok = await repository.acceptAssignment(job.id, phone: phone);
-    if (!context.mounted) return;
+    if (!accepted || !context.mounted) return;
     showAppSnackBar(
       context,
-      message: ok
-          ? 'Assignment accepted. Start the journey from this job when ready.'
-          : repository.lastActionError ?? 'Accept failed.',
-      type: ok ? AppSnackType.success : AppSnackType.error,
+      message: context.appText(
+        'Assignment accepted. Start the journey from this job when ready.',
+      ),
+      type: AppSnackType.success,
     );
   }
 
   Future<void> _startJourney(BuildContext context, OperatorJob job) async {
-    final confirmed = await showAppConfirmationDialog(
+    var journeyStarted = false;
+    final confirmed = await showAppAsyncConfirmationDialog(
       context,
       title: context.appText('Start journey?'),
       message: context.appText(
         'Your assignment will be marked en route and navigation to the farm will begin.',
       ),
       confirmLabel: 'Start Journey',
+      workingLabel: context.appText('Starting journey...'),
+      onConfirm: () async {
+        final phone = await repository.captureFieldLocation();
+        journeyStarted = await repository.startJourney(job.id, phone: phone);
+        if (!journeyStarted) throw StateError('journey_failed');
+      },
+      errorMessage: (_) =>
+          repository.lastActionError ??
+          context.appText('Could not start the journey.'),
     );
-    if (!confirmed || !context.mounted) return;
+    if (!confirmed || !journeyStarted || !context.mounted) return;
     final navigator = Navigator.of(context);
-    final phone = await repository.captureFieldLocation();
-    final ok = await repository.startJourney(job.id, phone: phone);
-    if (!context.mounted) return;
-    if (!ok) {
-      showAppSnackBar(
-        context,
-        message: repository.lastActionError ?? 'Could not start the journey.',
-        type: AppSnackType.error,
-      );
-      return;
-    }
     navigator.pushReplacement(
       appPageRoute(
         builder: (_) =>
@@ -324,12 +338,14 @@ class _JobActionSheet extends StatelessWidget {
     required this.onStartJourney,
     required this.onReportProblem,
     required this.onPhotos,
+    required this.primaryActionBusy,
   });
 
   final OperatorJob job;
   final VoidCallback onStartJourney;
   final VoidCallback onReportProblem;
   final VoidCallback? onPhotos;
+  final bool primaryActionBusy;
 
   @override
   Widget build(BuildContext context) {
@@ -403,7 +419,7 @@ class _JobActionSheet extends StatelessWidget {
                 ),
               if (onPhotos != null)
                 OutlinedButton.icon(
-                  onPressed: onPhotos,
+                  onPressed: primaryActionBusy ? null : onPhotos,
                   icon: const Icon(Icons.photo_library_outlined),
                   label: Text(context.appText('Job photos')),
                 ),
@@ -416,18 +432,23 @@ class _JobActionSheet extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: FilledButton.icon(
-                      onPressed: _statusGuidance(job) == null
+                    child: FilledButton(
+                      onPressed:
+                          !primaryActionBusy && _statusGuidance(job) == null
                           ? onStartJourney
                           : null,
-                      icon: const Icon(Icons.route_outlined),
-                      label: Text(_primaryActionLabel(job)),
+                      child: AppButtonContent(
+                        label: _primaryActionLabel(job),
+                        loadingLabel: context.appText('Please wait...'),
+                        loading: primaryActionBusy,
+                        icon: Icons.route_outlined,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   IconButton.filledTonal(
                     tooltip: context.appText('Report Problem'),
-                    onPressed: onReportProblem,
+                    onPressed: primaryActionBusy ? null : onReportProblem,
                     icon: const Icon(Icons.report_problem_outlined),
                   ),
                 ],

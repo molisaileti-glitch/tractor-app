@@ -1,3 +1,5 @@
+// File purpose: Protects the end-to-end operator and union API lifecycle, payload merging, permissions, and stale-response behavior.
+
 // Regression tests for the operator and union manager API flow.
 import 'dart:async';
 

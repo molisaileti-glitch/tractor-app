@@ -1,3 +1,5 @@
+// File purpose: Implements the technician tractor detail screen and connects user actions to feature state.
+
 import 'package:flutter/material.dart';
 
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';

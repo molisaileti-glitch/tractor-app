@@ -1,3 +1,5 @@
+// File purpose: Coordinates union-manager API reads, actions, screen-scoped refresh state, payload merging, and operational records.
+
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -26,15 +28,18 @@ enum UnionDataScreen {
 class UnionOperationsRepository extends ChangeNotifier {
   UnionOperationsRepository.seeded({
     MechanizationMobileApiClient? mobileApiClient,
-  }) : mobileApiClient =
-           mobileApiClient ?? const MechanizationMobileApiClient(),
+  }) : _ownsMobileApiClient = mobileApiClient == null,
+       mobileApiClient = mobileApiClient ?? MechanizationMobileApiClient(),
        _requests = [],
        _tractors = [],
        _operators = [],
        _jobs = [];
 
   final MechanizationMobileApiClient mobileApiClient;
+  final bool _ownsMobileApiClient;
   final Map<String, Map<String, Object?>> _jobPayloads = {};
+  final Map<String, List<OperationsTrailPoint>> _jobTrails = {};
+  final Map<String, OperationsLiveTractorPosition> _jobLiveTractors = {};
   final Map<String, Map<String, Object?>> _requestPayloads = {};
   Set<String>? _permissions;
   Map<String, Object?> _policy = {};
@@ -74,12 +79,22 @@ class UnionOperationsRepository extends ChangeNotifier {
     final token = _accessToken;
     if (token == null || token.isEmpty) return Future.value();
     final session = _sessionVersion;
+    final screenTimer = Stopwatch()..start();
     final completion = Completer<void>();
     _screenLoads[screen] = completion.future;
     _screenErrors.remove(screen);
     notifyListeners();
     unawaited(
       _loadScreen(screen, token, session).whenComplete(() {
+        screenTimer.stop();
+        if (kDebugMode) {
+          debugPrint(
+            '[Union screen timing] screen=${screen.name} '
+            'total_ms=${screenTimer.elapsedMilliseconds} '
+            'requests=${screen == UnionDataScreen.requests ? _requests.length : '-'} '
+            'error=${_screenErrors[screen] ?? 'none'}',
+          );
+        }
         if (_currentSession(token, session)) {
           _screenLoads.remove(screen);
           _loadedScreens.add(screen);
@@ -284,6 +299,11 @@ class UnionOperationsRepository extends ChangeNotifier {
   bool get hasMechanizationToken =>
       _accessToken != null && _accessToken!.isNotEmpty;
 
+  List<OperationsTrailPoint> trailForJob(String jobId) =>
+      List.unmodifiable(_jobTrails[jobId] ?? const <OperationsTrailPoint>[]);
+  OperationsLiveTractorPosition? liveTractorForJob(String jobId) =>
+      _jobLiveTractors[jobId];
+
   void setMechanizationAccessToken(String? token, {List<String>? permissions}) {
     final trimmed = token?.trim();
     final normalized = trimmed == null || trimmed.isEmpty ? null : trimmed;
@@ -292,6 +312,8 @@ class UnionOperationsRepository extends ChangeNotifier {
     _sessionVersion++;
     _mechanizationActionError = null;
     _jobPayloads.clear();
+    _jobTrails.clear();
+    _jobLiveTractors.clear();
     _screenLoads.clear();
     _loadedScreens.clear();
     _screenErrors.clear();
@@ -559,6 +581,44 @@ class UnionOperationsRepository extends ChangeNotifier {
       }
       _mechanizationActionError = error.message;
       notifyListeners();
+    }
+  }
+
+  /// Loads the tracker trail documented at GET /jobs/{id}/path.
+  ///
+  /// This is intentionally separate from normal job-detail refreshes so a
+  /// union screen only polls the heavier path payload while its map is open.
+  Future<bool> refreshJobTrail(String jobId) async {
+    final token = _accessToken;
+    final session = _sessionVersion;
+    if (token == null || token.isEmpty) {
+      _mechanizationActionError =
+          'Your session has expired. Please sign in again.';
+      notifyListeners();
+      return false;
+    }
+    try {
+      _mechanizationActionError = null;
+      final response = await mobileApiClient.jobPath(
+        token: token,
+        jobId: jobId,
+      );
+      if (!_currentSession(token, session)) return false;
+      _jobTrails[jobId] = _trailPointsFromResponse(response);
+      final livePosition = _liveTractorFromResponse(response);
+      if (livePosition != null) {
+        final previous = _jobLiveTractors[jobId];
+        if (previous == null || !_isOlderFix(livePosition, previous)) {
+          _jobLiveTractors[jobId] = livePosition;
+        }
+      }
+      notifyListeners();
+      return true;
+    } on MechanizationApiException catch (error) {
+      if (!_currentSession(token, session)) return false;
+      _mechanizationActionError = error.message;
+      notifyListeners();
+      return false;
     }
   }
 
@@ -1473,6 +1533,7 @@ class UnionOperationsRepository extends ChangeNotifier {
       (page) =>
           mobileApiClient.requests(token: token, status: 'all', page: page),
       isCurrent: () => _currentSession(token, session),
+      debugLabel: 'union service requests',
     );
   }
 
@@ -2309,6 +2370,106 @@ class UnionOperationsRepository extends ChangeNotifier {
     ];
   }
 
+  List<OperationsTrailPoint> _trailPointsFromResponse(
+    Map<String, Object?> response,
+  ) {
+    final data = response['data'];
+    final rawPoints = data is List
+        ? data
+        : data is Map
+        ? (_stringKeyedMap(data)['path'] ?? _stringKeyedMap(data)['points'])
+        : null;
+    if (rawPoints is! List) return const [];
+
+    return rawPoints
+        .whereType<Map>()
+        .map((raw) {
+          final point = _stringKeyedMap(raw);
+          final latitude = _number(point, const ['latitude', 'lat', 'y']);
+          final longitude = _number(point, const [
+            'longitude',
+            'lng',
+            'lon',
+            'x',
+          ]);
+          if (latitude == null ||
+              longitude == null ||
+              !latitude.isFinite ||
+              !longitude.isFinite ||
+              latitude.abs() > 90 ||
+              longitude.abs() > 180) {
+            return null;
+          }
+          return OperationsTrailPoint(
+            latitude: latitude.toDouble(),
+            longitude: longitude.toDouble(),
+            inside: point['in'] as bool?,
+            speedKph: _number(point, const ['speed', 'speed_kph'])?.toDouble(),
+            recordedAt: _dateTime(
+              point['t'] ??
+                  point['recorded_at'] ??
+                  point['time'] ??
+                  point['timestamp'],
+            ),
+          );
+        })
+        .whereType<OperationsTrailPoint>()
+        .toList(growable: false);
+  }
+
+  OperationsLiveTractorPosition? _liveTractorFromResponse(
+    Map<String, Object?> response,
+  ) {
+    final data = _dataMap(response);
+    final live = _map(data['live']);
+    final position = _map(live['position']);
+    final latitude = _number(position, const ['latitude', 'lat']);
+    final longitude = _number(position, const ['longitude', 'lng', 'lon']);
+    if (latitude == null ||
+        longitude == null ||
+        !latitude.isFinite ||
+        !longitude.isFinite ||
+        latitude.abs() > 90 ||
+        longitude.abs() > 180) {
+      return null;
+    }
+    return OperationsLiveTractorPosition(
+      latitude: latitude.toDouble(),
+      longitude: longitude.toDouble(),
+      online: _asBool(live['online']) ?? false,
+      receivedAt: DateTime.now(),
+      speedKph: _number(position, const ['speed_kph', 'speed'])?.toDouble(),
+      fixTime: _dateTime(
+        position['fix_time'] ??
+            position['recorded_at'] ??
+            position['timestamp'],
+      ),
+      ageSeconds: _asInt(position['age_s']),
+    );
+  }
+
+  bool _isOlderFix(
+    OperationsLiveTractorPosition incoming,
+    OperationsLiveTractorPosition previous,
+  ) {
+    final previousTime =
+        previous.fixTime ??
+        (previous.ageSeconds == null
+            ? null
+            : previous.receivedAt.subtract(
+                Duration(seconds: previous.ageSeconds!),
+              ));
+    final incomingTime =
+        incoming.fixTime ??
+        (incoming.ageSeconds == null
+            ? null
+            : incoming.receivedAt.subtract(
+                Duration(seconds: incoming.ageSeconds!),
+              ));
+    return previousTime != null &&
+        (incomingTime == null || incomingTime.isBefore(previousTime));
+  }
+
   Future<void> _enrichRequestBoundaries(
     String token, {
     Set<String>? requestIds,
@@ -2660,6 +2821,7 @@ class UnionOperationsRepository extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _sessionVersion++;
+    if (_ownsMobileApiClient) mobileApiClient.close();
     super.dispose();
   }
 

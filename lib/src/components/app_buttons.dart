@@ -1,3 +1,5 @@
+// File purpose: Provides shared button content and loading indicators that prevent duplicate submissions.
+
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_theme.dart';
@@ -45,52 +47,6 @@ class AppButtonContent extends StatelessWidget {
           Flexible(child: Text(loading ? loadingLabel ?? label : label)),
         ],
       ),
-    );
-  }
-}
-
-class AppPrimaryButton extends StatelessWidget {
-  const AppPrimaryButton({
-    super.key,
-    required this.label,
-    required this.onPressed,
-    this.icon,
-    this.loading = false,
-    this.trailing,
-  });
-
-  final String label;
-  final VoidCallback? onPressed;
-  final IconData? icon;
-  final bool loading;
-  final IconData? trailing;
-
-  @override
-  Widget build(BuildContext context) {
-    return FilledButton(
-      onPressed: loading ? null : onPressed,
-      child: loading
-          ? AppButtonContent(
-              label: label,
-              loading: true,
-              loadingLabel: label,
-              progressColor: Colors.white,
-            )
-          : Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (icon != null) ...[
-                  Icon(icon, size: 20),
-                  const SizedBox(width: 8),
-                ],
-                Text(label),
-                if (trailing != null) ...[
-                  const SizedBox(width: 10),
-                  Icon(trailing, size: 22),
-                ],
-              ],
-            ),
     );
   }
 }

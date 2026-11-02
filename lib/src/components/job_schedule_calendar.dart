@@ -1,3 +1,5 @@
+// File purpose: Renders the reusable job calendar, overlap layout, horizontal scrolling, day selection, and assignment details.
+
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';

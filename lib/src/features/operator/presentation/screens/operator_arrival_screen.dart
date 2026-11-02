@@ -1,3 +1,5 @@
+// File purpose: Implements the operator arrival screen and connects user actions to feature state.
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -784,7 +786,11 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
     final ok = await widget.repository.requestStartOverride(
       jobId: widget.jobId,
       reason: reason.trim(),
-      phone: _geofenceResult?.location,
+      phone:
+          _mapKey.currentState?.currentFieldEvidence(
+            maximumAge: widget.repository.phoneFixMaximumAge,
+          ) ??
+          _geofenceResult?.location,
     );
     if (!mounted) return;
     showAppSnackBar(
@@ -1643,6 +1649,14 @@ class _StartCheckResultsDialog extends StatelessWidget {
                     ? 'All required checks passed.'
                     : '${result.failed.length} checks need attention before work can start.',
               ),
+              if (!result.canStart && !result.overrideAllowed) ...[
+                const SizedBox(height: 10),
+                const AppMessage(
+                  type: AppMessageType.warning,
+                  message:
+                      'The server did not allow an override for these failed checks. Correct them and run Start Check again.',
+                ),
+              ],
               if (result.phone != null || result.tractor != null) ...[
                 const SizedBox(height: 12),
                 Text(

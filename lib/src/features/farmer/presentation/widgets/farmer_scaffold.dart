@@ -1,3 +1,5 @@
+// File purpose: Provides reusable farmer UI for farmer scaffold presentation and interaction.
+
 import 'package:flutter/material.dart';
 
 class FarmerPage extends StatelessWidget {

@@ -1,3 +1,5 @@
+// File purpose: Builds the root application, authentication session flow, role routing, localization, and theme wiring.
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';

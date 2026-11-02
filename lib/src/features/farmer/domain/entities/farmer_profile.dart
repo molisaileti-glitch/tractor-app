@@ -1,3 +1,5 @@
+// File purpose: Defines the farmer domain types for farmer profile data.
+
 enum FarmerSex { female, male }
 
 enum FarmerIdentityDocumentType { nida, votersId, drivingLicence }

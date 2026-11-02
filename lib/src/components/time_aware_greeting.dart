@@ -1,3 +1,5 @@
+// File purpose: Keeps dashboard greetings synchronized with the device's current time.
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';

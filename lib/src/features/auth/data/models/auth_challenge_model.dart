@@ -1,3 +1,5 @@
+// File purpose: Maps authentication auth challenge model data into the corresponding domain representation.
+
 class AuthChallengeModel {
   const AuthChallengeModel({
     required this.challengeId,

@@ -1,3 +1,5 @@
+// File purpose: Defines the shared light and dark Material themes, colors, typography, and component styling.
+
 import 'package:flutter/material.dart';
 
 class AppColors {

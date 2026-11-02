@@ -1,3 +1,5 @@
+// File purpose: Defines technician maintenance, tractor condition, part, and service-record models.
+
 enum MaintenanceType {
   scheduledMaintenance('Scheduled Maintenance'),
   breakdown('Breakdown'),

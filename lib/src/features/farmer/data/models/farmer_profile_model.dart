@@ -1,3 +1,5 @@
+// File purpose: Maps farmer farmer profile model data into the corresponding domain representation.
+
 import 'package:uuid/uuid.dart';
 
 import '../../domain/entities/farmer_profile.dart';

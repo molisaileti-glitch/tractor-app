@@ -1,3 +1,5 @@
+// File purpose: Maps authentication auth verified session model data into the corresponding domain representation.
+
 import '../../domain/entities/auth_session.dart';
 
 class AuthVerifiedSessionModel {

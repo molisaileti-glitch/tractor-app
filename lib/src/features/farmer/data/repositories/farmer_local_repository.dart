@@ -1,3 +1,5 @@
+// File purpose: Maintains the farmer workspace state and local farmer, plot, request, and service-progress operations.
+
 import 'package:flutter/foundation.dart';
 
 import '../../domain/entities/farm_plot.dart';

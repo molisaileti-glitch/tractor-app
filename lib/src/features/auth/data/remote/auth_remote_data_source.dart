@@ -1,3 +1,5 @@
+// File purpose: Calls the authentication endpoints and translates transport failures into authentication errors.
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -28,11 +30,23 @@ class AuthRemoteException implements Exception {
 }
 
 class AuthRemoteDataSource {
-  const AuthRemoteDataSource({this.baseUrl = MechanizationEndpoints.baseUrl});
+  AuthRemoteDataSource({this.baseUrl = MechanizationEndpoints.baseUrl})
+    : _client = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 10)
+        ..idleTimeout = const Duration(seconds: 20)
+        ..maxConnectionsPerHost = 4;
 
   static int _requestSequence = 0;
 
   final String baseUrl;
+  final HttpClient _client;
+  bool _closed = false;
+
+  void close() {
+    if (_closed) return;
+    _closed = true;
+    _client.close(force: true);
+  }
 
   Future<AuthChallengeModel> login({
     required String identifier,
@@ -120,8 +134,6 @@ class AuthRemoteDataSource {
     String? operation,
   }) async {
     final requestId = ++_requestSequence;
-    final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 10);
     try {
       final uri = Uri.parse('$baseUrl$path');
       _logRequest(
@@ -133,8 +145,8 @@ class AuthRemoteDataSource {
         hasToken: token != null,
       );
       final request = method == 'GET'
-          ? await client.getUrl(uri).timeout(const Duration(seconds: 10))
-          : await client.postUrl(uri).timeout(const Duration(seconds: 10));
+          ? await _client.getUrl(uri).timeout(const Duration(seconds: 10))
+          : await _client.postUrl(uri).timeout(const Duration(seconds: 10));
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
       request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
       if (token != null && token.isNotEmpty) {
@@ -223,8 +235,6 @@ class AuthRemoteDataSource {
       throw const AuthRemoteException(
         'Authentication server returned invalid JSON.',
       );
-    } finally {
-      client.close(force: true);
     }
   }
 

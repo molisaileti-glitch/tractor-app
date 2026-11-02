@@ -1,3 +1,5 @@
+// File purpose: Verifies mechanization HTTP paths, query parameters, JSON bodies, multipart uploads, and error decoding.
+
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -6,6 +8,21 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tractor/src/core/network/mechanization_mobile_api_client.dart';
 
 void main() {
+  test('one API client handles repeated calls before close', () async {
+    var requests = 0;
+    final api = await _server((request) async {
+      requests++;
+      await _reply(request, {
+        'data': {'ok': true},
+      });
+    });
+
+    await api.me(token: 'keep-alive-token');
+    await api.me(token: 'keep-alive-token');
+
+    expect(requests, 2);
+  });
+
   test(
     'photo upload sends real multipart fields and unmodified image bytes',
     () async {
@@ -47,7 +64,8 @@ void main() {
   test(
     'photo validation rejects unsupported and oversized files before sending',
     () {
-      const api = MechanizationMobileApiClient();
+      final api = MechanizationMobileApiClient();
+      addTearDown(api.close);
       expect(
         () => api.uploadJobPhoto(
           token: 'token',
@@ -255,9 +273,11 @@ Future<MechanizationMobileApiClient> _server(
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
   addTearDown(() => server.close(force: true));
   server.listen(handle);
-  return MechanizationMobileApiClient(
+  final api = MechanizationMobileApiClient(
     baseUrl: 'http://127.0.0.1:${server.port}',
   );
+  addTearDown(api.close);
+  return api;
 }
 
 Future<void> _reply(
@@ -266,6 +286,7 @@ Future<void> _reply(
   int status = 200,
 }) async {
   request.response.statusCode = status;
+  request.response.persistentConnection = true;
   request.response.headers.contentType = ContentType.json;
   request.response.write(jsonEncode(body));
   await request.response.close();

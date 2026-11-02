@@ -1,3 +1,5 @@
+// File purpose: Defines union operations requests, jobs, assets, staff, oversight, availability, and history models.
+
 import '../../../farmer/domain/entities/farm_plot.dart';
 import '../../../farmer/domain/entities/service_request.dart';
 
@@ -85,6 +87,60 @@ enum JobRescheduleReason {
 
   const JobRescheduleReason(this.label);
   final String label;
+}
+
+/// One GPS sample returned by GET /jobs/{id}/path for union trail review.
+class OperationsTrailPoint {
+  const OperationsTrailPoint({
+    required this.latitude,
+    required this.longitude,
+    this.inside,
+    this.speedKph,
+    this.recordedAt,
+  });
+
+  final double latitude;
+  final double longitude;
+  final bool? inside;
+  final double? speedKph;
+  final DateTime? recordedAt;
+}
+
+/// Latest assigned-tractor fix bundled with GET /jobs/{id}/path.
+class OperationsLiveTractorPosition {
+  const OperationsLiveTractorPosition({
+    required this.latitude,
+    required this.longitude,
+    required this.online,
+    required this.receivedAt,
+    this.speedKph,
+    this.fixTime,
+    this.ageSeconds,
+  });
+
+  final double latitude;
+  final double longitude;
+  final bool online;
+  final DateTime receivedAt;
+  final double? speedKph;
+  final DateTime? fixTime;
+  final int? ageSeconds;
+
+  /// Age continues increasing between polls, so a cached fix cannot look new.
+  int? ageAt(DateTime now) {
+    if (fixTime != null) {
+      final seconds = now.difference(fixTime!).inSeconds;
+      return seconds < 0 ? 0 : seconds;
+    }
+    if (ageSeconds == null) return null;
+    final elapsed = now.difference(receivedAt).inSeconds;
+    return ageSeconds! + (elapsed < 0 ? 0 : elapsed);
+  }
+
+  bool isLiveAt(DateTime now, {int maximumAgeSeconds = 180}) {
+    final age = ageAt(now);
+    return online && age != null && age >= -30 && age <= maximumAgeSeconds;
+  }
 }
 
 enum JobHistoryAction {

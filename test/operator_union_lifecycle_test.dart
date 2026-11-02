@@ -1,3 +1,5 @@
+// File purpose: Verifies that operator actions and union-manager records remain consistent through the complete job lifecycle.
+
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';

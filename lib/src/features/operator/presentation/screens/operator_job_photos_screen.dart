@@ -1,3 +1,5 @@
+// File purpose: Implements the operator job photos screen and connects user actions to feature state.
+
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';

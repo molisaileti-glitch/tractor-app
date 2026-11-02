@@ -1,3 +1,5 @@
+// File purpose: Provides reusable farmer UI for request card presentation and interaction.
+
 import 'package:flutter/material.dart';
 
 import '../../domain/entities/service_request.dart';

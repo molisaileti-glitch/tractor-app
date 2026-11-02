@@ -1,3 +1,5 @@
+// File purpose: Provides the shared app theme reveal component used across application features.
+
 import 'dart:async';
 import 'dart:math' as math;
 

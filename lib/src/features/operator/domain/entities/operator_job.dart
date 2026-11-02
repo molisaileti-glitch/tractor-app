@@ -1,3 +1,5 @@
+// File purpose: Defines operator job, start-check, tracker, trail, photo, confirmation, and lifecycle entities.
+
 import '../../../farmer/domain/entities/farm_plot.dart';
 import '../../../farmer/domain/entities/service_request.dart';
 

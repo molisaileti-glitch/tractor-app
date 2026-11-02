@@ -1,3 +1,5 @@
+// File purpose: Defines a normalized device GPS reading with accuracy, age, speed, and mock-location metadata.
+
 class DeviceLocation {
   const DeviceLocation({
     required this.latitude,

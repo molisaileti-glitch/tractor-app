@@ -1,3 +1,5 @@
+// File purpose: Implements the operator history screen and connects user actions to feature state.
+
 import 'package:flutter/material.dart';
 
 import '../../../../components/components.dart';

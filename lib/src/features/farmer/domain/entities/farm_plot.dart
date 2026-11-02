@@ -1,3 +1,5 @@
+// File purpose: Defines the farmer domain types for farm plot data.
+
 class FarmPlot {
   const FarmPlot({
     required this.id,
