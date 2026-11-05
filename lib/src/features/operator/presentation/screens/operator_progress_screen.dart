@@ -137,15 +137,17 @@ class _OperatorProgressScreenState extends State<OperatorProgressScreen>
                   ),
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
-                    onPressed: () => Navigator.of(context).push(
-                      appPageRoute(
-                        builder: (_) => OperatorJobPhotosScreen(
-                          repository: repository,
-                          jobId: job.id,
-                          initialKind: 'during',
-                        ),
-                      ),
-                    ),
+                    onPressed: _busy
+                        ? null
+                        : () => Navigator.of(context).push(
+                            appPageRoute(
+                              builder: (_) => OperatorJobPhotosScreen(
+                                repository: repository,
+                                jobId: job.id,
+                                initialKind: 'during',
+                              ),
+                            ),
+                          ),
                     icon: const Icon(Icons.add_a_photo_outlined),
                     label: Text(
                       AppLocalizations.of(context)!.optionalWorkPhotos,
@@ -193,7 +195,9 @@ class _OperatorProgressScreenState extends State<OperatorProgressScreen>
                     const SizedBox(height: 10),
                   ],
                   OutlinedButton.icon(
-                    onPressed: () => _showProblemDialog(context, job),
+                    onPressed: _busy
+                        ? null
+                        : () => _showProblemDialog(context, job),
                     icon: const Icon(Icons.report_problem_outlined),
                     label: Text(context.appText('Report Problem')),
                   ),
@@ -209,6 +213,10 @@ class _OperatorProgressScreenState extends State<OperatorProgressScreen>
                               builder: (_) => OperatorCompleteJobScreen(
                                 repository: repository,
                                 jobId: job.id,
+                                initialPhone: _mapKey.currentState
+                                    ?.currentFieldEvidence(
+                                      maximumAge: repository.phoneFixMaximumAge,
+                                    ),
                               ),
                             ),
                           ),
@@ -242,7 +250,11 @@ class _OperatorProgressScreenState extends State<OperatorProgressScreen>
     );
     if (!confirmed || !context.mounted) return;
     setState(() => _busy = true);
-    final phone = await repository.captureFieldLocation();
+    final phone =
+        _mapKey.currentState?.currentFieldEvidence(
+          maximumAge: repository.phoneFixMaximumAge,
+        ) ??
+        await repository.captureFieldLocation();
     final ok = await repository.pauseJob(
       jobId: job.id,
       reason: 'Paused',
@@ -268,7 +280,11 @@ class _OperatorProgressScreenState extends State<OperatorProgressScreen>
     );
     if (!confirmed || !context.mounted) return;
     setState(() => _busy = true);
-    final phone = await repository.captureFieldLocation();
+    final phone =
+        _mapKey.currentState?.currentFieldEvidence(
+          maximumAge: repository.phoneFixMaximumAge,
+        ) ??
+        await repository.captureFieldLocation();
     final ok = await repository.resumeJob(job.id, phone: phone);
     if (mounted) setState(() => _busy = false);
     if (!context.mounted) return;

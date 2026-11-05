@@ -262,6 +262,45 @@ class _AsyncConfirmationDialogState extends State<_AsyncConfirmationDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(widget.message),
+              if (_loading) ...[
+                const SizedBox(height: 16),
+                Semantics(
+                  liveRegion: true,
+                  label: context.appText(widget.workingLabel),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.3,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            context.appText(widget.workingLabel),
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
               if (_error != null) ...[
                 const SizedBox(height: 14),
                 Text(

@@ -36,6 +36,7 @@ class OperatorLocalRepository extends ChangeNotifier {
   final Map<String, OperatorStartCheckResult> _startChecks = {};
   final Set<String> _inspectedTractors = {};
   final Map<String, int> _inspectionVersions = {};
+  final Map<String, num> _latestInspectionHourMeters = {};
   Map<String, Object?> _policy = {};
   final Map<String, String> _eventIds = {};
   final Set<String> _pendingActions = {};
@@ -235,6 +236,12 @@ class OperatorLocalRepository extends ChangeNotifier {
   Map<String, String> get inspectionChecklist =>
       Map.unmodifiable(_inspectionChecklist);
 
+  num? baselineHourMeterForJob(String jobId) {
+    final job = maybeJobById(jobId);
+    if (job == null) return null;
+    return job.startHourMeter ?? _latestInspectionHourMeters[job.tractorId];
+  }
+
   TractorTrackerPosition? trackerPositionFor(String tractorId) =>
       _trackerPositions[tractorId];
 
@@ -305,6 +312,7 @@ class OperatorLocalRepository extends ChangeNotifier {
     _startChecks.clear();
     _inspectedTractors.clear();
     _inspectionVersions.clear();
+    _latestInspectionHourMeters.clear();
     _inspectionChecklist.clear();
     _trackerPositions.clear();
     _tractorImplements.clear();
@@ -512,6 +520,15 @@ class OperatorLocalRepository extends ChangeNotifier {
           checklist.values.every((value) => value == true);
       _inspectionVersions[tractorId] =
           (_inspectionVersions[tractorId] ?? 0) + 1;
+      final recordedHourMeter =
+          _number(inspection, const ['hour_meter']) ?? hourMeter;
+      if (recordedHourMeter != null && recordedHourMeter >= 0) {
+        _latestInspectionHourMeters[tractorId] = recordedHourMeter;
+        final job = maybeJobById(jobId);
+        if (job != null) {
+          _replace(jobId, job.copyWith(startHourMeter: recordedHourMeter));
+        }
+      }
       if (fit) {
         _inspectedTractors.add(tractorId);
       } else {
@@ -555,6 +572,10 @@ class OperatorLocalRepository extends ChangeNotifier {
         return;
       }
       final inspection = _map(response['data']);
+      final hourMeter = _number(inspection, const ['hour_meter']);
+      if (hourMeter != null && hourMeter >= 0) {
+        _latestInspectionHourMeters[tractorId] = hourMeter;
+      }
       if (inspection.isNotEmpty && inspection['is_fit'] != false) {
         _inspectedTractors.add(tractorId);
       } else {
@@ -642,6 +663,13 @@ class OperatorLocalRepository extends ChangeNotifier {
       if (!_currentSession(token, session)) return false;
       _eventIds.remove(key);
       _applyJobResponse(response);
+      if (hourMeter != null && hourMeter >= 0) {
+        final updated = maybeJobById(jobId);
+        if (updated != null) {
+          _latestInspectionHourMeters[updated.tractorId] = hourMeter;
+          _replace(jobId, updated.copyWith(startHourMeter: hourMeter));
+        }
+      }
       _lastActionError = null;
       notifyListeners();
       return true;
@@ -1377,6 +1405,10 @@ class OperatorLocalRepository extends ChangeNotifier {
       status: _jobStatus(json['status']?.toString()),
       journeyStartedAt: _dateTime(json['dispatched_at']),
       startedAt: _dateTime(json['started_at']),
+      startHourMeter: _number(json, const [
+        'start_hour_meter',
+        'starting_hour_meter',
+      ]),
       finishedAt: _dateTime(json['completed_at']),
       areaServicedHectares:
           _number(json, const ['reported_acres'])?.toDouble() == null

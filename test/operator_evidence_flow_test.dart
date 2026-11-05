@@ -14,11 +14,52 @@ import 'package:tractor/src/features/operator/presentation/screens/operator_farm
 import 'package:tractor/src/features/operator/presentation/screens/operator_job_photos_screen.dart';
 import 'package:tractor/src/features/operator/presentation/screens/operator_arrival_screen.dart';
 import 'package:tractor/src/features/operator/presentation/screens/operator_complete_job_screen.dart';
+import 'package:tractor/src/features/operator/presentation/screens/operator_job_detail_screen.dart';
 import 'package:tractor/src/additional_data/location/domain/entities/device_location.dart';
 import 'package:tractor/src/additional_data/location/domain/repositories/location_repository.dart';
 import 'package:tractor/src/l10n/generated/app_localizations.dart';
 
 void main() {
+  testWidgets(
+    'accept uses its own button for progress and exposes retry on GPS failure',
+    (tester) async {
+      final api = _EvidenceApi()..record['status'] = 'dispatched';
+      final location = _PendingLocation();
+      final repo = OperatorLocalRepository.seeded(
+        mobileApiClient: api,
+        locationRepository: location,
+      );
+      addTearDown(repo.dispose);
+      repo.setMechanizationAccessToken(
+        'operator',
+        permissions: ['mech.view', 'mech.operate'],
+      );
+      await tester.runAsync(() async {
+        final deadline = DateTime.now().add(const Duration(seconds: 5));
+        while (repo.isSyncingMechanization) {
+          if (DateTime.now().isAfter(deadline)) fail('Fixture timed out');
+          await Future<void>.delayed(const Duration(milliseconds: 1));
+        }
+      });
+
+      await tester.pumpWidget(
+        _localized(OperatorJobDetailScreen(repository: repo, jobId: 'job-1')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Accept Assignment'));
+      await tester.pump();
+
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text('Confirming location...'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsWidgets);
+
+      location.completeUnavailable();
+      await tester.pumpAndSettle();
+      expect(find.text('Try again'), findsOneWidget);
+      expect(find.textContaining('GPS unavailable'), findsOneWidget);
+    },
+  );
+
   test(
     'an older inspection read cannot relock photos after a new passed inspection',
     () async {
@@ -232,6 +273,43 @@ void main() {
       expect(api.uploads, 0);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'completion rejects an end hour meter below the recorded start reading',
+    (tester) async {
+      final api = _EvidenceApi()..record['status'] = 'in_progress';
+      final repo = (await tester.runAsync(() => _repository(api)))!;
+      addTearDown(repo.dispose);
+      await tester.runAsync(
+        () => repo.recordInspection(
+          tractorId: 'tractor-1',
+          jobId: 'job-1',
+          checklist: {'engine_oil': true},
+          hourMeter: 120.5,
+          isFit: true,
+        ),
+      );
+      await tester.pumpWidget(
+        _localized(OperatorCompleteJobScreen(repository: repo, jobId: 'job-1')),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, '2');
+      await tester.enterText(
+        find.byKey(const ValueKey('completion-end-hour-meter')),
+        '119',
+      );
+      await tester.ensureVisible(find.text('Finish Job'));
+      await tester.tap(find.text('Finish Job'));
+      await tester.pump();
+
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(
+        find.text('End reading must be at least 120.5 h.'),
+        findsOneWidget,
+      );
+      expect(api.record['status'], 'in_progress');
     },
   );
 
@@ -793,6 +871,22 @@ class _NoLocation implements LocationRepository {
       );
   @override
   Stream<DeviceLocation> watchLocation() => const Stream.empty();
+}
+
+class _PendingLocation implements LocationRepository {
+  final Completer<LocationResult> _fix = Completer<LocationResult>();
+
+  @override
+  Future<LocationResult> getCurrentLocation() => _fix.future;
+
+  @override
+  Stream<DeviceLocation> watchLocation() => const Stream.empty();
+
+  void completeUnavailable() {
+    _fix.complete(
+      const LocationUnavailable(LocationFailure('Phone GPS unavailable.')),
+    );
+  }
 }
 
 class _DisabledLocation

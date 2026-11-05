@@ -85,17 +85,23 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
                     children: [
                       Text(_resourceError!),
                       TextButton(
-                        onPressed: () async {
-                          await Future.wait([
-                            widget.repository.refreshScreen(
-                              UnionDataScreen.tractors,
-                            ),
-                            widget.repository.refreshScreen(
-                              UnionDataScreen.operators,
-                            ),
-                          ]);
-                          if (mounted) _loadResources();
-                        },
+                        onPressed: _loadingResources
+                            ? null
+                            : () async {
+                                setState(() {
+                                  _loadingResources = true;
+                                  _resourceError = null;
+                                });
+                                await Future.wait([
+                                  widget.repository.refreshScreen(
+                                    UnionDataScreen.tractors,
+                                  ),
+                                  widget.repository.refreshScreen(
+                                    UnionDataScreen.operators,
+                                  ),
+                                ]);
+                                if (mounted) await _loadResources();
+                              },
                         child: Text(context.appText('Retry')),
                       ),
                     ],

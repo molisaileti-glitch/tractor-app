@@ -3,6 +3,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../additional_data/location/data/repositories/geolocator_location_repository.dart';
 import '../../../../additional_data/location/domain/entities/device_location.dart';
@@ -16,6 +17,13 @@ import '../widgets/operator_widgets.dart';
 import '../widgets/operator_live_job_map.dart';
 import 'operator_progress_screen.dart';
 import 'operator_job_photos_screen.dart';
+
+final TextInputFormatter _decimalReadingFormatter =
+    TextInputFormatter.withFunction((oldValue, newValue) {
+      return RegExp(r'^\d*(?:\.\d{0,2})?$').hasMatch(newValue.text)
+          ? newValue
+          : oldValue;
+    });
 
 class OperatorArrivalScreen extends StatefulWidget {
   const OperatorArrivalScreen({
@@ -46,6 +54,7 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
   OperatorStartCheckResult? _startCheck;
   String? _locationError;
   final _hourMeterController = TextEditingController();
+  String? _startHourMeterError;
   String? _selectedImplement;
   final _mapKey = GlobalKey<OperatorLiveJobMapState>();
   bool _pollingReadiness = false;
@@ -438,8 +447,20 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
                                   const TextInputType.numberWithOptions(
                                     decimal: true,
                                   ),
+                              inputFormatters: [_decimalReadingFormatter],
+                              onChanged: (_) {
+                                if (_startHourMeterError != null) {
+                                  setState(() => _startHourMeterError = null);
+                                }
+                              },
                               decoration: InputDecoration(
                                 labelText: context.appText('Start hour meter'),
+                                suffixText: 'h',
+                                errorText: _startHourMeterError,
+                                helperMaxLines: 2,
+                                helperText: context.appText(
+                                  'Enter the reading displayed on the tractor hour meter, not the number of hours worked.',
+                                ),
                               ),
                             ),
                             const SizedBox(height: 10),
@@ -642,7 +663,30 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
 
   Future<void> _startJob() async {
     final navigator = Navigator.of(context);
-    final hourMeter = num.tryParse(_hourMeterController.text.trim());
+    final hourText = _hourMeterController.text.trim();
+    final hourMeter = hourText.isEmpty ? null : num.tryParse(hourText);
+    final inspectionReading = widget.repository.baselineHourMeterForJob(
+      widget.jobId,
+    );
+    if (hourText.isNotEmpty &&
+        (hourMeter == null || !hourMeter.isFinite || hourMeter < 0)) {
+      setState(() {
+        _startHourMeterError = context.appText(
+          'Enter a valid hour-meter reading.',
+        );
+      });
+      return;
+    }
+    if (hourMeter != null &&
+        inspectionReading != null &&
+        hourMeter < inspectionReading) {
+      setState(() {
+        _startHourMeterError = context
+            .appText('Start reading must be at least {start} h.')
+            .replaceAll('{start}', _formatReading(inspectionReading));
+      });
+      return;
+    }
     final implement = _selectedImplement;
     final confirmed = await showAppConfirmationDialog(
       context,
@@ -783,16 +827,31 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
     if (reason == null || reason.trim().isEmpty) return;
     if (!mounted) return;
 
-    final ok = await widget.repository.requestStartOverride(
-      jobId: widget.jobId,
-      reason: reason.trim(),
-      phone:
-          _mapKey.currentState?.currentFieldEvidence(
-            maximumAge: widget.repository.phoneFixMaximumAge,
-          ) ??
-          _geofenceResult?.location,
+    var ok = false;
+    final submitted = await showAppAsyncConfirmationDialog(
+      context,
+      title: context.appText('Request override?'),
+      message: context.appText(
+        'The reason and current location evidence will be sent to the union for review.',
+      ),
+      confirmLabel: 'Request Override',
+      workingLabel: 'Sending override request...',
+      onConfirm: () async {
+        ok = await widget.repository.requestStartOverride(
+          jobId: widget.jobId,
+          reason: reason.trim(),
+          phone:
+              _mapKey.currentState?.currentFieldEvidence(
+                maximumAge: widget.repository.phoneFixMaximumAge,
+              ) ??
+              _geofenceResult?.location,
+        );
+        if (!ok) throw StateError('override_request_failed');
+      },
+      errorMessage: (_) =>
+          widget.repository.lastActionError ?? 'Could not request override.',
     );
-    if (!mounted) return;
+    if (!mounted || !submitted) return;
     showAppSnackBar(
       context,
       message: ok
@@ -842,6 +901,11 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
     if (!mounted) return;
     setState(() {
       _submittingInspection = false;
+      if (ok &&
+          inspection.hourMeter != null &&
+          _hourMeterController.text.trim().isEmpty) {
+        _hourMeterController.text = _formatReading(inspection.hourMeter!);
+      }
     });
     showAppSnackBar(
       context,
@@ -853,6 +917,11 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
                 'Inspection could not be recorded.',
       type: ok ? AppSnackType.success : AppSnackType.error,
     );
+  }
+
+  String _formatReading(num value) {
+    final rounded = value.toStringAsFixed(2);
+    return rounded.replaceFirst(RegExp(r'\.?0+$'), '');
   }
 }
 
@@ -1151,9 +1220,17 @@ class _InspectionScreenState extends State<_InspectionScreen> {
                     TextField(
                       controller: _fuelController,
                       keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(3),
+                      ],
                       decoration: InputDecoration(
                         labelText: context.appText('Fuel level (%)'),
                         hintText: '0–100',
+                        helperText: context.appText(
+                          'Read the percentage from the tractor gauge. Only values from 0 to 100 are accepted.',
+                        ),
+                        helperMaxLines: 2,
                         prefixIcon: const Icon(
                           Icons.local_gas_station_outlined,
                         ),
@@ -1164,8 +1241,13 @@ class _InspectionScreenState extends State<_InspectionScreen> {
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
+                      inputFormatters: [_decimalReadingFormatter],
                       decoration: InputDecoration(
                         labelText: context.appText('Hour meter'),
+                        helperText: context.appText(
+                          'Enter the reading displayed on the tractor, not the number of hours worked.',
+                        ),
+                        helperMaxLines: 2,
                         prefixIcon: const Icon(Icons.speed_outlined),
                       ),
                     ),

@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../../../../additional_data/location/domain/entities/device_location.dart';
 import '../../../../components/components.dart';
 import '../../../farmer/presentation/widgets/farmer_formatters.dart';
 import '../../data/repositories/operator_local_repository.dart';
@@ -33,6 +34,9 @@ class _OperatorJobDetailScreenState extends State<OperatorJobDetailScreen> {
   String get jobId => widget.jobId;
   final _mapKey = GlobalKey<OperatorLiveJobMapState>();
   bool _primaryActionBusy = false;
+  String _primaryActionLoadingLabel = 'Please wait...';
+  String? _primaryActionError;
+  bool _mapRefreshing = false;
 
   @override
   Widget build(BuildContext context) {
@@ -76,8 +80,15 @@ class _OperatorJobDetailScreenState extends State<OperatorJobDetailScreen> {
                       ),
                       IconButton.filledTonal(
                         tooltip: context.appText('Refresh this job'),
-                        onPressed: () => _mapKey.currentState?.refresh(),
-                        icon: const Icon(Icons.refresh),
+                        onPressed: _mapRefreshing ? null : _refreshMap,
+                        icon: _mapRefreshing
+                            ? const SizedBox.square(
+                                dimension: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.refresh),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -128,6 +139,8 @@ class _OperatorJobDetailScreenState extends State<OperatorJobDetailScreen> {
                           )
                         : null,
                     primaryActionBusy: _primaryActionBusy,
+                    primaryActionLoadingLabel: _primaryActionLoadingLabel,
+                    primaryActionError: _primaryActionError,
                   ),
                 ),
               ),
@@ -140,7 +153,11 @@ class _OperatorJobDetailScreenState extends State<OperatorJobDetailScreen> {
 
   Future<void> _advance(BuildContext context, OperatorJob job) async {
     if (_primaryActionBusy) return;
-    setState(() => _primaryActionBusy = true);
+    setState(() {
+      _primaryActionBusy = true;
+      _primaryActionError = null;
+      _primaryActionLoadingLabel = 'Please wait...';
+    });
     try {
       if (job.status == OperatorJobStatus.completedPendingConfirmation &&
           job.farmerConfirmedAt == null) {
@@ -194,28 +211,42 @@ class _OperatorJobDetailScreenState extends State<OperatorJobDetailScreen> {
           type: AppSnackType.info,
         );
       }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _primaryActionError =
+              repository.lastActionError ??
+              context.appText('The action could not be completed. Try again.');
+        });
+      }
     } finally {
       if (mounted) setState(() => _primaryActionBusy = false);
     }
   }
 
   Future<void> _acceptAssignment(BuildContext context, OperatorJob job) async {
-    final accepted = await showAppAsyncConfirmationDialog(
-      context,
-      title: context.appText('Accept assignment?'),
-      message:
-          'Confirm that you are available to operate ${job.tractorLabel ?? 'the assigned tractor'} for this job.',
-      confirmLabel: 'Accept',
-      workingLabel: context.appText('Accepting...'),
-      onConfirm: () async {
-        final phone = await repository.captureFieldLocation();
-        final ok = await repository.acceptAssignment(job.id, phone: phone);
-        if (!ok) throw StateError('accept_failed');
-      },
-      errorMessage: (_) =>
-          repository.lastActionError ?? context.appText('Accept failed.'),
-    );
-    if (!accepted || !context.mounted) return;
+    final phone = await _actionLocation();
+    if (!context.mounted) return;
+    if (phone == null && repository.requiresPhoneLocation) {
+      setState(() {
+        _primaryActionError =
+            repository.lastActionError ??
+            context.appText(
+              'Current location is unavailable. Check location settings and try again.',
+            );
+      });
+      return;
+    }
+    _setPrimaryActionLabel('Accepting assignment...');
+    final accepted = await repository.acceptAssignment(job.id, phone: phone);
+    if (!context.mounted) return;
+    if (!accepted) {
+      setState(() {
+        _primaryActionError =
+            repository.lastActionError ?? context.appText('Accept failed.');
+      });
+      return;
+    }
     showAppSnackBar(
       context,
       message: context.appText(
@@ -226,25 +257,29 @@ class _OperatorJobDetailScreenState extends State<OperatorJobDetailScreen> {
   }
 
   Future<void> _startJourney(BuildContext context, OperatorJob job) async {
-    var journeyStarted = false;
-    final confirmed = await showAppAsyncConfirmationDialog(
-      context,
-      title: context.appText('Start journey?'),
-      message: context.appText(
-        'Your assignment will be marked en route and navigation to the farm will begin.',
-      ),
-      confirmLabel: 'Start Journey',
-      workingLabel: context.appText('Starting journey...'),
-      onConfirm: () async {
-        final phone = await repository.captureFieldLocation();
-        journeyStarted = await repository.startJourney(job.id, phone: phone);
-        if (!journeyStarted) throw StateError('journey_failed');
-      },
-      errorMessage: (_) =>
-          repository.lastActionError ??
-          context.appText('Could not start the journey.'),
-    );
-    if (!confirmed || !journeyStarted || !context.mounted) return;
+    final phone = await _actionLocation();
+    if (!context.mounted) return;
+    if (phone == null && repository.requiresPhoneLocation) {
+      setState(() {
+        _primaryActionError =
+            repository.lastActionError ??
+            context.appText(
+              'Current location is unavailable. Check location settings and try again.',
+            );
+      });
+      return;
+    }
+    _setPrimaryActionLabel('Starting journey...');
+    final journeyStarted = await repository.startJourney(job.id, phone: phone);
+    if (!context.mounted) return;
+    if (!journeyStarted) {
+      setState(() {
+        _primaryActionError =
+            repository.lastActionError ??
+            context.appText('Could not start the journey.');
+      });
+      return;
+    }
     final navigator = Navigator.of(context);
     navigator.pushReplacement(
       appPageRoute(
@@ -252,6 +287,32 @@ class _OperatorJobDetailScreenState extends State<OperatorJobDetailScreen> {
             OperatorArrivalScreen(repository: repository, jobId: job.id),
       ),
     );
+  }
+
+  DeviceLocation? _currentActionLocation() {
+    return _mapKey.currentState?.currentFieldEvidence(
+      maximumAge: repository.phoneFixMaximumAge,
+    );
+  }
+
+  Future<DeviceLocation?> _actionLocation() async {
+    _setPrimaryActionLabel('Confirming location...');
+    return _currentActionLocation() ?? await repository.captureFieldLocation();
+  }
+
+  void _setPrimaryActionLabel(String label) {
+    if (!mounted) return;
+    setState(() => _primaryActionLoadingLabel = context.appText(label));
+  }
+
+  Future<void> _refreshMap() async {
+    if (_mapRefreshing) return;
+    setState(() => _mapRefreshing = true);
+    try {
+      await _mapKey.currentState?.refresh();
+    } finally {
+      if (mounted) setState(() => _mapRefreshing = false);
+    }
   }
 
   void _showProblemDialog(BuildContext context, OperatorJob job) {
@@ -339,6 +400,8 @@ class _JobActionSheet extends StatelessWidget {
     required this.onReportProblem,
     required this.onPhotos,
     required this.primaryActionBusy,
+    required this.primaryActionLoadingLabel,
+    required this.primaryActionError,
   });
 
   final OperatorJob job;
@@ -346,6 +409,8 @@ class _JobActionSheet extends StatelessWidget {
   final VoidCallback onReportProblem;
   final VoidCallback? onPhotos;
   final bool primaryActionBusy;
+  final String primaryActionLoadingLabel;
+  final String? primaryActionError;
 
   @override
   Widget build(BuildContext context) {
@@ -429,6 +494,33 @@ class _JobActionSheet extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Text(guidance),
                 ),
+              if (primaryActionError != null) ...[
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.errorContainer.withValues(alpha: 0.65),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(primaryActionError!)),
+                      TextButton(
+                        onPressed: primaryActionBusy ? null : onStartJourney,
+                        child: Text(context.appText('Try again')),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               Row(
                 children: [
                   Expanded(
@@ -439,7 +531,7 @@ class _JobActionSheet extends StatelessWidget {
                           : null,
                       child: AppButtonContent(
                         label: _primaryActionLabel(job),
-                        loadingLabel: context.appText('Please wait...'),
+                        loadingLabel: primaryActionLoadingLabel,
                         loading: primaryActionBusy,
                         icon: Icons.route_outlined,
                       ),

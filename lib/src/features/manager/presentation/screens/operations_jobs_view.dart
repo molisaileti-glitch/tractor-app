@@ -60,7 +60,11 @@ class OperationsJobsView extends StatelessWidget {
             ),
           ),
         for (final job in repository.jobs) ...[
-          _JobCard(repository: repository, job: job),
+          _JobCard(
+            key: ValueKey('union-job-${job.id}'),
+            repository: repository,
+            job: job,
+          ),
           const SizedBox(height: 12),
         ],
       ],
@@ -105,7 +109,11 @@ class OperationsJobDetailScreen extends StatelessWidget {
                     ),
                   )
                 else
-                  _JobCard(repository: repository, job: job),
+                  _JobCard(
+                    key: ValueKey('union-job-${job.id}'),
+                    repository: repository,
+                    job: job,
+                  ),
               ],
             ),
           ),
@@ -152,11 +160,23 @@ class _JobFact extends StatelessWidget {
   }
 }
 
-class _JobCard extends StatelessWidget {
-  const _JobCard({required this.repository, required this.job});
+class _JobCard extends StatefulWidget {
+  const _JobCard({super.key, required this.repository, required this.job});
 
   final UnionOperationsRepository repository;
   final OperationsJob job;
+
+  @override
+  State<_JobCard> createState() => _JobCardState();
+}
+
+class _JobCardState extends State<_JobCard> {
+  bool _loadingEvidence = false;
+  bool _preparingVerification = false;
+  bool _refreshingVerification = false;
+
+  UnionOperationsRepository get repository => widget.repository;
+  OperationsJob get job => widget.job;
 
   bool get _canDispatch =>
       repository.can('mech.jobs.manage') && job.status == JobStatus.scheduled;
@@ -304,11 +324,30 @@ class _JobCard extends StatelessWidget {
                     : 'Ready for union verification.',
               ),
             const SizedBox(height: 10),
-            OutlinedButton.icon(
-              onPressed: () => _showEvidence(context),
-              icon: const Icon(Icons.insights_outlined),
-              label: Text(context.appText('Review work evidence')),
+            OutlinedButton(
+              onPressed: _loadingEvidence ? null : () => _showEvidence(context),
+              child: AppButtonContent(
+                label: context.appText('Review work evidence'),
+                loadingLabel: context.appText('Loading evidence...'),
+                loading: _loadingEvidence,
+                icon: Icons.insights_outlined,
+              ),
             ),
+            if (_refreshingVerification) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(context.appText('Refreshing verification...')),
+                  ),
+                ],
+              ),
+            ],
             if (_hasTrailStage) ...[
               const SizedBox(height: 10),
               OutlinedButton.icon(
@@ -328,10 +367,16 @@ class _JobCard extends StatelessWidget {
             if (repository.can('mech.jobs.manage') &&
                 job.status == JobStatus.completedPendingConfirmation) ...[
               const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: () => _showVerifyDialog(context),
-                icon: const Icon(Icons.verified_outlined),
-                label: Text(context.appText('Verify completed work')),
+              OutlinedButton(
+                onPressed: _preparingVerification
+                    ? null
+                    : () => _showVerifyDialog(context),
+                child: AppButtonContent(
+                  label: context.appText('Verify completed work'),
+                  loadingLabel: context.appText('Loading evidence...'),
+                  loading: _preparingVerification,
+                  icon: Icons.verified_outlined,
+                ),
               ),
             ],
             if (repository.can('mech.jobs.manage') &&
@@ -400,17 +445,26 @@ class _JobCard extends StatelessWidget {
                 ListTile(
                   leading: const Icon(Icons.insights_outlined),
                   title: Text(context.appText('Refresh verification')),
-                  onTap: () async {
-                    Navigator.of(context).pop();
-                    await repository.refreshJobVerification(job.id);
-                    if (!context.mounted) return;
-                    await _showActionResult(
-                      context,
-                      successTitle: 'Verification refreshed',
-                      successMessage:
-                          'The latest verification details are now shown on this job.',
-                    );
-                  },
+                  onTap: _refreshingVerification
+                      ? null
+                      : () async {
+                          Navigator.of(context).pop();
+                          setState(() => _refreshingVerification = true);
+                          try {
+                            await repository.refreshJobVerification(job.id);
+                          } finally {
+                            if (mounted) {
+                              setState(() => _refreshingVerification = false);
+                            }
+                          }
+                          if (!context.mounted) return;
+                          await _showActionResult(
+                            context,
+                            successTitle: 'Verification refreshed',
+                            successMessage:
+                                'The latest verification details are now shown on this job.',
+                          );
+                        },
                 ),
               if (job.status == JobStatus.completedPendingConfirmation ||
                   job.status == JobStatus.verified)
@@ -680,7 +734,13 @@ class _JobCard extends StatelessWidget {
   }
 
   Future<void> _showEvidence(BuildContext context) async {
-    await repository.refreshJobDetail(job.id);
+    if (_loadingEvidence) return;
+    setState(() => _loadingEvidence = true);
+    try {
+      await repository.refreshJobDetail(job.id);
+    } finally {
+      if (mounted) setState(() => _loadingEvidence = false);
+    }
     if (!context.mounted) return;
     final detail = repository.maybeJobById(job.id);
     if (detail == null) return;
@@ -746,7 +806,13 @@ class _JobCard extends StatelessWidget {
   }
 
   Future<void> _showVerifyDialog(BuildContext context) async {
-    await repository.refreshJobDetail(job.id);
+    if (_preparingVerification) return;
+    setState(() => _preparingVerification = true);
+    try {
+      await repository.refreshJobDetail(job.id);
+    } finally {
+      if (mounted) setState(() => _preparingVerification = false);
+    }
     if (!context.mounted) return;
     if (repository.mechanizationActionError != null) {
       await showAppErrorDialog(

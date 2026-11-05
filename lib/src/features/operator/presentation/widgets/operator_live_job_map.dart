@@ -243,7 +243,7 @@ class OperatorLiveJobMapState extends State<OperatorLiveJobMap>
   DeviceLocation? currentFieldEvidence({
     Duration maximumAge = const Duration(seconds: 30),
   }) {
-    final evidence = _fieldEvidence;
+    final evidence = _fieldEvidence ?? _verifiedPhone;
     if (evidence == null) return null;
     final age = DateTime.now().difference(evidence.recordedAt).inSeconds;
     return age >= -30 && age <= maximumAge.inSeconds ? evidence : null;

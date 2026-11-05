@@ -45,8 +45,8 @@ void main() {
     await tester.pump();
 
     expect(submissions, 1);
-    expect(find.text('Accepting...'), findsOneWidget);
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.text('Accepting...'), findsNWidgets(2));
+    expect(find.byType(CircularProgressIndicator), findsNWidgets(2));
     final dialogConfirm = tester.widget<FilledButton>(
       find.descendant(
         of: find.byType(AlertDialog),

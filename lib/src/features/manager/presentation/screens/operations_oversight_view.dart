@@ -25,6 +25,7 @@ class OperationsOversightView extends StatefulWidget {
 
 class _OperationsOversightViewState extends State<OperationsOversightView> {
   _OversightTab _tab = _OversightTab.overrides;
+  bool _refreshing = false;
 
   @override
   Widget build(BuildContext context) {
@@ -45,8 +46,13 @@ class _OperationsOversightViewState extends State<OperationsOversightView> {
             ),
             IconButton.filledTonal(
               tooltip: '${strings.refresh} ${strings.oversight.toLowerCase()}',
-              onPressed: repository.refreshOversightData,
-              icon: const Icon(Icons.refresh),
+              onPressed: _refreshing ? null : _refresh,
+              icon: _refreshing
+                  ? const SizedBox.square(
+                      dimension: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh),
             ),
           ],
         ),
@@ -126,6 +132,16 @@ class _OperationsOversightViewState extends State<OperationsOversightView> {
         ),
       ],
     );
+  }
+
+  Future<void> _refresh() async {
+    if (_refreshing) return;
+    setState(() => _refreshing = true);
+    try {
+      await widget.repository.refreshOversightData();
+    } finally {
+      if (mounted) setState(() => _refreshing = false);
+    }
   }
 }
 

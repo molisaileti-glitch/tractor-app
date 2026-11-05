@@ -108,6 +108,7 @@ class OperatorJob {
     this.acceptedByOperator = false,
     this.journeyStartedAt,
     this.startedAt,
+    this.startHourMeter,
     this.finishedAt,
     this.areaServicedHectares,
     this.completionNotes,
@@ -140,6 +141,7 @@ class OperatorJob {
   final OperatorJobStatus status;
   final DateTime? journeyStartedAt;
   final DateTime? startedAt;
+  final num? startHourMeter;
   final DateTime? finishedAt;
   final double? areaServicedHectares;
   final String? completionNotes;
@@ -193,6 +195,7 @@ class OperatorJob {
     DateTime? scheduledEndAt,
     DateTime? journeyStartedAt,
     DateTime? startedAt,
+    num? startHourMeter,
     DateTime? finishedAt,
     double? areaServicedHectares,
     String? completionNotes,
@@ -218,6 +221,7 @@ class OperatorJob {
       status: status ?? this.status,
       journeyStartedAt: journeyStartedAt ?? this.journeyStartedAt,
       startedAt: startedAt ?? this.startedAt,
+      startHourMeter: startHourMeter ?? this.startHourMeter,
       finishedAt: finishedAt ?? this.finishedAt,
       areaServicedHectares: areaServicedHectares ?? this.areaServicedHectares,
       completionNotes: completionNotes ?? this.completionNotes,

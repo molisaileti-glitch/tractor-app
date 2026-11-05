@@ -26,6 +26,8 @@ const Map<String, String> swahiliCopy = {
   'Flagging job...': 'Inaweka alama kwenye kazi...',
   'Clearing flag...': 'Inaondoa alama...',
   'Verifying...': 'Inathibitisha...',
+  'Loading evidence...': 'Inapakia ushahidi...',
+  'Refreshing verification...': 'Inasasisha uthibitishaji...',
   'Recording dispute...': 'Inarekodi pingamizi...',
   'Confirming...': 'Inathibitisha...',
   'Returning...': 'Inarudisha...',
@@ -36,8 +38,19 @@ const Map<String, String> swahiliCopy = {
   'Rescheduling...': 'Inapanga upya...',
   'Approving...': 'Inaidhinisha...',
   'Accepting...': 'Inakubali...',
+  'Accepting assignment...': 'Inakubali kazi...',
+  'Confirming location...': 'Inathibitisha eneo...',
+  'Try again': 'Jaribu tena',
+  'The action could not be completed. Try again.':
+      'Kitendo hakikukamilika. Jaribu tena.',
+  'Current location is unavailable. Check location settings and try again.':
+      'Eneo la sasa halipatikani. Kagua mipangilio ya eneo kisha ujaribu tena.',
+  'Confirming location and accepting...':
+      'Inathibitisha eneo na kukubali kazi...',
   'Accept failed.': 'Imeshindwa kukubali kazi.',
   'Starting journey...': 'Inaanza safari...',
+  'Confirming location and starting...':
+      'Inathibitisha eneo na kuanza safari...',
   'Please wait...': 'Tafadhali subiri...',
   'Could not start the journey.': 'Imeshindwa kuanza safari.',
   'Assignment accepted. Start the journey from this job when ready.':
@@ -50,6 +63,7 @@ const Map<String, String> swahiliCopy = {
   'Checking GPS...': 'Inakagua GPS...',
   'Record Arrival': 'Rekodi Kuwasili',
   'Run Start Check': 'Fanya Ukaguzi wa Kuanza',
+  'Request override?': 'Omba ruhusa maalum?',
   'Starting...': 'Inaanza...',
   'Start Service': 'Anza Huduma',
   'TRACTOR INSPECTION': 'UKAGUZI WA TREKTA',
@@ -154,6 +168,21 @@ const Map<String, String> swahiliCopy = {
   'Reported acres': 'Ekari zilizoripotiwa',
   'End hour meter': 'Kipimo cha saa mwisho',
   'Fuel used (L)': 'Mafuta yaliyotumika (L)',
+  'Use the readings shown on the tractor and the actual fuel record. Do not enter estimates or the number of hours worked.':
+      'Tumia usomaji unaoonekana kwenye trekta na rekodi halisi ya mafuta. Usiweke makadirio au idadi ya saa zilizofanya kazi.',
+  'Start reading: {start} h - Meter difference: {difference} h':
+      'Usomaji wa mwanzo: saa {start} - Tofauti ya kipimo: saa {difference}',
+  'Enter the final reading displayed by the tractor hour meter.':
+      'Weka usomaji wa mwisho unaoonekana kwenye kipimo cha saa cha trekta.',
+  'Recorded start reading: {start} h. The end reading cannot be lower.':
+      'Usomaji wa mwanzo uliorekodiwa: saa {start}. Usomaji wa mwisho hauwezi kuwa mdogo.',
+  'Enter the actual litres used for this job from the fuel or issue record. Leave blank if no reading is available.':
+      'Weka lita halisi zilizotumika kwa kazi hii kutoka rekodi ya mafuta. Acha wazi ikiwa usomaji haupatikani.',
+  'Enter a valid hour-meter reading.': 'Weka usomaji sahihi wa kipimo cha saa.',
+  'End reading must be at least {start} h.':
+      'Usomaji wa mwisho lazima uwe angalau saa {start}.',
+  'Enter zero or the actual non-negative litres used.':
+      'Weka sifuri au lita halisi zilizotumika zisizo chini ya sifuri.',
   'Add Notes': 'Ongeza maelezo',
   'Missing acres': 'Ekari hazijawekwa',
   'Enter the reported acres completed before submitting.':
@@ -192,6 +221,10 @@ const Map<String, String> swahiliCopy = {
   'Run safety checks': 'Fanya ukaguzi wa usalama',
   'Start service': 'Anza huduma',
   'Start hour meter': 'Kipimo cha saa mwanzo',
+  'Enter the reading displayed on the tractor hour meter, not the number of hours worked.':
+      'Weka usomaji unaoonekana kwenye kipimo cha saa cha trekta, si idadi ya saa zilizofanya kazi.',
+  'Start reading must be at least {start} h.':
+      'Usomaji wa kuanza lazima uwe angalau saa {start}.',
   'Implement': 'Kifaa',
   'Select an implement': 'Chagua kifaa',
   'Location could not be verified': 'Mahali halikuweza kuthibitishwa',
@@ -203,7 +236,11 @@ const Map<String, String> swahiliCopy = {
   'Submit inspection?': 'Uwasilishe ukaguzi?',
   'Pre-start inspection': 'Ukaguzi kabla ya kuanza',
   'Fuel level (%)': 'Kiwango cha mafuta (%)',
+  'Read the percentage from the tractor gauge. Only values from 0 to 100 are accepted.':
+      'Soma asilimia kwenye kipimo cha trekta. Thamani za 0 hadi 100 pekee zinakubalika.',
   'Hour meter': 'Kipimo cha saa',
+  'Enter the reading displayed on the tractor, not the number of hours worked.':
+      'Weka usomaji unaoonekana kwenye trekta, si idadi ya saa zilizofanya kazi.',
   'Defects / notes': 'Hitilafu / maelezo',
   'Pass': 'Imepita',
   'Issue': 'Tatizo',
