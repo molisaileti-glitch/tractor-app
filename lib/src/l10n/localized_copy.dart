@@ -168,6 +168,16 @@ const Map<String, String> swahiliCopy = {
   'Reported acres': 'Ekari zilizoripotiwa',
   'End hour meter': 'Kipimo cha saa mwisho',
   'Fuel used (L)': 'Mafuta yaliyotumika (L)',
+  'Pause the job before reporting a problem.':
+      'Sitisha kazi kabla ya kuripoti tatizo.',
+  'Pause work before reporting a problem':
+      'Sitisha kazi kabla ya kuripoti tatizo',
+  'Work is paused. Report the problem now, or resume when ready.':
+      'Kazi imesitishwa. Ripoti tatizo sasa, au endelea ukiwa tayari.',
+  'Work time will stop. After pausing, use Report Problem to notify operations.':
+      'Muda wa kazi utasimama. Baada ya kusitisha, tumia Ripoti Tatizo kuwajulisha wasimamizi.',
+  'Work paused. Report Problem is now available.':
+      'Kazi imesitishwa. Sasa unaweza kutumia Ripoti Tatizo.',
   'Use the readings shown on the tractor and the actual fuel record. Do not enter estimates or the number of hours worked.':
       'Tumia usomaji unaoonekana kwenye trekta na rekodi halisi ya mafuta. Usiweke makadirio au idadi ya saa zilizofanya kazi.',
   'Start reading: {start} h - Meter difference: {difference} h':

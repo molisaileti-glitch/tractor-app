@@ -539,8 +539,16 @@ class _JobActionSheet extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   IconButton.filledTonal(
-                    tooltip: context.appText('Report Problem'),
-                    onPressed: primaryActionBusy ? null : onReportProblem,
+                    tooltip: context.appText(
+                      job.status == OperatorJobStatus.inProgress
+                          ? 'Pause work before reporting a problem'
+                          : 'Report Problem',
+                    ),
+                    onPressed:
+                        primaryActionBusy ||
+                            job.status == OperatorJobStatus.inProgress
+                        ? null
+                        : onReportProblem,
                     icon: const Icon(Icons.report_problem_outlined),
                   ),
                 ],

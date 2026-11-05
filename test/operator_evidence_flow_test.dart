@@ -15,11 +15,49 @@ import 'package:tractor/src/features/operator/presentation/screens/operator_job_
 import 'package:tractor/src/features/operator/presentation/screens/operator_arrival_screen.dart';
 import 'package:tractor/src/features/operator/presentation/screens/operator_complete_job_screen.dart';
 import 'package:tractor/src/features/operator/presentation/screens/operator_job_detail_screen.dart';
+import 'package:tractor/src/features/operator/presentation/screens/operator_progress_screen.dart';
 import 'package:tractor/src/additional_data/location/domain/entities/device_location.dart';
 import 'package:tractor/src/additional_data/location/domain/repositories/location_repository.dart';
 import 'package:tractor/src/l10n/generated/app_localizations.dart';
 
 void main() {
+  testWidgets('problem reporting unlocks only after work is paused', (
+    tester,
+  ) async {
+    final api = _EvidenceApi()..record['status'] = 'in_progress';
+    final repo = (await tester.runAsync(() => _repository(api)))!;
+    addTearDown(repo.dispose);
+
+    await tester.pumpWidget(
+      _localized(OperatorProgressScreen(repository: repo, jobId: 'job-1')),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+
+    final reportAction = find.byKey(const ValueKey('report-problem-action'));
+    expect(reportAction, findsOneWidget);
+    expect(tester.widget<OutlinedButton>(reportAction).onPressed, isNull);
+    expect(
+      find.text('Pause the job before reporting a problem.'),
+      findsOneWidget,
+    );
+    expect(find.text('End Job'), findsOneWidget);
+
+    await tester.runAsync(
+      () => repo.pauseJob(jobId: 'job-1', reason: 'Problem reported'),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(tester.widget<OutlinedButton>(reportAction).onPressed, isNotNull);
+    expect(
+      find.text(
+        'Work is paused. Report the problem now, or resume when ready.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Resume'), findsOneWidget);
+    expect(find.text('End Job'), findsOneWidget);
+  });
+
   testWidgets(
     'accept uses its own button for progress and exposes retry on GPS failure',
     (tester) async {
@@ -804,6 +842,12 @@ class _EvidenceApi implements MechanizationMobileApiClient {
           'checks': [],
         };
       case #startJob:
+        record['status'] = 'in_progress';
+        data = Map<String, Object?>.from(record);
+      case #pauseJob:
+        record['status'] = 'paused';
+        data = Map<String, Object?>.from(record);
+      case #resumeJob:
         record['status'] = 'in_progress';
         data = Map<String, Object?>.from(record);
       case #completeJob:

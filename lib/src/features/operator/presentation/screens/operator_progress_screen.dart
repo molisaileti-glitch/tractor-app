@@ -170,6 +170,39 @@ class _OperatorProgressScreenState extends State<OperatorProgressScreen>
                     ),
                   ),
                   const SizedBox(height: 14),
+                  if (job.status == OperatorJobStatus.paused) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF4D6),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFF3C969)),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(
+                            Icons.pause_circle_outline,
+                            color: Color(0xFF9A6700),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              context.appText(
+                                'Work is paused. Report the problem now, or resume when ready.',
+                              ),
+                              style: const TextStyle(
+                                color: Color(0xFF6F4B00),
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
                   if (job.status == OperatorJobStatus.inProgress) ...[
                     OutlinedButton(
                       onPressed: _busy ? null : () => _pause(context, job),
@@ -195,12 +228,29 @@ class _OperatorProgressScreenState extends State<OperatorProgressScreen>
                     const SizedBox(height: 10),
                   ],
                   OutlinedButton.icon(
-                    onPressed: _busy
+                    key: const ValueKey('report-problem-action'),
+                    onPressed:
+                        _busy || job.status == OperatorJobStatus.inProgress
                         ? null
                         : () => _showProblemDialog(context, job),
                     icon: const Icon(Icons.report_problem_outlined),
                     label: Text(context.appText('Report Problem')),
                   ),
+                  if (job.status == OperatorJobStatus.inProgress) ...[
+                    const SizedBox(height: 6),
+                    Center(
+                      child: Text(
+                        context.appText(
+                          'Pause the job before reporting a problem.',
+                        ),
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 10),
                   FilledButton.icon(
                     onPressed:
@@ -244,7 +294,7 @@ class _OperatorProgressScreenState extends State<OperatorProgressScreen>
       context,
       title: context.appText('Pause work?'),
       message: context.appText(
-        'Work time for this job will be paused until you resume.',
+        'Work time will stop. After pausing, use Report Problem to notify operations.',
       ),
       confirmLabel: 'Pause',
     );
@@ -265,7 +315,7 @@ class _OperatorProgressScreenState extends State<OperatorProgressScreen>
     showAppSnackBar(
       context,
       message: ok
-          ? 'Work paused. Use Resume when you are ready to continue.'
+          ? 'Work paused. Report Problem is now available.'
           : repository.lastActionError ?? 'Pause failed.',
       type: ok ? AppSnackType.success : AppSnackType.error,
     );
@@ -346,10 +396,16 @@ class _OperatorProgressScreenState extends State<OperatorProgressScreen>
               onConfirm: () async {
                 if (submitting) return;
                 setState(() => submitting = true);
+                final phone =
+                    _mapKey.currentState?.currentFieldEvidence(
+                      maximumAge: repository.phoneFixMaximumAge,
+                    ) ??
+                    await repository.captureFieldLocation();
                 final ok = await repository.reportProblem(
                   jobId: job.id,
                   reason: reason,
                   notes: notesController.text.trim(),
+                  phone: phone,
                 );
                 if (!screenContext.mounted || !context.mounted) return;
                 if (ok) Navigator.of(context).pop();
