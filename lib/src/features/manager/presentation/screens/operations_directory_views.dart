@@ -44,9 +44,13 @@ class _TractorDirectoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final title = tractor.assetNo ?? tractor.label ?? tractor.model;
+    final title = operationsDisplayLabel(
+      tractor.assetNo ?? tractor.label ?? tractor.model,
+      fallback: context.appText('Tractor'),
+    );
     final model = [tractor.make, tractor.model]
         .whereType<String>()
+        .map((value) => operationsDisplayLabel(value, fallback: ''))
         .where((value) => value.trim().isNotEmpty)
         .toSet()
         .join(' ');
@@ -283,10 +287,12 @@ class _OperatorDirectoryCard extends StatelessWidget {
               const SizedBox(height: 9),
               _DirectoryFact(
                 icon: Icons.agriculture_outlined,
-                text:
-                    currentJob.tractor.assetNo ??
-                    currentJob.tractor.label ??
-                    currentJob.tractor.model,
+                text: operationsDisplayLabel(
+                  currentJob.tractor.assetNo ??
+                      currentJob.tractor.label ??
+                      currentJob.tractor.model,
+                  fallback: context.appText('Tractor'),
+                ),
               ),
               const SizedBox(height: 9),
               _DirectoryFact(
@@ -433,8 +439,14 @@ class MaintenanceView extends StatelessWidget {
             children: [
               for (final tractor in blocked)
                 _MaintenanceCard(
-                  tractorId: tractor.id,
-                  model: tractor.model,
+                  tractorId: operationsDisplayLabel(
+                    tractor.assetNo ?? tractor.label ?? tractor.model,
+                    fallback: context.appText('Tractor'),
+                  ),
+                  model: operationsDisplayLabel(
+                    tractor.model,
+                    fallback: context.appText('Tractor'),
+                  ),
                   note: tractor.note ?? tractor.status.label,
                   status: tractor.status,
                   hours: tractor.operatingHours,

@@ -1,5 +1,6 @@
 // File purpose: Verifies mechanization HTTP paths, query parameters, JSON bodies, multipart uploads, and error decoding.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -232,6 +233,40 @@ void main() {
       expect(expiredToken, 'expired-token');
     },
   );
+
+  test('slow session cleanup does not hold an unauthorized request', () async {
+    final previous = MechanizationMobileApiClient.onUnauthorized;
+    addTearDown(() => MechanizationMobileApiClient.onUnauthorized = previous);
+    final cleanupStarted = Completer<void>();
+    final cleanupMayContinue = Completer<void>();
+    MechanizationMobileApiClient.onUnauthorized = (token) async {
+      cleanupStarted.complete();
+      await cleanupMayContinue.future;
+    };
+    final api = await _server((request) async {
+      await _reply(request, {
+        'success': false,
+        'message': 'Session expired',
+      }, status: 401);
+    });
+
+    final stopwatch = Stopwatch()..start();
+    await expectLater(
+      api.me(token: 'expired-token'),
+      throwsA(
+        isA<MechanizationApiException>().having(
+          (error) => error.statusCode,
+          'status',
+          401,
+        ),
+      ),
+    );
+    stopwatch.stop();
+
+    await cleanupStarted.future;
+    expect(stopwatch.elapsed, lessThan(const Duration(seconds: 1)));
+    cleanupMayContinue.complete();
+  });
 
   test('rate limit preserves Retry-After', () async {
     var requests = 0;

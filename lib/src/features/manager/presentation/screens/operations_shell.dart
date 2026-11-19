@@ -2,6 +2,7 @@
 
 import 'dart:async';
 
+import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../components/components.dart';
@@ -137,55 +138,80 @@ class _OperationsShellState extends State<OperationsShell> {
                       ),
                     ),
                   Expanded(
-                    child: AnimatedSwitcher(
+                    child: PageTransitionSwitcher(
                       duration: AppMotion.duration(
                         context,
-                        const Duration(milliseconds: 450),
+                        const Duration(milliseconds: 600),
                       ),
-                      switchInCurve: Curves.easeOutCubic,
-                      switchOutCurve: Curves.easeInCubic,
-                      transitionBuilder: (child, animation) =>
-                          FadeTransition(opacity: animation, child: child),
+                      transitionBuilder:
+                          (child, primaryAnimation, secondaryAnimation) =>
+                              FadeThroughTransition(
+                                animation: primaryAnimation,
+                                secondaryAnimation: secondaryAnimation,
+                                fillColor: Theme.of(
+                                  context,
+                                ).scaffoldBackgroundColor,
+                                child: child,
+                              ),
                       child: widget.repository.isInitialScreenLoad(_screen)
                           ? _initialLoading()
                           : RefreshIndicator(
                               key: ValueKey(_section),
                               onRefresh: _refreshCurrentSection,
-                              child: SingleChildScrollView(
-                                physics: const AlwaysScrollableScrollPhysics(),
-                                padding: const EdgeInsets.fromLTRB(
-                                  20,
-                                  16,
-                                  20,
-                                  28,
-                                ),
-                                child: Align(
-                                  alignment: Alignment.topCenter,
-                                  child: ConstrainedBox(
-                                    constraints: const BoxConstraints(
-                                      maxWidth: 1180,
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
-                                        if (widget.repository.screenError(
-                                              _screen,
-                                            ) !=
-                                            null) ...[
-                                          AppMessage(
-                                            message: widget.repository
-                                                .screenError(_screen)!,
-                                            type: AppMessageType.warning,
+                              child: _section == OperationsSection.jobs
+                                  ? OperationsJobsScrollView(
+                                      repository: widget.repository,
+                                      screenError: widget.repository
+                                          .screenError(_screen),
+                                    )
+                                  : _section == OperationsSection.requests
+                                  ? OperationsRequestsView(
+                                      repository: widget.repository,
+                                      screenError: widget.repository
+                                          .screenError(_screen),
+                                    )
+                                  : _section == OperationsSection.oversight
+                                  ? OperationsOversightView(
+                                      repository: widget.repository,
+                                      screenError: widget.repository
+                                          .screenError(_screen),
+                                    )
+                                  : SingleChildScrollView(
+                                      physics:
+                                          const AlwaysScrollableScrollPhysics(),
+                                      padding: const EdgeInsets.fromLTRB(
+                                        20,
+                                        16,
+                                        20,
+                                        28,
+                                      ),
+                                      child: Align(
+                                        alignment: Alignment.topCenter,
+                                        child: ConstrainedBox(
+                                          constraints: const BoxConstraints(
+                                            maxWidth: 1180,
                                           ),
-                                          const SizedBox(height: 12),
-                                        ],
-                                        _currentView(),
-                                      ],
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.stretch,
+                                            children: [
+                                              if (widget.repository.screenError(
+                                                    _screen,
+                                                  ) !=
+                                                  null) ...[
+                                                AppMessage(
+                                                  message: widget.repository
+                                                      .screenError(_screen)!,
+                                                  type: AppMessageType.warning,
+                                                ),
+                                                const SizedBox(height: 12),
+                                              ],
+                                              _currentView(),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                ),
-                              ),
                             ),
                     ),
                   ),

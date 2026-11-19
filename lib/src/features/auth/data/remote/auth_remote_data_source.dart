@@ -159,7 +159,10 @@ class AuthRemoteDataSource {
       final response = await request.close().timeout(
         const Duration(seconds: 15),
       );
-      final responseBody = await response.transform(utf8.decoder).join();
+      final responseBody = await response
+          .transform(utf8.decoder)
+          .join()
+          .timeout(const Duration(seconds: 15));
       late final Map<String, Object?> decoded;
       try {
         decoded = responseBody.trim().isEmpty

@@ -233,6 +233,19 @@ class UnionOperationsRepository extends ChangeNotifier {
       if (has('farmers')) _applyFarmersResponse(responses['farmers']!);
       if (has('overrides')) _applyOverridesResponse(responses['overrides']!);
       if (has('exceptions')) _applyExceptionsResponse(responses['exceptions']!);
+      // The dashboard loads the same complete datasets as these sections.
+      // Reuse successful responses on first navigation; explicit refreshes
+      // still fetch fresh data for the selected section.
+      if (screen == UnionDataScreen.dashboard) {
+        if (has('jobs') && !_screenLoads.containsKey(UnionDataScreen.jobs)) {
+          _loadedScreens.add(UnionDataScreen.jobs);
+        }
+        if (has('overrides') &&
+            has('exceptions') &&
+            !_screenLoads.containsKey(UnionDataScreen.oversight)) {
+          _loadedScreens.add(UnionDataScreen.oversight);
+        }
+      }
       final errors = responses.values
           .map((response) => response['_load_error'])
           .whereType<String>()
@@ -1864,6 +1877,7 @@ class UnionOperationsRepository extends ChangeNotifier {
       tractor: TractorAsset(
         id: tractorId,
         model: tractorId,
+        label: _text(event, const ['tractor', 'tractor_code']),
         status: _tractorStatus(status),
         operatingHours: 0,
       ),

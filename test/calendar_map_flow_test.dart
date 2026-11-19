@@ -18,6 +18,64 @@ import 'package:tractor/src/features/operator/presentation/widgets/map_position_
 import 'package:tractor/src/l10n/generated/app_localizations.dart';
 
 void main() {
+  testWidgets(
+    'union calendar hides internal identifiers but keeps job actions',
+    (tester) async {
+      final api = _CalendarApi()..opaqueCalendarLabels = true;
+      final repo = UnionOperationsRepository.seeded(mobileApiClient: api);
+      addTearDown(repo.dispose);
+      await tester.runAsync(() async {
+        repo.setMechanizationAccessToken('manager');
+        await _settle(() => repo.isSyncingMechanization);
+        await repo.refreshScreen(UnionDataScreen.schedule);
+      });
+    await tester.pumpWidget(
+      _app(SingleChildScrollView(child: OperationsScheduleView(repository: repo))),
+    );
+      await tester.pumpAndSettle();
+      final assignment = tester
+          .widget<JobScheduleCalendar>(find.byType(JobScheduleCalendar))
+          .assignments
+          .first;
+      expect(assignment.id, 'job-0');
+      expect(assignment.reference, 'Job');
+      expect(assignment.details, containsAll(['Tractor', 'Operator']));
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets('union trail opens at the farm with the path overlaid', (
+    tester,
+  ) async {
+    final previous = GoogleMapsFlutterPlatform.instance;
+    GoogleMapsFlutterPlatform.instance = _MapPlatform();
+    addTearDown(() => GoogleMapsFlutterPlatform.instance = previous);
+    final repo = UnionOperationsRepository.seeded(
+      mobileApiClient: _CalendarApi(),
+    );
+    addTearDown(repo.dispose);
+    await tester.runAsync(() async {
+      repo.setMechanizationAccessToken('manager');
+      await _settle(() => repo.isSyncingMechanization);
+      await repo.refreshJobTrail('job-0');
+    });
+    await tester.pumpWidget(
+      _app(UnionJobTrailScreen(repository: repo, jobId: 'job-0')),
+    );
+    await tester.pumpAndSettle();
+
+    final map = tester.widget<GoogleMap>(find.byType(GoogleMap));
+    expect(map.initialCameraPosition.target, const LatLng(-6.18, 35.75));
+    expect(map.polygons.single.polygonId.value, 'job-plot-boundary');
+    expect(map.polylines.single.points, [
+      const LatLng(-6.18, 35.75),
+      const LatLng(-6.19, 35.76),
+    ]);
+    expect(find.text('Show farm and trail'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('union job status stays at the right edge with a long label', (
     tester,
   ) async {
@@ -541,6 +599,7 @@ class _MapPlatform extends GoogleMapsFlutterPlatform {
 
 class _CalendarApi implements MechanizationMobileApiClient {
   String? opened;
+  bool opaqueCalendarLabels = false;
   bool invalidFix = false;
   String jobStatus = 'dispatched';
   final DateTime day = DateUtils.dateOnly(DateTime.now());
@@ -596,14 +655,20 @@ class _CalendarApi implements MechanizationMobileApiClient {
             for (var i = 0; i < 12; i++)
               {
                 'id': 'job-$i',
-                'reference': 'JOB-$i',
+                'reference': opaqueCalendarLabels
+                    ? '123e4567-e89b-12d3-a456-426614174000'
+                    : 'JOB-$i',
                 'status': 'dispatched',
                 'start': '${date}T08:00:00',
                 'end': '${date}T08:15:00',
                 'farmer': 'Calendar Farmer',
                 'plot': 'A long named calendar plot',
-                'tractor': 'T-001',
-                'operator': 'Calendar Operator',
+                'tractor': opaqueCalendarLabels
+                    ? '123e4567-e89b-12d3-a456-426614174001'
+                    : 'T-001',
+                'operator': opaqueCalendarLabels
+                    ? '123e4567-e89b-12d3-a456-426614174002'
+                    : 'Calendar Operator',
                 'service_type': 'ploughing',
               },
           ],

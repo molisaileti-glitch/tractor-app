@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../../components/components.dart';
 import '../../../../components/job_schedule_calendar.dart';
 import '../../data/repositories/union_operations_repository.dart';
+import '../widgets/operations_widgets.dart';
 import 'operations_jobs_view.dart';
 
 class OperationsScheduleView extends StatelessWidget {
@@ -21,18 +22,31 @@ class OperationsScheduleView extends StatelessWidget {
           for (final job in repository.scheduleJobs)
             ScheduleAssignment(
               id: job.id,
-              reference: job.reference ?? job.id,
+              reference: operationsDisplayLabel(
+                job.reference,
+                fallback: context.appText('Job'),
+              ),
               start: job.scheduledAt,
               end:
                   job.scheduledEndAt ??
                   job.scheduledAt.add(
                     Duration(hours: job.estimatedHours.clamp(1, 24)),
                   ),
-              title: '${job.serviceType.label} - ${job.farmerName}',
+              title:
+                  '${job.serviceType.label} - ${operationsDisplayLabel(job.farmerName, fallback: context.appText('Farmer'))}',
               details: [
-                job.plot.name,
-                job.tractor.assetNo ?? job.tractor.label ?? job.tractor.model,
-                job.operator.name,
+                operationsDisplayLabel(
+                  job.plot.name,
+                  fallback: context.appText('Farm plot'),
+                ),
+                operationsDisplayLabel(
+                  job.tractor.assetNo ?? job.tractor.label ?? job.tractor.model,
+                  fallback: context.appText('Tractor'),
+                ),
+                operationsDisplayLabel(
+                  job.operator.name,
+                  fallback: context.appText('Operator'),
+                ),
               ],
               status: job.status.label,
               statusKey: job.status.name,

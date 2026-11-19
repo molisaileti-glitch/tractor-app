@@ -964,14 +964,14 @@ class MechanizationMobileApiClient {
         Duration(seconds: upload == null ? 15 : 60),
       );
       final responseHeadersMilliseconds = stopwatch.elapsedMilliseconds;
-      if (response.statusCode == 401 || response.statusCode == 419) {
-        await onUnauthorized?.call(token);
-      }
       final responseBody = await response
           .transform(utf8.decoder)
           .join()
           .timeout(const Duration(seconds: 15));
       final bodyReceivedMilliseconds = stopwatch.elapsedMilliseconds;
+      if (response.statusCode == 401 || response.statusCode == 419) {
+        _notifyUnauthorized(token, requestId);
+      }
       Map<String, Object?> decoded;
       try {
         decoded = responseBody.trim().isEmpty
@@ -1052,6 +1052,18 @@ class MechanizationMobileApiClient {
     } finally {
       stopwatch.stop();
     }
+  }
+
+  void _notifyUnauthorized(String token, int requestId) {
+    final callback = onUnauthorized;
+    if (callback == null) return;
+    // Session cleanup may include secure storage and a best-effort logout call.
+    // It must never hold the failed mechanization request or its action button.
+    unawaited(
+      Future<void>.sync(() => callback(token)).catchError((Object error) {
+        _log(requestId, 'session-expiry cleanup failed: $error');
+      }),
+    );
   }
 
   void _log(int requestId, String message) {

@@ -213,11 +213,16 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
                               for (final tractor in availableTractors) ...[
                                 _SelectableResourceCard(
                                   selected: _tractorId == tractor.id,
-                                  title:
-                                      tractor.assetNo ??
-                                      tractor.label ??
-                                      tractor.model,
-                                  subtitle: tractor.model,
+                                  title: operationsDisplayLabel(
+                                    tractor.assetNo ??
+                                        tractor.label ??
+                                        tractor.model,
+                                    fallback: context.appText('Tractor'),
+                                  ),
+                                  subtitle: operationsDisplayLabel(
+                                    tractor.model,
+                                    fallback: context.appText('Tractor'),
+                                  ),
                                   supportingText: tractor.note,
                                   trailing: OperationsStatusChip.tractor(
                                     tractorStatus: tractor.status,
@@ -484,10 +489,16 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
   }
 
   Future<void> _confirmSchedule() async {
+    if (_submitting) return;
+    setState(() => _submitting = true);
     final availability = await _checkAvailability();
     if (!mounted) return;
-    if (availability == null) return;
+    if (availability == null) {
+      setState(() => _submitting = false);
+      return;
+    }
     if (!availability.isAvailable) {
+      setState(() => _submitting = false);
       showAppSnackBar(
         context,
         message: availability.summary,
@@ -503,15 +514,6 @@ class _ScheduleServiceScreenState extends State<ScheduleServiceScreen> {
       _time.hour,
       _time.minute,
     );
-    final confirmed = await showAppConfirmationDialog(
-      context,
-      title: context.appText('Schedule service?'),
-      message:
-          'This will assign the selected tractor and operator on ${formatDate(scheduledAt)} at ${formatTime(scheduledAt)}.',
-      confirmLabel: 'Schedule',
-    );
-    if (!confirmed || !mounted) return;
-    setState(() => _submitting = true);
     await widget.repository.scheduleRequest(
       requestId: widget.requestId,
       tractorId: _tractorId!,

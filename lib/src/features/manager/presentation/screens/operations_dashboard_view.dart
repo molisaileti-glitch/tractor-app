@@ -372,8 +372,10 @@ class _TodayJobCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tractorLabel =
-        job.tractor.assetNo ?? job.tractor.label ?? job.tractor.model;
+    final tractorLabel = operationsDisplayLabel(
+      job.tractor.assetNo ?? job.tractor.label ?? job.tractor.model,
+      fallback: context.appText('Tractor'),
+    );
     final plotArea = job.plot.areaHectares > 0
         ? '${job.plot.areaHectares.toStringAsFixed(1)} ha'
         : null;
@@ -439,12 +441,18 @@ class _TodayJobCard extends StatelessWidget {
               _JobFact(
                 icon: Icons.person_outline,
                 label: context.appText('Farmer'),
-                value: job.farmerName,
+                value: operationsDisplayLabel(
+                  job.farmerName,
+                  fallback: context.appText('Farmer'),
+                ),
               ),
               _JobFact(
                 icon: Icons.engineering_outlined,
                 label: context.appText('Operator'),
-                value: job.operator.name,
+                value: operationsDisplayLabel(
+                  job.operator.name,
+                  fallback: context.appText('Operator'),
+                ),
               ),
               _JobFact(
                 icon: Icons.agriculture_outlined,
@@ -455,7 +463,10 @@ class _TodayJobCard extends StatelessWidget {
                 icon: Icons.location_on_outlined,
                 label: context.appText('Plot'),
                 value: [
-                  job.plot.name,
+                  operationsDisplayLabel(
+                    job.plot.name,
+                    fallback: context.appText('Farm plot'),
+                  ),
                   plotArea,
                 ].whereType<String>().join(' - '),
               ),

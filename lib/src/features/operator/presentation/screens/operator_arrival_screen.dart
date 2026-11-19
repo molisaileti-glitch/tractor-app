@@ -188,7 +188,6 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
         ),
       );
     }
-    final isWithinAllowedArea = _geofenceResult?.isWithinAllowedArea ?? false;
     final hasArrived =
         job.status == OperatorJobStatus.arrived ||
         job.status == OperatorJobStatus.inProgress;
@@ -234,37 +233,16 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
                     child: OperatorStatusPill(status: job.status),
                   ),
                   const SizedBox(height: 12),
-                  OperatorCard(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          isWithinAllowedArea
-                              ? Icons.check_circle_outline
-                              : Icons.warning_amber_outlined,
-                          color: isWithinAllowedArea
-                              ? Theme.of(context).colorScheme.primary
-                              : Theme.of(context).colorScheme.error,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            _statusText(
-                              hasArrived: hasArrived,
-                              result: _geofenceResult,
-                            ),
-                            style: Theme.of(context).textTheme.bodyLarge
-                                ?.copyWith(fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                      ],
+                  if (_locationError != null)
+                    AppMessage(
+                      type: AppMessageType.warning,
+                      message: _locationError!,
                     ),
-                  ),
                   if (_geofenceResult != null) ...[
                     const SizedBox(height: 10),
                     OperatorCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: ExpansionTile(
+                        title: Text(context.appText('Location details')),
                         children: [
                           _LocationFact(
                             label: context.appText('Latitude'),
@@ -290,29 +268,10 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
                       ),
                     ),
                   ],
-                  const SizedBox(height: 16),
-                  _WorkflowStep(
-                    number: 1,
-                    title: context.appText('Confirm your location'),
-                    complete: _geofenceResult != null,
-                    child: OutlinedButton(
-                      onPressed: _checkingLocation ? null : _refreshLocation,
-                      child: AppButtonContent(
-                        loading: _checkingLocation,
-                        loadingLabel: context.appText('Checking GPS...'),
-                        label: context.appText(
-                          _geofenceResult == null
-                              ? 'Check Location'
-                              : 'Refresh Location',
-                        ),
-                        icon: Icons.gps_fixed,
-                      ),
-                    ),
-                  ),
                   if (!hasArrived) ...[
                     const SizedBox(height: 12),
                     _WorkflowStep(
-                      number: 2,
+                      number: 1,
                       title: context.appText('Travel and record arrival'),
                       complete: false,
                       child: Column(
@@ -321,13 +280,6 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
                             context.appText(
                               'Both your phone and the assigned tractor must be within the farm boundary. The server checks GPS freshness, farm tolerance and proximity to the tractor.',
                             ),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: _checkingLocation
-                                ? null
-                                : _refreshLocation,
-                            icon: const Icon(Icons.route_outlined),
-                            label: Text(context.appText('Refresh Route')),
                           ),
                           const SizedBox(height: 10),
                           FilledButton(
@@ -363,7 +315,7 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
                   if (hasArrived) ...[
                     const SizedBox(height: 12),
                     _WorkflowStep(
-                      number: 2,
+                      number: 1,
                       title: context.appText('Inspect the tractor'),
                       complete: _hasInspection,
                       child: OutlinedButton(
@@ -409,7 +361,7 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
                     if (_readyForChecks) ...[
                       const SizedBox(height: 12),
                       _WorkflowStep(
-                        number: 3,
+                        number: 2,
                         title: context.appText('Run safety checks'),
                         complete: _startCheck?.canStart ?? false,
                         child: Column(
@@ -436,7 +388,7 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
                             (_startCheck?.overrideAllowed ?? false))) ...[
                       const SizedBox(height: 12),
                       _WorkflowStep(
-                        number: 4,
+                        number: 3,
                         title: context.appText('Start service'),
                         complete: false,
                         child: Column(
@@ -516,44 +468,8 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
     );
   }
 
-  String _statusText({
-    required bool hasArrived,
-    required PlotGeofenceResult? result,
-  }) {
-    if (_checkingLocation) {
-      return hasArrived
-          ? 'Checking phone GPS against the assigned farm boundary.'
-          : 'Checking your phone location for the route to the assigned farm.';
-    }
-    if (_locationError != null) {
-      return 'Location could not be verified.';
-    }
-    if (result == null) {
-      return hasArrived
-          ? 'Check location before starting this service.'
-          : 'Check location to show the route to the farm.';
-    }
-    final distanceMeters = result.distanceFromPlotMeters;
-    final distanceText = distanceMeters.isInfinite
-        ? 'unknown'
-        : '${distanceMeters.toStringAsFixed(0)} m';
-    return switch (result.state) {
-      PlotGeofenceState.insideBoundary =>
-        hasArrived
-            ? 'GPS evidence is inside the mapped farm boundary. Run Start Check for the server decision.'
-            : 'You appear to be inside the assigned farm boundary. Record arrival when the tractor is also present.',
-      PlotGeofenceState.withinTolerance =>
-        'GPS evidence is $distanceText outside the mapped boundary but within the farm tolerance. Run Start Check for the server decision.',
-      PlotGeofenceState.uncertain =>
-        'GPS accuracy overlaps the allowed farm area. Keep the tablet in open sky and verify again.',
-      PlotGeofenceState.outsideAllowedArea =>
-        'GPS evidence is outside the allowed farm area. Distance from the mapped boundary: $distanceText.',
-      PlotGeofenceState.unavailable =>
-        'The farm boundary or current GPS evidence is unavailable.',
-    };
-  }
-
   Future<void> _refreshLocation() async {
+    if (_checkingLocation) return;
     final job = widget.repository.maybeJobById(widget.jobId);
     debugPrint(
       '[Operator GPS] Check requested for job=${widget.jobId}; '
@@ -626,15 +542,6 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
   }
 
   Future<void> _recordArrival() async {
-    final confirmed = await showAppConfirmationDialog(
-      context,
-      title: context.appText('Record arrival?'),
-      message: context.appText(
-        'Confirm that you and the assigned tractor have arrived at the farm.',
-      ),
-      confirmLabel: 'Record Arrival',
-    );
-    if (!confirmed || !mounted) return;
     setState(() => _submittingArrival = true);
     final phone =
         _mapKey.currentState?.currentFieldEvidence(
@@ -875,17 +782,6 @@ class _OperatorArrivalScreenState extends State<OperatorArrivalScreen>
     );
     if (inspection == null) return;
     if (!mounted) return;
-
-    final confirmed = await showAppConfirmationDialog(
-      context,
-      title: context.appText('Submit inspection?'),
-      message: inspection.isFit
-          ? 'All checklist items passed. Submit this tractor as fit for work?'
-          : 'Issues were recorded. Submit this tractor as requiring attention?',
-      confirmLabel: 'Submit Inspection',
-      danger: !inspection.isFit,
-    );
-    if (!confirmed || !mounted) return;
 
     setState(() => _submittingInspection = true);
     final ok = await widget.repository.recordInspection(
@@ -1144,7 +1040,9 @@ class _InspectionScreenState extends State<_InspectionScreen> {
                         onPressed: _reviewing ? _submit : _openReview,
                         child: AppButtonContent(
                           label: context.appText(
-                            _reviewing ? 'Use Inspection' : 'Review Inspection',
+                            _reviewing
+                                ? 'Submit Inspection'
+                                : 'Review Inspection',
                           ),
                           icon: _reviewing
                               ? Icons.check_circle_outline

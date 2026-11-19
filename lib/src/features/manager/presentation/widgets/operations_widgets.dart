@@ -5,6 +5,19 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/operations_models.dart';
 
+/// Keep internal identifiers for API calls, but avoid presenting UUIDs as names.
+String operationsDisplayLabel(String? value, {required String fallback}) {
+  final text = value?.trim();
+  if (text == null ||
+      text.isEmpty ||
+      RegExp(
+        r'^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$',
+      ).hasMatch(text)) {
+    return fallback;
+  }
+  return text;
+}
+
 class OperationsCard extends StatelessWidget {
   const OperationsCard({super.key, required this.child, this.onTap});
 

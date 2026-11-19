@@ -2,6 +2,7 @@
 
 import 'dart:async';
 
+import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,6 +14,9 @@ import 'package:tractor/src/additional_data/location/domain/usecases/check_plot_
 import 'package:tractor/src/core/network/mechanization_mobile_api_client.dart';
 import 'package:tractor/src/features/farmer/domain/entities/farm_plot.dart';
 import 'package:tractor/src/features/manager/data/repositories/union_operations_repository.dart';
+import 'package:tractor/src/features/manager/presentation/screens/operations_jobs_view.dart';
+import 'package:tractor/src/features/manager/presentation/screens/operations_requests_view.dart';
+import 'package:tractor/src/features/manager/presentation/screens/operations_oversight_view.dart';
 import 'package:tractor/src/features/manager/presentation/screens/operations_shell.dart';
 import 'package:tractor/src/features/operator/data/repositories/operator_local_repository.dart';
 import 'package:tractor/src/features/operator/presentation/screens/operator_shell.dart';
@@ -116,6 +120,184 @@ void main() {
       expect(repo.screenError(entry.key), isNull);
     }
   });
+
+  test(
+    'dashboard data is reused for jobs and oversight until refreshed',
+    () async {
+      final api = _ScreenApi();
+      final repo = UnionOperationsRepository.seeded(mobileApiClient: api);
+      addTearDown(repo.dispose);
+      repo.setMechanizationAccessToken('manager');
+      await _settle(() => repo.isSyncingMechanization);
+      api.calls.clear();
+
+      await repo.ensureScreenLoaded(UnionDataScreen.jobs);
+      await repo.ensureScreenLoaded(UnionDataScreen.oversight);
+      expect(api.calls, isEmpty);
+      expect(repo.jobs, isNotEmpty);
+
+      await repo.refreshScreen(UnionDataScreen.jobs);
+      expect(api.names, [#jobs]);
+    },
+  );
+
+  test('failed dashboard modules are retried when their tab opens', () async {
+    final api = _ScreenApi()..failJobs = true;
+    final repo = UnionOperationsRepository.seeded(mobileApiClient: api);
+    addTearDown(repo.dispose);
+    repo.setMechanizationAccessToken('manager');
+    await _settle(() => repo.isSyncingMechanization);
+    api.calls.clear();
+    api.failJobs = false;
+
+    await repo.ensureScreenLoaded(UnionDataScreen.jobs);
+    expect(api.names, [#jobs]);
+    expect(repo.jobs, isNotEmpty);
+  });
+
+  testWidgets('union jobs tab is visible on the next frame without a reload', (
+    tester,
+  ) async {
+    final api = _ScreenApi();
+    final repo = UnionOperationsRepository.seeded(mobileApiClient: api);
+    final preferences = AppPreferencesController();
+    addTearDown(repo.dispose);
+    addTearDown(preferences.dispose);
+    await tester.runAsync(() async {
+      repo.setMechanizationAccessToken('manager');
+      await _settle(() => repo.isSyncingMechanization);
+    });
+    await tester.pumpWidget(
+      _app(
+        OperationsShell(
+          repository: repo,
+          preferences: preferences,
+          onLogout: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    api.calls.clear();
+    expect(
+      tester
+          .widget<PageTransitionSwitcher>(find.byType(PageTransitionSwitcher))
+          .duration,
+      const Duration(milliseconds: 600),
+    );
+
+    await tester.tap(find.byIcon(Icons.route_outlined).last);
+    await tester.pump();
+    expect(find.byType(OperationsJobsScrollView), findsOneWidget);
+    expect(find.byKey(const ValueKey('loading-jobs')), findsNothing);
+    expect(api.calls, isEmpty);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('union jobs builds cards as they scroll into view', (
+    tester,
+  ) async {
+    final api = _ScreenApi()..jobCount = 30;
+    final repo = UnionOperationsRepository.seeded(mobileApiClient: api);
+    addTearDown(repo.dispose);
+    await tester.runAsync(() async {
+      repo.setMechanizationAccessToken('manager');
+      await _settle(() => repo.isSyncingMechanization);
+    });
+    await tester.pumpWidget(_app(OperationsJobsScrollView(repository: repo)));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('union-job-job-0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('union-job-job-29')), findsNothing);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('union-job-job-29')),
+      500,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.byKey(const ValueKey('union-job-job-29')), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('union requests builds cards as they scroll into view', (
+    tester,
+  ) async {
+    final api = _ScreenApi()..requestCount = 30;
+    final repo = UnionOperationsRepository.seeded(mobileApiClient: api);
+    addTearDown(repo.dispose);
+    await tester.runAsync(() async {
+      repo.setMechanizationAccessToken('manager');
+      await _settle(() => repo.isSyncingMechanization);
+      await repo.ensureScreenLoaded(UnionDataScreen.requests);
+    });
+    await tester.pumpWidget(
+      _app(Scaffold(body: OperationsRequestsView(repository: repo))),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Pending 30'), findsOneWidget);
+    expect(find.text('Register'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('union-request-request-29')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('union-request-request-0')), findsNothing);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('union-request-request-0')),
+      500,
+      scrollable: find
+          .descendant(
+            of: find.byType(CustomScrollView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(
+      find.byKey(const ValueKey('union-request-request-0')),
+      findsOneWidget,
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets(
+    'oversight shows exceptions without reloading and builds cards lazily',
+    (tester) async {
+      final api = _ScreenApi()..exceptionCount = 30;
+      final repo = UnionOperationsRepository.seeded(mobileApiClient: api);
+      addTearDown(repo.dispose);
+      await tester.runAsync(() async {
+        repo.setMechanizationAccessToken('manager');
+        await _settle(() => repo.isSyncingMechanization);
+      });
+      await tester.pumpWidget(
+        _app(Scaffold(body: OperationsOversightView(repository: repo))),
+      );
+      await tester.pumpAndSettle();
+      api.calls.clear();
+      await tester.tap(find.text('Exceptions 30'));
+      await tester.pump();
+      expect(api.calls, isEmpty);
+      expect(
+        find.byKey(const ValueKey('union-exception-exception-0')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('union-exception-exception-29')),
+        findsNothing,
+      );
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('union-exception-exception-29')),
+        500,
+        scrollable: find
+            .descendant(
+              of: find.byType(CustomScrollView),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      expect(
+        find.byKey(const ValueKey('union-exception-exception-29')),
+        findsOneWidget,
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
   for (final operator in [true, false]) {
     testWidgets(
@@ -741,6 +923,10 @@ class _MapPlatform extends GoogleMapsFlutterPlatform {
 
 class _ScreenApi implements MechanizationMobileApiClient {
   final calls = <Invocation>[];
+  bool failJobs = false;
+  int jobCount = 1;
+  int requestCount = 0;
+  int exceptionCount = 0;
   List<Symbol> get names => calls.map((call) => call.memberName).toList();
   Completer<Map<String, Object?>>? calendarGate;
   Map<String, Object?> checkResponse = {
@@ -796,18 +982,33 @@ class _ScreenApi implements MechanizationMobileApiClient {
           'policy': {'phone_accuracy_max_m': 75, 'fix_max_age_s': 120},
         };
       case #jobs:
+        if (failJobs) throw const MechanizationApiException('Jobs unavailable');
         data = [
-          _jobData(
-            call.namedArguments[#status] ==
-                    'completed,verified,closed,cancelled'
-                ? 'completed'
-                : 'in_progress',
-          ),
+          for (var index = 0; index < jobCount; index++)
+            {
+              ..._jobData(
+                call.namedArguments[#status] ==
+                        'completed,verified,closed,cancelled'
+                    ? 'completed'
+                    : 'in_progress',
+              ),
+              if (jobCount > 1) 'id': 'job-$index',
+            },
         ];
       case #job:
         data = _jobData();
       case #jobPath:
         data = {'path': [], 'live': null};
+      case #requests:
+        data = [
+          for (var i = 0; i < requestCount; i++)
+            {'id': 'request-$i', 'status': 'pending'},
+        ];
+      case #exceptions:
+        data = [
+          for (var i = 0; i < exceptionCount; i++)
+            {'id': 'exception-$i', 'title': 'Exception $i', 'status': 'open'},
+        ];
       case #startCheck:
         data = checkResponse;
       case #startJob:

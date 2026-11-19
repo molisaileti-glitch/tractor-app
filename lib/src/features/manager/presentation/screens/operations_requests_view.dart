@@ -3,7 +3,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:animations/animations.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../../components/components.dart';
@@ -14,9 +13,14 @@ import '../widgets/operations_widgets.dart';
 import 'schedule_service_screen.dart';
 
 class OperationsRequestsView extends StatefulWidget {
-  const OperationsRequestsView({super.key, required this.repository});
+  const OperationsRequestsView({
+    super.key,
+    required this.repository,
+    this.screenError,
+  });
 
   final UnionOperationsRepository repository;
+  final String? screenError;
 
   @override
   State<OperationsRequestsView> createState() => _OperationsRequestsViewState();
@@ -55,126 +59,146 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
         .requestsByStatus(OperationsRequestStatus.cancelled)
         .length;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+    final header = <Widget>[
+      if (widget.screenError != null) ...[
+        AppMessage(message: widget.screenError!, type: AppMessageType.warning),
+        const SizedBox(height: 12),
+      ],
+      Text(
+        context.appText('Service Requests'),
+        style: Theme.of(
+          context,
+        ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
+      ),
+      const SizedBox(height: 14),
+      _RemoteRequestsBanner(
+        isLoading: _loadingRemoteRequests,
+        error:
+            _remoteRequestsError ?? widget.repository.mechanizationActionError,
+        onRefresh: _loadRemoteRequests,
+      ),
+      const SizedBox(height: 12),
+      SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
           children: [
-            Expanded(
-              child: Text(
-                context.appText('Service Requests'),
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
+            _FilterChip(
+              label: 'Pending $pendingCount',
+              selected: _status == OperationsRequestStatus.pending,
+              onSelected: () =>
+                  setState(() => _status = OperationsRequestStatus.pending),
             ),
-            const SizedBox(width: 12),
-            FilledButton.icon(
-              onPressed: widget.repository.can('mech.requests.manage')
-                  ? _openRegisterRequest
-                  : null,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(0, 44),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+            _FilterChip(
+              label: 'Approved $approvedCount',
+              selected: _status == OperationsRequestStatus.approved,
+              onSelected: () =>
+                  setState(() => _status = OperationsRequestStatus.approved),
+            ),
+            _FilterChip(
+              label: 'Rejected $rejectedCount',
+              selected: _status == OperationsRequestStatus.rejected,
+              onSelected: () =>
+                  setState(() => _status = OperationsRequestStatus.rejected),
+            ),
+            _FilterChip(
+              label: 'Returned $returnedCount',
+              selected: _status == OperationsRequestStatus.returned,
+              onSelected: () =>
+                  setState(() => _status = OperationsRequestStatus.returned),
+            ),
+            _FilterChip(
+              label: 'Scheduled $scheduledCount',
+              selected: _status == OperationsRequestStatus.scheduled,
+              onSelected: () =>
+                  setState(() => _status = OperationsRequestStatus.scheduled),
+            ),
+            _FilterChip(
+              label: 'Cancelled $cancelledCount',
+              selected: _status == OperationsRequestStatus.cancelled,
+              onSelected: () =>
+                  setState(() => _status = OperationsRequestStatus.cancelled),
+            ),
+            for (final status in [
+              OperationsRequestStatus.inProgress,
+              OperationsRequestStatus.paused,
+              OperationsRequestStatus.completed,
+              OperationsRequestStatus.verified,
+              OperationsRequestStatus.closed,
+              OperationsRequestStatus.flagged,
+            ])
+              _FilterChip(
+                label:
+                    '${status.label} ${widget.repository.requestsByStatus(status).length}',
+                selected: _status == status,
+                onSelected: () => setState(() => _status = status),
               ),
-              icon: const Icon(Icons.add),
-              label: Text(context.appText('Register')),
+            _FilterChip(
+              label: 'All ${widget.repository.requests.length}',
+              selected: _status == null,
+              onSelected: () => setState(() => _status = null),
             ),
           ],
         ),
-        const SizedBox(height: 14),
-        _RemoteRequestsBanner(
-          isLoading: _loadingRemoteRequests,
-          error:
-              _remoteRequestsError ??
-              widget.repository.mechanizationActionError,
-          onRefresh: _loadRemoteRequests,
-        ),
-        const SizedBox(height: 12),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              _FilterChip(
-                label: 'Pending $pendingCount',
-                selected: _status == OperationsRequestStatus.pending,
-                onSelected: () =>
-                    setState(() => _status = OperationsRequestStatus.pending),
-              ),
-              _FilterChip(
-                label: 'Approved $approvedCount',
-                selected: _status == OperationsRequestStatus.approved,
-                onSelected: () =>
-                    setState(() => _status = OperationsRequestStatus.approved),
-              ),
-              _FilterChip(
-                label: 'Rejected $rejectedCount',
-                selected: _status == OperationsRequestStatus.rejected,
-                onSelected: () =>
-                    setState(() => _status = OperationsRequestStatus.rejected),
-              ),
-              _FilterChip(
-                label: 'Returned $returnedCount',
-                selected: _status == OperationsRequestStatus.returned,
-                onSelected: () =>
-                    setState(() => _status = OperationsRequestStatus.returned),
-              ),
-              _FilterChip(
-                label: 'Scheduled $scheduledCount',
-                selected: _status == OperationsRequestStatus.scheduled,
-                onSelected: () =>
-                    setState(() => _status = OperationsRequestStatus.scheduled),
-              ),
-              _FilterChip(
-                label: 'Cancelled $cancelledCount',
-                selected: _status == OperationsRequestStatus.cancelled,
-                onSelected: () =>
-                    setState(() => _status = OperationsRequestStatus.cancelled),
-              ),
-              for (final status in [
-                OperationsRequestStatus.inProgress,
-                OperationsRequestStatus.paused,
-                OperationsRequestStatus.completed,
-                OperationsRequestStatus.verified,
-                OperationsRequestStatus.closed,
-                OperationsRequestStatus.flagged,
-              ])
-                _FilterChip(
-                  label:
-                      '${status.label} ${widget.repository.requestsByStatus(status).length}',
-                  selected: _status == status,
-                  onSelected: () => setState(() => _status = status),
-                ),
-              _FilterChip(
-                label: 'All ${widget.repository.requests.length}',
-                selected: _status == null,
-                onSelected: () => setState(() => _status = null),
-              ),
-            ],
+      ),
+      const SizedBox(height: 14),
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final contentWidth = (constraints.maxWidth - 40).clamp(0.0, 1180.0);
+        final columns = contentWidth >= 980
+            ? 3
+            : contentWidth >= 650
+            ? 2
+            : 1;
+        Widget centred(Widget child) => Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1180),
+            child: child,
           ),
-        ),
-        const SizedBox(height: 14),
-        PageTransitionSwitcher(
-          duration: AppMotion.duration(context, AppMotion.standard),
-          transitionBuilder: (child, primaryAnimation, secondaryAnimation) =>
-              FadeThroughTransition(
-                animation: primaryAnimation,
-                secondaryAnimation: secondaryAnimation,
-                fillColor: Colors.transparent,
-                child: child,
-              ),
-          child: requests.isEmpty
-              ? _RequestsEmptyState(
-                  key: ValueKey('empty-$_status'),
-                  message: context.appText('No requests found.'),
-                )
-              : _RequestCardGrid(
-                  key: ValueKey('requests-$_status'),
-                  requests: requests,
-                  onOpen: (id) => _openRequest(context, id),
+        );
+        return CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              sliver: SliverToBoxAdapter(
+                child: centred(
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ...header,
+                      if (requests.isEmpty)
+                        _RequestsEmptyState(
+                          message: context.appText('No requests found.'),
+                        ),
+                    ],
+                  ),
                 ),
-        ),
-      ],
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+              sliver: SliverList.builder(
+                itemCount: (requests.length + columns - 1) ~/ columns,
+                itemBuilder: (context, index) {
+                  final start = index * columns;
+                  final end = (start + columns).clamp(0, requests.length);
+                  return centred(
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _RequestCardGrid(
+                        requests: requests.sublist(start, end),
+                        onOpen: (id) => _openRequest(context, id),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -188,18 +212,6 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
         ),
       ),
     );
-  }
-
-  Future<void> _openRegisterRequest() async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (_) => _RegisterRequestSheet(repository: widget.repository),
-    );
-    if (!mounted) return;
-    await _loadRemoteRequests();
   }
 
   Future<void> _loadRemoteRequests({bool initial = false}) async {
@@ -220,7 +232,7 @@ class _OperationsRequestsViewState extends State<OperationsRequestsView> {
 }
 
 class _RequestsEmptyState extends StatelessWidget {
-  const _RequestsEmptyState({super.key, required this.message});
+  const _RequestsEmptyState({required this.message});
 
   final String message;
 
@@ -341,11 +353,7 @@ class _FilterChip extends StatelessWidget {
 }
 
 class _RequestCardGrid extends StatelessWidget {
-  const _RequestCardGrid({
-    super.key,
-    required this.requests,
-    required this.onOpen,
-  });
+  const _RequestCardGrid({required this.requests, required this.onOpen});
 
   final List<OperationsServiceRequest> requests;
   final ValueChanged<String> onOpen;
@@ -368,6 +376,7 @@ class _RequestCardGrid extends StatelessWidget {
               SizedBox(
                 width: width,
                 child: _RequestPreviewCard(
+                  key: ValueKey('union-request-${request.id}'),
                   request: request,
                   onTap: () => onOpen(request.id),
                 ),
@@ -380,7 +389,11 @@ class _RequestCardGrid extends StatelessWidget {
 }
 
 class _RequestPreviewCard extends StatelessWidget {
-  const _RequestPreviewCard({required this.request, required this.onTap});
+  const _RequestPreviewCard({
+    super.key,
+    required this.request,
+    required this.onTap,
+  });
 
   final OperationsServiceRequest request;
   final VoidCallback onTap;
@@ -1118,14 +1131,6 @@ class _ApproveRequestSheetState extends State<_ApproveRequestSheet> {
       );
       return;
     }
-    final confirmed = await showAppConfirmationDialog(
-      context,
-      title: context.appText('Approve request?'),
-      message:
-          'Approve this service request with an estimated amount of $amount?',
-      confirmLabel: 'Approve',
-    );
-    if (!confirmed || !mounted) return;
     setState(() => _submitting = true);
     await widget.onSubmit(
       amount: amount,
@@ -1135,358 +1140,6 @@ class _ApproveRequestSheetState extends State<_ApproveRequestSheet> {
           : _noteController.text.trim(),
     );
     if (!mounted) return;
-    Navigator.of(context).pop();
-  }
-}
-
-class _RegisterRequestSheet extends StatefulWidget {
-  const _RegisterRequestSheet({required this.repository});
-
-  final UnionOperationsRepository repository;
-
-  @override
-  State<_RegisterRequestSheet> createState() => _RegisterRequestSheetState();
-}
-
-class _RegisterRequestSheetState extends State<_RegisterRequestSheet> {
-  final _farmerIdController = TextEditingController();
-  final _plotIdController = TextEditingController();
-  final _serviceTypeIdController = TextEditingController();
-  final _acresController = TextEditingController();
-  final _notesController = TextEditingController();
-  DateTime _date = DateTime.now().add(const Duration(days: 1));
-  String _window = 'morning';
-  String _priority = 'normal';
-  bool _submitting = false;
-  bool _loadingPickers = true;
-  bool _loadingPlots = false;
-  int _plotLoadVersion = 0;
-  String? _pickerError;
-  List<Map<String, Object?>> _serviceTypes = [];
-  List<Map<String, Object?>> _plots = [];
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_loadPickers());
-  }
-
-  Future<void> _loadPickers() async {
-    try {
-      await widget.repository.refreshFarmers();
-      final services = await widget.repository.serviceTypeOptions();
-      if (!mounted) return;
-      setState(() {
-        _serviceTypes = services;
-        _loadingPickers = false;
-        _pickerError = widget.repository.mechanizationSyncError;
-      });
-    } catch (error) {
-      if (mounted) {
-        setState(() {
-          _pickerError = error.toString();
-          _loadingPickers = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _selectFarmer(String? farmerId) async {
-    final version = ++_plotLoadVersion;
-    setState(() {
-      _farmerIdController.text = farmerId ?? '';
-      _plotIdController.clear();
-      _plots = [];
-      _loadingPlots = true;
-      _pickerError = null;
-    });
-    try {
-      final plots = farmerId == null
-          ? <Map<String, Object?>>[]
-          : await widget.repository.farmerPlotOptions(farmerId);
-      if (!mounted || version != _plotLoadVersion) return;
-      setState(() {
-        _plots = plots;
-        _loadingPlots = false;
-      });
-    } catch (error) {
-      if (mounted && version == _plotLoadVersion) {
-        setState(() {
-          _pickerError = error.toString();
-          _loadingPlots = false;
-        });
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _farmerIdController.dispose();
-    _plotIdController.dispose();
-    _serviceTypeIdController.dispose();
-    _acresController.dispose();
-    _notesController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        20,
-        20,
-        20,
-        MediaQuery.viewInsetsOf(context).bottom + 20,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              context.appText('Register Service Request'),
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 14),
-            if (_loadingPickers) const LinearProgressIndicator(),
-            if (_pickerError != null)
-              AppMessage(message: _pickerError!, type: AppMessageType.error),
-            DropdownButtonFormField<String>(
-              initialValue: _farmerIdController.text.isEmpty
-                  ? null
-                  : _farmerIdController.text,
-              isExpanded: true,
-              decoration: InputDecoration(labelText: context.appText('Farmer')),
-              items: [
-                for (final farmer in widget.repository.farmers)
-                  DropdownMenuItem(
-                    value: farmer.id,
-                    child: Text(farmer.name, overflow: TextOverflow.ellipsis),
-                  ),
-              ],
-              onChanged: _loadingPickers || _submitting ? null : _selectFarmer,
-            ),
-            const SizedBox(height: 10),
-            if (_loadingPlots) const LinearProgressIndicator(),
-            DropdownButtonFormField<String>(
-              key: ValueKey(
-                'plots-${_farmerIdController.text}-$_plotLoadVersion',
-              ),
-              initialValue: _plotIdController.text.isEmpty
-                  ? null
-                  : _plotIdController.text,
-              isExpanded: true,
-              decoration: InputDecoration(
-                labelText: context.appText('Mapped plot'),
-              ),
-              items: [
-                for (final plot in _plots)
-                  if (plot['mapped'] == true ||
-                      (plot['boundary'] is List &&
-                          (plot['boundary'] as List).length >= 3))
-                    DropdownMenuItem(
-                      value: plot['id'].toString(),
-                      child: Text(
-                        plot['name']?.toString() ?? 'Plot',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-              ],
-              onChanged: _loadingPlots || _submitting
-                  ? null
-                  : (value) =>
-                        setState(() => _plotIdController.text = value ?? ''),
-            ),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              initialValue: _serviceTypeIdController.text.isEmpty
-                  ? null
-                  : _serviceTypeIdController.text,
-              isExpanded: true,
-              decoration: InputDecoration(
-                labelText: context.appText('Service'),
-              ),
-              items: [
-                for (final service in _serviceTypes)
-                  DropdownMenuItem(
-                    value: service['id'].toString(),
-                    child: Text(
-                      service['name']?.toString() ?? service['code'].toString(),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-              ],
-              onChanged: _loadingPickers || _submitting
-                  ? null
-                  : (value) => setState(
-                      () => _serviceTypeIdController.text = value ?? '',
-                    ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _acresController,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: InputDecoration(
-                labelText: context.appText('Requested acres'),
-              ),
-            ),
-            const SizedBox(height: 10),
-            OutlinedButton.icon(
-              onPressed: _pickDate,
-              icon: const Icon(Icons.calendar_month_outlined),
-              label: Text('Preferred date: ${formatDate(_date)}'),
-            ),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              initialValue: _window,
-              decoration: InputDecoration(
-                labelText: context.appText('Preferred window'),
-              ),
-              items: [
-                DropdownMenuItem(
-                  value: 'morning',
-                  child: Text(context.appText('Morning')),
-                ),
-                DropdownMenuItem(
-                  value: 'afternoon',
-                  child: Text(context.appText('Afternoon')),
-                ),
-                DropdownMenuItem(
-                  value: 'full_day',
-                  child: Text(context.appText('Full day')),
-                ),
-              ],
-              onChanged: (value) => setState(() => _window = value ?? _window),
-            ),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              initialValue: _priority,
-              decoration: InputDecoration(
-                labelText: context.appText('Priority'),
-              ),
-              items: [
-                DropdownMenuItem(
-                  value: 'normal',
-                  child: Text(context.appText('Normal')),
-                ),
-                DropdownMenuItem(
-                  value: 'high',
-                  child: Text(context.appText('High')),
-                ),
-                DropdownMenuItem(
-                  value: 'urgent',
-                  child: Text(context.appText('Urgent')),
-                ),
-              ],
-              onChanged: (value) =>
-                  setState(() => _priority = value ?? _priority),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _notesController,
-              maxLines: 2,
-              decoration: InputDecoration(labelText: context.appText('Notes')),
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _submitting
-                        ? null
-                        : () => Navigator.of(context).pop(),
-                    child: Text(context.appText('Cancel')),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: _submitting || _loadingPickers || _loadingPlots
-                        ? null
-                        : _submit,
-                    child: AppButtonContent(
-                      loading: _submitting,
-                      loadingLabel: context.appText('Registering...'),
-                      label: context.appText('Register'),
-                      icon: Icons.add_task_outlined,
-                      progressColor: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _pickDate() async {
-    final selected = await showDatePicker(
-      context: context,
-      initialDate: _date,
-      firstDate: DateTime.now(),
-      lastDate: DateTime(2027, 12, 31),
-    );
-    if (selected == null) return;
-    setState(() => _date = selected);
-  }
-
-  Future<void> _submit() async {
-    final farmerId = _farmerIdController.text.trim();
-    final plotId = _plotIdController.text.trim();
-    final serviceTypeId = _serviceTypeIdController.text.trim();
-    final acres = num.tryParse(_acresController.text.trim());
-    if (farmerId.isEmpty ||
-        plotId.isEmpty ||
-        serviceTypeId.isEmpty ||
-        acres == null ||
-        !acres.isFinite ||
-        acres <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            context.appText(
-              'Select a farmer, mapped plot and service, and enter positive acres.',
-            ),
-          ),
-        ),
-      );
-      return;
-    }
-    final confirmed = await showAppConfirmationDialog(
-      context,
-      title: context.appText('Register service request?'),
-      message: 'Create a request for $acres acres on ${formatDate(_date)}?',
-      confirmLabel: 'Register',
-    );
-    if (!confirmed || !mounted) return;
-    setState(() => _submitting = true);
-    await widget.repository.registerRequest(
-      farmerId: farmerId,
-      plotId: plotId,
-      serviceTypeId: serviceTypeId,
-      requestedAcres: acres,
-      preferredDate: _date,
-      preferredWindow: _window,
-      priority: _priority,
-      notes: _notesController.text.trim().isEmpty
-          ? null
-          : _notesController.text.trim(),
-    );
-    if (!mounted) return;
-    setState(() => _submitting = false);
-    final error = widget.repository.mechanizationActionError;
-    if (error != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error)));
-      return;
-    }
     Navigator.of(context).pop();
   }
 }
@@ -1585,14 +1238,6 @@ class _RejectRequestSheetState extends State<_RejectRequestSheet> {
   }
 
   Future<void> _submit() async {
-    final confirmed = await showAppConfirmationDialog(
-      context,
-      title: context.appText('Reject request?'),
-      message: 'This request will be rejected for: $_reason.',
-      confirmLabel: 'Reject',
-      danger: true,
-    );
-    if (!confirmed || !mounted) return;
     setState(() => _submitting = true);
     await widget.repository.rejectRequest(
       id: widget.request.id,

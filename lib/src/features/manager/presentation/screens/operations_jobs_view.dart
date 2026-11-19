@@ -2,6 +2,8 @@
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
@@ -14,6 +16,100 @@ import '../widgets/operations_widgets.dart';
 class OperationsJobsView extends StatelessWidget {
   const OperationsJobsView({super.key, required this.repository});
 
+  final UnionOperationsRepository repository;
+
+  @override
+  Widget build(BuildContext context) {
+    final jobs = repository.jobs;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _JobsHeader(repository: repository),
+        if (jobs.isEmpty) const _JobsEmptyState(),
+        for (final job in jobs) ...[
+          _JobCard(
+            key: ValueKey('union-job-${job.id}'),
+            repository: repository,
+            job: job,
+          ),
+          const SizedBox(height: 12),
+        ],
+      ],
+    );
+  }
+}
+
+/// Builds only the job cards near the viewport in the union navigation shell.
+class OperationsJobsScrollView extends StatelessWidget {
+  const OperationsJobsScrollView({
+    super.key,
+    required this.repository,
+    this.screenError,
+  });
+
+  final UnionOperationsRepository repository;
+  final String? screenError;
+
+  @override
+  Widget build(BuildContext context) {
+    final jobs = repository.jobs;
+    Widget content(Widget child) => Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1180),
+        child: child,
+      ),
+    );
+    return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+          sliver: SliverToBoxAdapter(
+            child: content(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (screenError != null) ...[
+                    AppMessage(
+                      message: screenError!,
+                      type: AppMessageType.warning,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  _JobsHeader(repository: repository),
+                  if (jobs.isEmpty) const _JobsEmptyState(),
+                ],
+              ),
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+          sliver: SliverList.builder(
+            itemCount: jobs.length,
+            itemBuilder: (context, index) {
+              final job = jobs[index];
+              return content(
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _JobCard(
+                    key: ValueKey('union-job-${job.id}'),
+                    repository: repository,
+                    job: job,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _JobsHeader extends StatelessWidget {
+  const _JobsHeader({required this.repository});
   final UnionOperationsRepository repository;
 
   @override
@@ -48,28 +144,23 @@ class OperationsJobsView extends StatelessWidget {
           ),
           const SizedBox(height: 12),
         ],
-        if (repository.jobs.isEmpty)
-          SizedBox(
-            height: 420,
-            child: AppEmptyState(
-              icon: Icons.route_outlined,
-              title: context.appText('No jobs available'),
-              message: context.appText(
-                'Scheduled and active jobs will appear here.',
-              ),
-            ),
-          ),
-        for (final job in repository.jobs) ...[
-          _JobCard(
-            key: ValueKey('union-job-${job.id}'),
-            repository: repository,
-            job: job,
-          ),
-          const SizedBox(height: 12),
-        ],
       ],
     );
   }
+}
+
+class _JobsEmptyState extends StatelessWidget {
+  const _JobsEmptyState();
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 420,
+    child: AppEmptyState(
+      icon: Icons.route_outlined,
+      title: context.appText('No jobs available'),
+      message: context.appText('Scheduled and active jobs will appear here.'),
+    ),
+  );
 }
 
 class OperationsJobDetailScreen extends StatelessWidget {
@@ -88,7 +179,14 @@ class OperationsJobDetailScreen extends StatelessWidget {
     builder: (context, _) {
       final job = repository.maybeJobById(jobId);
       return Scaffold(
-        appBar: AppBar(title: Text(job?.reference ?? 'Job details')),
+        appBar: AppBar(
+          title: Text(
+            operationsDisplayLabel(
+              job?.reference,
+              fallback: context.appText('Job details'),
+            ),
+          ),
+        ),
         body: RefreshIndicator(
           onRefresh: () => repository.refreshJobDetail(jobId),
           child: SingleChildScrollView(
@@ -202,8 +300,10 @@ class _JobCardState extends State<_JobCard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tractorLabel =
-        job.tractor.assetNo ?? job.tractor.label ?? job.tractor.model;
+    final tractorLabel = operationsDisplayLabel(
+      job.tractor.assetNo ?? job.tractor.label ?? job.tractor.model,
+      fallback: context.appText('Tractor'),
+    );
     return OperationsCard(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
@@ -280,12 +380,18 @@ class _JobCardState extends State<_JobCard> {
                 _JobFact(
                   icon: Icons.person_outline,
                   label: context.appText('Farmer'),
-                  value: job.farmerName,
+                  value: operationsDisplayLabel(
+                    job.farmerName,
+                    fallback: context.appText('Farmer'),
+                  ),
                 ),
                 _JobFact(
                   icon: Icons.engineering_outlined,
                   label: context.appText('Operator'),
-                  value: job.operator.name,
+                  value: operationsDisplayLabel(
+                    job.operator.name,
+                    fallback: context.appText('Operator'),
+                  ),
                 ),
                 _JobFact(
                   icon: Icons.agriculture_outlined,
@@ -295,7 +401,10 @@ class _JobCardState extends State<_JobCard> {
                 _JobFact(
                   icon: Icons.location_on_outlined,
                   label: context.appText('Plot'),
-                  value: job.plot.name,
+                  value: operationsDisplayLabel(
+                    job.plot.name,
+                    fallback: context.appText('Farm plot'),
+                  ),
                 ),
               ],
             ),
@@ -534,7 +643,7 @@ class _JobCardState extends State<_JobCard> {
       context,
       title: context.appText('Dispatch job?'),
       message:
-          'This will send the assignment to ${job.operator.name} using ${job.tractor.assetNo ?? job.tractor.label ?? job.tractor.model}.',
+          'This will send the assignment to ${operationsDisplayLabel(job.operator.name, fallback: context.appText('Operator'))} using ${operationsDisplayLabel(job.tractor.assetNo ?? job.tractor.label ?? job.tractor.model, fallback: context.appText('Tractor'))}.',
       onConfirm: () => repository.dispatchJob(job.id),
       confirmLabel: 'Dispatch',
       workingLabel: 'Dispatching...',
@@ -1166,9 +1275,7 @@ class _UnionJobTrailScreenState extends State<UnionJobTrailScreen>
         return Scaffold(
           appBar: AppBar(
             title: Text(
-              job?.reference == null
-                  ? context.appText('Tractor trail')
-                  : '${job!.reference} · ${context.appText('Tractor trail')}',
+              '${operationsDisplayLabel(job?.reference, fallback: context.appText('Job'))} · ${context.appText('Tractor trail')}',
             ),
             actions: [
               IconButton(
@@ -1215,7 +1322,22 @@ class _UnionJobTrailScreenState extends State<UnionJobTrailScreen>
                     liveTractor: liveTractor,
                   ),
                   const SizedBox(height: 12),
-                  if (trail.isEmpty && liveTractor == null)
+                  if (job.plot.boundaryPoints.length < 3) ...[
+                    AppMessage(
+                      type: AppMessageType.warning,
+                      message: job.plot.boundaryPoints.isNotEmpty
+                          ? context.appText(
+                              'Farm boundary unavailable. The map is centred on the farm location.',
+                            )
+                          : context.appText(
+                              'Farm boundary and location are unavailable. The map shows available tractor positions instead.',
+                            ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  if (trail.isEmpty &&
+                      liveTractor == null &&
+                      job.plot.boundaryPoints.isEmpty)
                     Column(
                       children: [
                         SizedBox(
@@ -1247,6 +1369,16 @@ class _UnionJobTrailScreenState extends State<UnionJobTrailScreen>
                         ),
                       ),
                     ),
+                  if (trail.isEmpty &&
+                      (liveTractor != null ||
+                          job.plot.boundaryPoints.isNotEmpty)) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      context.appText(
+                        'No tractor trail has been recorded for this job yet.',
+                      ),
+                    ),
+                  ],
                   if (trail.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     const _TrailColourGuide(),
@@ -1327,7 +1459,7 @@ class _UnionTrailSummary extends StatelessWidget {
   }
 }
 
-class _UnionTrailMap extends StatelessWidget {
+class _UnionTrailMap extends StatefulWidget {
   const _UnionTrailMap({
     required this.job,
     required this.trail,
@@ -1339,90 +1471,143 @@ class _UnionTrailMap extends StatelessWidget {
   final OperationsLiveTractorPosition? liveTractor;
 
   @override
+  State<_UnionTrailMap> createState() => _UnionTrailMapState();
+}
+
+class _UnionTrailMapState extends State<_UnionTrailMap> {
+  GoogleMapController? _controller;
+
+  @override
+  void didUpdateWidget(covariant _UnionTrailMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.job.plot.boundaryPoints.length < 3 &&
+        widget.job.plot.boundaryPoints.length >= 3) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _fit(_farmPoints());
+      });
+    }
+  }
+
+  List<LatLng> _farmPoints() => widget.job.plot.boundaryPoints
+      .map((point) => LatLng(point.latitude, point.longitude))
+      .toList(growable: false);
+
+  void _fit(List<LatLng> points) {
+    if (points.isEmpty) return;
+    _controller?.moveCamera(
+      points.length == 1
+          ? CameraUpdate.newLatLngZoom(points.first, 17)
+          : CameraUpdate.newLatLngBounds(_trailBounds(points), 48),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final boundary = job.plot.boundaryPoints
-        .map((point) => LatLng(point.latitude, point.longitude))
-        .toList(growable: false);
+    final trail = widget.trail;
+    final liveTractor = widget.liveTractor;
+    final boundary = _farmPoints();
     final path = trail
         .map((point) => LatLng(point.latitude, point.longitude))
         .toList(growable: false);
     final livePoint = liveTractor == null
         ? null
-        : LatLng(liveTractor!.latitude, liveTractor!.longitude);
-    final allPoints = [...boundary, ...path, ?livePoint];
-    final initial = allPoints.first;
-    return GoogleMap(
-      initialCameraPosition: CameraPosition(target: initial, zoom: 17),
-      onMapCreated: (controller) {
-        if (allPoints.length < 2) return;
-        controller.moveCamera(
-          CameraUpdate.newLatLngBounds(_trailBounds(allPoints), 48),
-        );
-      },
-      mapType: MapType.hybrid,
-      markers: {
-        if (path.isNotEmpty)
-          Marker(
-            markerId: const MarkerId('trail-start'),
-            position: path.first,
-            infoWindow: InfoWindow(title: context.appText('Trail start')),
-            icon: BitmapDescriptor.defaultMarkerWithHue(
-              BitmapDescriptor.hueAzure,
+        : LatLng(liveTractor.latitude, liveTractor.longitude);
+    final focusPoints = boundary.isNotEmpty
+        ? boundary
+        : path.isNotEmpty
+        ? path
+        : <LatLng>[?livePoint];
+    final initial = focusPoints.first;
+    return Stack(
+      children: [
+        GoogleMap(
+          initialCameraPosition: CameraPosition(target: initial, zoom: 17),
+          onMapCreated: (controller) {
+            _controller = controller;
+            _fit(focusPoints);
+          },
+          gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+            Factory<EagerGestureRecognizer>(() => EagerGestureRecognizer()),
+          },
+          mapType: MapType.hybrid,
+          markers: {
+            if (path.isNotEmpty)
+              Marker(
+                markerId: const MarkerId('trail-start'),
+                position: path.first,
+                infoWindow: InfoWindow(title: context.appText('Trail start')),
+                icon: BitmapDescriptor.defaultMarkerWithHue(
+                  BitmapDescriptor.hueAzure,
+                ),
+              ),
+            if (livePoint == null && path.length > 1)
+              Marker(
+                markerId: const MarkerId('trail-latest'),
+                position: path.last,
+                infoWindow: InfoWindow(
+                  title: context.appText('Latest tracker sample'),
+                ),
+                icon: BitmapDescriptor.defaultMarkerWithHue(
+                  BitmapDescriptor.hueOrange,
+                ),
+              ),
+            if (livePoint != null)
+              Marker(
+                markerId: const MarkerId('live-tractor'),
+                position: livePoint,
+                infoWindow: InfoWindow(
+                  title: context.appText('Tractor location'),
+                  snippet: _liveTractorSnippet(context, liveTractor!),
+                ),
+                icon: BitmapDescriptor.defaultMarkerWithHue(
+                  BitmapDescriptor.hueOrange,
+                ),
+              ),
+          },
+          polygons: {
+            if (boundary.length >= 3)
+              Polygon(
+                polygonId: const PolygonId('job-plot-boundary'),
+                points: boundary,
+                fillColor: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.12),
+                strokeColor: Theme.of(context).colorScheme.primary,
+                strokeWidth: 3,
+              ),
+          },
+          polylines: {
+            for (var index = 1; index < trail.length; index++)
+              Polyline(
+                polylineId: PolylineId('trail-segment-$index'),
+                points: [path[index - 1], path[index]],
+                width: 5,
+                color: switch (trail[index].inside) {
+                  true => const Color(0xFF16A34A),
+                  false => const Color(0xFFDC2626),
+                  null => const Color(0xFF64748B),
+                },
+              ),
+          },
+          mapToolbarEnabled: false,
+          myLocationButtonEnabled: false,
+          zoomControlsEnabled: true,
+          compassEnabled: true,
+        ),
+        Positioned(
+          top: 8,
+          right: 8,
+          child: Material(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(8),
+            child: TextButton.icon(
+              onPressed: () => _fit(focusPoints),
+              icon: const Icon(Icons.center_focus_strong),
+              label: Text(context.appText('Show farm and trail')),
             ),
           ),
-        if (livePoint == null && path.length > 1)
-          Marker(
-            markerId: const MarkerId('trail-latest'),
-            position: path.last,
-            infoWindow: InfoWindow(
-              title: context.appText('Latest tracker sample'),
-            ),
-            icon: BitmapDescriptor.defaultMarkerWithHue(
-              BitmapDescriptor.hueOrange,
-            ),
-          ),
-        if (livePoint != null)
-          Marker(
-            markerId: const MarkerId('live-tractor'),
-            position: livePoint,
-            infoWindow: InfoWindow(
-              title: context.appText('Tractor location'),
-              snippet: _liveTractorSnippet(context, liveTractor!),
-            ),
-            icon: BitmapDescriptor.defaultMarkerWithHue(
-              BitmapDescriptor.hueOrange,
-            ),
-          ),
-      },
-      polygons: {
-        if (boundary.length >= 3)
-          Polygon(
-            polygonId: const PolygonId('job-plot-boundary'),
-            points: boundary,
-            fillColor: Theme.of(
-              context,
-            ).colorScheme.primary.withValues(alpha: 0.12),
-            strokeColor: Theme.of(context).colorScheme.primary,
-            strokeWidth: 3,
-          ),
-      },
-      polylines: {
-        for (var index = 1; index < trail.length; index++)
-          Polyline(
-            polylineId: PolylineId('trail-segment-$index'),
-            points: [path[index - 1], path[index]],
-            width: 5,
-            color: switch (trail[index].inside) {
-              true => const Color(0xFF16A34A),
-              false => const Color(0xFFDC2626),
-              null => const Color(0xFF64748B),
-            },
-          ),
-      },
-      mapToolbarEnabled: false,
-      myLocationButtonEnabled: false,
-      zoomControlsEnabled: true,
-      compassEnabled: true,
+        ),
+      ],
     );
   }
 }
@@ -1613,7 +1798,7 @@ class _RescheduleJobScreenState extends State<RescheduleJobScreen> {
               ),
               const SizedBox(height: 18),
               Text(
-                '${job.id} - ${job.farmerName} - ${job.serviceType.label}',
+                '${operationsDisplayLabel(job.reference, fallback: context.appText('Job'))} - ${job.farmerName} - ${job.serviceType.label}',
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),

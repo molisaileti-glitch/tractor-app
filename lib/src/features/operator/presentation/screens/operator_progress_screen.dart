@@ -290,15 +290,6 @@ class _OperatorProgressScreenState extends State<OperatorProgressScreen>
   }
 
   Future<void> _pause(BuildContext context, OperatorJob job) async {
-    final confirmed = await showAppConfirmationDialog(
-      context,
-      title: context.appText('Pause work?'),
-      message: context.appText(
-        'Work time will stop. After pausing, use Report Problem to notify operations.',
-      ),
-      confirmLabel: 'Pause',
-    );
-    if (!confirmed || !context.mounted) return;
     setState(() => _busy = true);
     final phone =
         _mapKey.currentState?.currentFieldEvidence(
@@ -322,13 +313,6 @@ class _OperatorProgressScreenState extends State<OperatorProgressScreen>
   }
 
   Future<void> _resume(BuildContext context, OperatorJob job) async {
-    final confirmed = await showAppConfirmationDialog(
-      context,
-      title: context.appText('Resume work?'),
-      message: context.appText('Work time will continue for this job.'),
-      confirmLabel: 'Resume',
-    );
-    if (!confirmed || !context.mounted) return;
     setState(() => _busy = true);
     final phone =
         _mapKey.currentState?.currentFieldEvidence(

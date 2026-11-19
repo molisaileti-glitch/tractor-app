@@ -1,7 +1,6 @@
 // File purpose: Implements the union manager operations oversight screen and connects user actions to feature state.
 
 import 'package:flutter/material.dart';
-import 'package:animations/animations.dart';
 
 import '../../../../components/components.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -14,9 +13,14 @@ import '../widgets/operations_widgets.dart';
 enum _OversightTab { overrides, exceptions }
 
 class OperationsOversightView extends StatefulWidget {
-  const OperationsOversightView({super.key, required this.repository});
+  const OperationsOversightView({
+    super.key,
+    required this.repository,
+    this.screenError,
+  });
 
   final UnionOperationsRepository repository;
+  final String? screenError;
 
   @override
   State<OperationsOversightView> createState() =>
@@ -26,108 +30,144 @@ class OperationsOversightView extends StatefulWidget {
 class _OperationsOversightViewState extends State<OperationsOversightView> {
   _OversightTab _tab = _OversightTab.overrides;
   bool _refreshing = false;
+  final _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _selectTab(_OversightTab tab) {
+    if (_tab == tab) return;
+    setState(() => _tab = tab);
+    if (_scrollController.hasClients) _scrollController.jumpTo(0);
+  }
 
   @override
   Widget build(BuildContext context) {
     final repository = widget.repository;
     final strings = AppLocalizations.of(context)!;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                strings.oversight,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-            IconButton.filledTonal(
-              tooltip: '${strings.refresh} ${strings.oversight.toLowerCase()}',
-              onPressed: _refreshing ? null : _refresh,
-              icon: _refreshing
-                  ? const SizedBox.square(
-                      dimension: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.refresh),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(strings.oversightDescription),
-        if (repository.mechanizationActionError != null) ...[
-          const SizedBox(height: 14),
-          _ActionError(message: repository.mechanizationActionError!),
-        ],
-        const SizedBox(height: 18),
-        Row(
-          children: [
-            Expanded(
-              child: _OversightTabButton(
-                selected: _tab == _OversightTab.overrides,
-                icon: Icons.rule_folder_outlined,
-                label: strings.overrides,
-                count: repository.overrides.length,
-                onTap: () => setState(() => _tab = _OversightTab.overrides),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _OversightTabButton(
-                selected: _tab == _OversightTab.exceptions,
-                icon: Icons.report_problem_outlined,
-                label: strings.exceptions,
-                count: repository.exceptions.length,
-                onTap: () => setState(() => _tab = _OversightTab.exceptions),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        PageTransitionSwitcher(
-          duration: AppMotion.duration(context, AppMotion.standard),
-          transitionBuilder: (child, primaryAnimation, secondaryAnimation) =>
-              FadeThroughTransition(
-                animation: primaryAnimation,
-                secondaryAnimation: secondaryAnimation,
-                fillColor: Colors.transparent,
-                child: child,
-              ),
-          child: KeyedSubtree(
-            key: ValueKey(_tab),
-            child: switch (_tab) {
-              _OversightTab.overrides =>
-                repository.overrides.isEmpty
-                    ? _OversightEmptyState(
-                        icon: Icons.rule_folder_outlined,
-                        message: strings.noOverridesFound,
-                      )
-                    : Column(
-                        children: [
-                          for (final item in repository.overrides) ...[
-                            _OverrideCard(repository: repository, item: item),
-                            const SizedBox(height: 12),
-                          ],
-                        ],
+    final overrides = repository.overrides;
+    final exceptions = repository.exceptions;
+    final count = _tab == _OversightTab.overrides
+        ? overrides.length
+        : exceptions.length;
+    Widget centred(Widget child) => Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1180),
+        child: child,
+      ),
+    );
+    return CustomScrollView(
+      controller: _scrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+          sliver: SliverToBoxAdapter(
+            child: centred(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (widget.screenError != null) ...[
+                    AppMessage(
+                      message: widget.screenError!,
+                      type: AppMessageType.warning,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          strings.oversight,
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(fontWeight: FontWeight.w900),
+                        ),
                       ),
-              _OversightTab.exceptions =>
-                repository.exceptions.isEmpty
-                    ? _OversightEmptyState(
-                        icon: Icons.report_problem_outlined,
-                        message: strings.noExceptionsFound,
-                      )
-                    : Column(
-                        children: [
-                          for (final item in repository.exceptions) ...[
-                            _ExceptionCard(repository: repository, item: item),
-                            const SizedBox(height: 12),
-                          ],
-                        ],
+                      IconButton.filledTonal(
+                        tooltip:
+                            '${strings.refresh} ${strings.oversight.toLowerCase()}',
+                        onPressed: _refreshing ? null : _refresh,
+                        icon: _refreshing
+                            ? const SizedBox.square(
+                                dimension: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.refresh),
                       ),
-            },
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(strings.oversightDescription),
+                  if (repository.mechanizationActionError != null) ...[
+                    const SizedBox(height: 14),
+                    _ActionError(message: repository.mechanizationActionError!),
+                  ],
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _OversightTabButton(
+                          selected: _tab == _OversightTab.overrides,
+                          icon: Icons.rule_folder_outlined,
+                          label: strings.overrides,
+                          count: overrides.length,
+                          onTap: () => _selectTab(_OversightTab.overrides),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _OversightTabButton(
+                          selected: _tab == _OversightTab.exceptions,
+                          icon: Icons.report_problem_outlined,
+                          label: strings.exceptions,
+                          count: exceptions.length,
+                          onTap: () => _selectTab(_OversightTab.exceptions),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  if (count == 0)
+                    _OversightEmptyState(
+                      icon: _tab == _OversightTab.overrides
+                          ? Icons.rule_folder_outlined
+                          : Icons.report_problem_outlined,
+                      message: _tab == _OversightTab.overrides
+                          ? strings.noOverridesFound
+                          : strings.noExceptionsFound,
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+          sliver: SliverList.builder(
+            itemCount: count,
+            itemBuilder: (context, index) => centred(
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _tab == _OversightTab.overrides
+                    ? _OverrideCard(
+                        repository: repository,
+                        item: overrides[index],
+                      )
+                    : _ExceptionCard(
+                        key: ValueKey(
+                          'union-exception-${exceptions[index].id}',
+                        ),
+                        repository: repository,
+                        item: exceptions[index],
+                      ),
+              ),
+            ),
           ),
         ),
       ],
@@ -273,13 +313,23 @@ class _OverrideCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      item.jobId.isEmpty ? item.id : 'Job ${item.jobId}',
+                      operationsDisplayLabel(
+                        repository.maybeJobById(item.jobId)?.reference,
+                        fallback: context.appText('Job override'),
+                      ),
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w900,
                       ),
                     ),
                     const SizedBox(height: 3),
-                    Text(strings.requestedBy(item.requestedBy)),
+                    Text(
+                      strings.requestedBy(
+                        operationsDisplayLabel(
+                          item.requestedBy,
+                          fallback: context.appText('Operator'),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -408,7 +458,11 @@ class _OverrideCard extends StatelessWidget {
 }
 
 class _ExceptionCard extends StatelessWidget {
-  const _ExceptionCard({required this.repository, required this.item});
+  const _ExceptionCard({
+    super.key,
+    required this.repository,
+    required this.item,
+  });
 
   final UnionOperationsRepository repository;
   final MechanizationException item;
@@ -626,6 +680,7 @@ class _FactsLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final visible = values
         .whereType<String>()
+        .map((value) => operationsDisplayLabel(value, fallback: ''))
         .where((value) => value.trim().isNotEmpty)
         .toList();
     if (visible.isEmpty) return const SizedBox.shrink();
